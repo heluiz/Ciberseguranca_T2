@@ -5,6 +5,8 @@ services:
   inventario:
     build: .
     image: inventario:1.0
+    # A imagem é construída aqui: não tentar baixá-la do Docker Hub antes.
+    pull_policy: build
     container_name: inventario
     # O processo principal é um menu: precisa de entrada aberta (-i) e de
     # terminal (-t), senão input() recebe fim de entrada e o programa
@@ -14,6 +16,12 @@ services:
     # Religa se o programa cair ou o servidor reiniciar, a não ser que
     # alguém tenha parado de propósito (docker stop).
     restart: unless-stopped
+    # Endurecimento (CIS Docker Benchmark): o sistema de arquivos do
+    # container é só leitura, menos o volume de dados, e nenhum
+    # processo pode ganhar privilégio além do que já tem.
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
     # Os dados sobrevivem ao container: ficam neste volume.
     volumes:
       - inventario-dados:/app/dados
