@@ -1,0 +1,2180 @@
+[
+  {
+    "id": 1,
+    "tipo": 2,
+    "hostname": "DRPC-SRV01",
+    "custodiante": "Suporte de Informática",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Servidor de arquivos da sede regional",
+    "vulnerabilidades": [
+      {
+        "id": 1,
+        "descricao": "Pasta pública com permissão de escrita para todos os usuários",
+        "origem": 5,
+        "cvss": 7.5,
+        "situacao": 1
+      },
+      {
+        "id": 2,
+        "descricao": "Sistema operacional do servidor sem atualizações há 5 meses",
+        "origem": 2,
+        "cvss": 7.5,
+        "situacao": 2
+      },
+      {
+        "id": 3,
+        "descricao": "Backup diário configurado, mas nunca testado com restauração",
+        "origem": 1,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.15
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      },
+      {
+        "equipamento_id": 5,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "tipo": 2,
+    "hostname": "DRPC-SRV02",
+    "custodiante": "Suporte de Informática",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Controlador de domínio da rede da 1ª DRPC",
+    "vulnerabilidades": [
+      {
+        "id": 4,
+        "descricao": "Contas de servidores transferidos ainda ativas no domínio",
+        "origem": 5,
+        "cvss": 7.5,
+        "situacao": 1
+      },
+      {
+        "id": 5,
+        "descricao": "Política de senhas aceitava senhas de 6 caracteres",
+        "origem": 3,
+        "cvss": 5.3,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 1,
+        "fracao": 0.1
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.15
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      },
+      {
+        "equipamento_id": 5,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "tipo": 3,
+    "hostname": "DRPC-RT01",
+    "custodiante": "Suporte de Informática",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Roteador de borda do link principal",
+    "vulnerabilidades": [
+      {
+        "id": 6,
+        "descricao": "Firmware do roteador desatualizado",
+        "origem": 2,
+        "cvss": 7.5,
+        "situacao": 2
+      },
+      {
+        "id": 7,
+        "descricao": "Administração do roteador por Telnet, sem criptografia",
+        "origem": 4,
+        "cvss": 9.8,
+        "situacao": 3
+      },
+      {
+        "id": 8,
+        "descricao": "Rede Wi-Fi de visitantes na mesma rede das estações",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      },
+      {
+        "equipamento_id": 5,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "tipo": 7,
+    "hostname": "DRPC-SW01",
+    "custodiante": "Suporte de Informática",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Switch gerenciável do rack principal",
+    "vulnerabilidades": [
+      {
+        "id": 9,
+        "descricao": "Senha padrão de fábrica no painel de gerenciamento",
+        "origem": 3,
+        "cvss": 9.8,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 5,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "tipo": 7,
+    "hostname": "DRPC-UPS01",
+    "custodiante": "Suporte de Informática",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Nobreak do rack de servidores",
+    "vulnerabilidades": [
+      {
+        "id": 10,
+        "descricao": "Bateria do nobreak com vida útil vencida",
+        "origem": 6,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": []
+  },
+  {
+    "id": 6,
+    "tipo": 5,
+    "hostname": "SIS-REDS",
+    "custodiante": "Suporte de Informática",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Acesso ao REDS (Registro de Eventos de Defesa Social) pela rede da 1ª DRPC",
+    "vulnerabilidades": [
+      {
+        "id": 11,
+        "descricao": "Sessões do REDS abertas em estações sem bloqueio de tela",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 1
+      },
+      {
+        "id": 12,
+        "descricao": "Senha de acesso ao REDS compartilhada entre plantonistas",
+        "origem": 3,
+        "cvss": 9.8,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.3
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "tipo": 5,
+    "hostname": "SIS-PCNET",
+    "custodiante": "Suporte de Informática",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Acesso ao PCNet, sistema de gerenciamento dos atos de polícia judiciária",
+    "vulnerabilidades": [
+      {
+        "id": 13,
+        "descricao": "Contas de servidores transferidos ainda ativas no PCNet",
+        "origem": 5,
+        "cvss": 7.5,
+        "situacao": 1
+      },
+      {
+        "id": 14,
+        "descricao": "Credencial do PCNet salva no navegador das estações do cartório",
+        "origem": 3,
+        "cvss": 5.3,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.3
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "tipo": 5,
+    "hostname": "SIS-BNMP",
+    "custodiante": "Suporte de Informática",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Acesso ao BNMP (Banco Nacional de Monitoramento de Prisões) para consulta de mandados",
+    "vulnerabilidades": [
+      {
+        "id": 15,
+        "descricao": "Consulta ao BNMP feita em estação com antivírus desatualizado",
+        "origem": 2,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.3
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "tipo": 5,
+    "hostname": "SIS-SIP",
+    "custodiante": "Suporte de Informática",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Acesso ao SIP pela rede da 1ª DRPC",
+    "vulnerabilidades": [
+      {
+        "id": 16,
+        "descricao": "Perfis de acesso ao SIP sem revisão periódica",
+        "origem": 5,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.3
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "tipo": 6,
+    "hostname": "DRPC-DB01",
+    "custodiante": "Suporte de Informática",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Banco de dados do controle de patrimônio",
+    "vulnerabilidades": [
+      {
+        "id": 17,
+        "descricao": "Banco de dados sem cópia de segurança fora do prédio",
+        "origem": 6,
+        "cvss": 5.3,
+        "situacao": 4
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 1,
+        "fracao": 0.3
+      },
+      {
+        "equipamento_id": 5,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "tipo": 1,
+    "hostname": "DRPC-PC01",
+    "custodiante": "Setor Administrativo",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Estação da recepção da sede regional",
+    "vulnerabilidades": [
+      {
+        "id": 18,
+        "descricao": "Porta USB liberada para qualquer dispositivo",
+        "origem": 1,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.15
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "tipo": 7,
+    "hostname": "DRPC-PONTO01",
+    "custodiante": "Setor Administrativo",
+    "lotacao": "1ª DRPC Uberlândia",
+    "descricao": "Relógio de ponto biométrico da sede",
+    "vulnerabilidades": [
+      {
+        "id": 19,
+        "descricao": "Relógio de ponto com senha padrão de fábrica",
+        "origem": 3,
+        "cvss": 5.3,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.1
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "tipo": 1,
+    "hostname": "GABDR-PC01",
+    "custodiante": "Delegado Regional",
+    "lotacao": "Gabinete do Regional",
+    "descricao": "Estação do Delegado Regional",
+    "vulnerabilidades": [
+      {
+        "id": 20,
+        "descricao": "Bloqueio automático de tela desativado",
+        "origem": 1,
+        "cvss": 5.3,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "tipo": 1,
+    "hostname": "GABDR-NB01",
+    "custodiante": "Delegado Regional",
+    "lotacao": "Gabinete do Regional",
+    "descricao": "Notebook institucional do Delegado Regional",
+    "vulnerabilidades": [
+      {
+        "id": 21,
+        "descricao": "Disco do notebook sem criptografia",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 15,
+    "tipo": 1,
+    "hostname": "GABDR-PC02",
+    "custodiante": "Secretaria do Gabinete",
+    "lotacao": "Gabinete do Regional",
+    "descricao": "Estação da secretaria do gabinete",
+    "vulnerabilidades": [],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 16,
+    "tipo": 4,
+    "hostname": "GABDR-IMP01",
+    "custodiante": "Secretaria do Gabinete",
+    "lotacao": "Gabinete do Regional",
+    "descricao": "Impressora multifuncional do gabinete",
+    "vulnerabilidades": [
+      {
+        "id": 22,
+        "descricao": "Impressora guarda cópias das digitalizações na memória interna",
+        "origem": 1,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 17,
+    "tipo": 1,
+    "hostname": "DPLAN-PC01",
+    "custodiante": "Delegado de Plantão",
+    "lotacao": "Delegacia de Plantão",
+    "descricao": "Estação do delegado de plantão",
+    "vulnerabilidades": [
+      {
+        "id": 23,
+        "descricao": "Usuário do plantão com privilégio de administrador local",
+        "origem": 5,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 18,
+    "tipo": 1,
+    "hostname": "DPLAN-PC02",
+    "custodiante": "Escrivão de Plantão",
+    "lotacao": "Delegacia de Plantão",
+    "descricao": "Estação de lavratura de autos de prisão em flagrante",
+    "vulnerabilidades": [
+      {
+        "id": 24,
+        "descricao": "Windows 7, sem suporte do fabricante desde 2020",
+        "origem": 2,
+        "cvss": 9.8,
+        "situacao": 2
+      },
+      {
+        "id": 25,
+        "descricao": "Senha do administrador local igual em todas as estações do plantão",
+        "origem": 3,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 19,
+    "tipo": 1,
+    "hostname": "DPLAN-PC03",
+    "custodiante": "Escrivão de Plantão",
+    "lotacao": "Delegacia de Plantão",
+    "descricao": "Estação de registro de ocorrências no REDS",
+    "vulnerabilidades": [
+      {
+        "id": 26,
+        "descricao": "Navegador desatualizado usado para acessar o REDS",
+        "origem": 2,
+        "cvss": 5.3,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 20,
+    "tipo": 1,
+    "hostname": "DPLAN-PC04",
+    "custodiante": "Inspetor de Plantão",
+    "lotacao": "Delegacia de Plantão",
+    "descricao": "Estação da inspetoria de plantão",
+    "vulnerabilidades": [
+      {
+        "id": 27,
+        "descricao": "Senha anotada em papel colado no monitor",
+        "origem": 3,
+        "cvss": 7.5,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 21,
+    "tipo": 4,
+    "hostname": "DPLAN-IMP01",
+    "custodiante": "Escrivão de Plantão",
+    "lotacao": "Delegacia de Plantão",
+    "descricao": "Impressora de rede do plantão",
+    "vulnerabilidades": [
+      {
+        "id": 28,
+        "descricao": "Firmware da impressora desatualizado",
+        "origem": 2,
+        "cvss": 3.1,
+        "situacao": 1
+      },
+      {
+        "id": 29,
+        "descricao": "Painel web da impressora sem senha",
+        "origem": 3,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "tipo": 7,
+    "hostname": "DPLAN-CAM01",
+    "custodiante": "Inspetor de Plantão",
+    "lotacao": "Delegacia de Plantão",
+    "descricao": "Câmera IP da recepção do plantão",
+    "vulnerabilidades": [
+      {
+        "id": 30,
+        "descricao": "Câmera acessível pela rede de visitantes com senha padrão",
+        "origem": 3,
+        "cvss": 9.8,
+        "situacao": 1
+      },
+      {
+        "id": 31,
+        "descricao": "Gravação da câmera parada há 12 dias",
+        "origem": 6,
+        "cvss": 7.5,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 23,
+    "tipo": 7,
+    "hostname": "DPLAN-UPS01",
+    "custodiante": "Inspetor de Plantão",
+    "lotacao": "Delegacia de Plantão",
+    "descricao": "Nobreak das estações do plantão",
+    "vulnerabilidades": [
+      {
+        "id": 32,
+        "descricao": "Nobreak sem manutenção preventiva registrada",
+        "origem": 6,
+        "cvss": 3.1,
+        "situacao": 4
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 24,
+    "tipo": 1,
+    "hostname": "GAOP-PC01",
+    "custodiante": "Chefia do GAOP",
+    "lotacao": "GAOP",
+    "descricao": "Estação de planejamento de operações e consulta a mandados",
+    "vulnerabilidades": [
+      {
+        "id": 33,
+        "descricao": "Antivírus com assinaturas vencidas",
+        "origem": 2,
+        "cvss": 7.5,
+        "situacao": 1
+      },
+      {
+        "id": 34,
+        "descricao": "Sessão do BNMP aberta sem bloqueio de tela",
+        "origem": 1,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 27,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 25,
+    "tipo": 1,
+    "hostname": "GAOP-NB01",
+    "custodiante": "Equipe do GAOP",
+    "lotacao": "GAOP",
+    "descricao": "Notebook de apoio às operações de campo",
+    "vulnerabilidades": [
+      {
+        "id": 35,
+        "descricao": "Notebook de operações sem criptografia de disco",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 27,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 26,
+    "tipo": 4,
+    "hostname": "GAOP-IMP01",
+    "custodiante": "Equipe do GAOP",
+    "lotacao": "GAOP",
+    "descricao": "Impressora de rede do GAOP",
+    "vulnerabilidades": [
+      {
+        "id": 36,
+        "descricao": "Impressora compartilhada com toda a rede, sem restrição",
+        "origem": 5,
+        "cvss": 5.3,
+        "situacao": 4
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      },
+      {
+        "equipamento_id": 27,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 27,
+    "tipo": 3,
+    "hostname": "GAOP-RT01",
+    "custodiante": "Chefia do GAOP",
+    "lotacao": "GAOP",
+    "descricao": "Roteador 4G de apoio às operações",
+    "vulnerabilidades": [
+      {
+        "id": 37,
+        "descricao": "Gerenciamento remoto do roteador habilitado para a internet",
+        "origem": 4,
+        "cvss": 9.8,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.3
+      }
+    ]
+  },
+  {
+    "id": 28,
+    "tipo": 1,
+    "hostname": "PERICIA-PC01",
+    "custodiante": "Perito Criminal",
+    "lotacao": "Perícia",
+    "descricao": "Estação de elaboração de laudos",
+    "vulnerabilidades": [
+      {
+        "id": 38,
+        "descricao": "Programa de edição de imagens sem atualizações de segurança",
+        "origem": 2,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 31,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 29,
+    "tipo": 1,
+    "hostname": "PERICIA-NB01",
+    "custodiante": "Perito Criminal",
+    "lotacao": "Perícia",
+    "descricao": "Notebook de campo da perícia",
+    "vulnerabilidades": [
+      {
+        "id": 39,
+        "descricao": "Notebook de campo sem criptografia de disco",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 30,
+    "tipo": 2,
+    "hostname": "PERICIA-SRV01",
+    "custodiante": "Chefia da Perícia",
+    "lotacao": "Perícia",
+    "descricao": "Servidor de imagens e fotografias periciais",
+    "vulnerabilidades": [
+      {
+        "id": 40,
+        "descricao": "Compartilhamento SMBv1 habilitado no servidor",
+        "origem": 4,
+        "cvss": 7.5,
+        "situacao": 2
+      },
+      {
+        "id": 41,
+        "descricao": "Disco acima de 95% de ocupação sem alerta configurado",
+        "origem": 1,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 31,
+    "tipo": 6,
+    "hostname": "PERICIA-DB01",
+    "custodiante": "Chefia da Perícia",
+    "lotacao": "Perícia",
+    "descricao": "Banco de dados de laudos e requisições",
+    "vulnerabilidades": [
+      {
+        "id": 42,
+        "descricao": "Registro de acessos (log) desativado no banco de dados",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 1,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 30,
+        "fracao": 0.3
+      }
+    ]
+  },
+  {
+    "id": 32,
+    "tipo": 1,
+    "hostname": "INSP-PC01",
+    "custodiante": "Chefe da Inspetoria",
+    "lotacao": "Inspetoria",
+    "descricao": "Estação da inspetoria regional",
+    "vulnerabilidades": [
+      {
+        "id": 43,
+        "descricao": "Usuário comum com privilégio de administrador",
+        "origem": 5,
+        "cvss": 5.3,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 33,
+    "tipo": 1,
+    "hostname": "INSP-NB01",
+    "custodiante": "Chefe da Inspetoria",
+    "lotacao": "Inspetoria",
+    "descricao": "Notebook de apoio às operações",
+    "vulnerabilidades": [],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 34,
+    "tipo": 1,
+    "hostname": "CART-PC01",
+    "custodiante": "Chefe de Cartório",
+    "lotacao": "Chefia de Cartório",
+    "descricao": "Estação da chefia de cartório",
+    "vulnerabilidades": [
+      {
+        "id": 44,
+        "descricao": "Pasta de inquéritos digitalizados compartilhada sem restrição",
+        "origem": 5,
+        "cvss": 9.8,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 36,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 35,
+    "tipo": 4,
+    "hostname": "CART-IMP01",
+    "custodiante": "Chefe de Cartório",
+    "lotacao": "Chefia de Cartório",
+    "descricao": "Multifuncional de digitalização de inquéritos",
+    "vulnerabilidades": [
+      {
+        "id": 45,
+        "descricao": "Digitalizações enviadas por e-mail sem criptografia",
+        "origem": 4,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 36,
+    "tipo": 6,
+    "hostname": "CART-DB01",
+    "custodiante": "Chefe de Cartório",
+    "lotacao": "Chefia de Cartório",
+    "descricao": "Banco de dados de bens apreendidos",
+    "vulnerabilidades": [
+      {
+        "id": 46,
+        "descricao": "Banco de bens apreendidos com senha padrão do fabricante",
+        "origem": 3,
+        "cvss": 9.8,
+        "situacao": 3
+      },
+      {
+        "id": 47,
+        "descricao": "Sem rotina de cópia de segurança do banco de bens apreendidos",
+        "origem": 6,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 1,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 37,
+    "tipo": 1,
+    "hostname": "DP1-PC01",
+    "custodiante": "Cartório da 1ª DP",
+    "lotacao": "1ª DP",
+    "descricao": "Estação do cartório da 1ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 48,
+        "descricao": "Sistema operacional sem atualizações há 8 meses",
+        "origem": 2,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      },
+      {
+        "equipamento_id": 39,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 38,
+    "tipo": 1,
+    "hostname": "DP1-PC02",
+    "custodiante": "Inspetoria da 1ª DP",
+    "lotacao": "1ª DP",
+    "descricao": "Estação da inspetoria da 1ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 49,
+        "descricao": "Bloqueio automático de tela desativado",
+        "origem": 1,
+        "cvss": 3.1,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      },
+      {
+        "equipamento_id": 39,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 39,
+    "tipo": 3,
+    "hostname": "DP1-RT01",
+    "custodiante": "Delegado da 1ª DP",
+    "lotacao": "1ª DP",
+    "descricao": "Roteador do link da 1ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 50,
+        "descricao": "Senha do Wi-Fi nunca trocada desde a instalação",
+        "origem": 3,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.3
+      }
+    ]
+  },
+  {
+    "id": 40,
+    "tipo": 1,
+    "hostname": "DP2-PC01",
+    "custodiante": "Cartório da 2ª DP",
+    "lotacao": "2ª DP",
+    "descricao": "Estação do cartório da 2ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 51,
+        "descricao": "Antivírus desativado pelo usuário",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 41,
+    "tipo": 1,
+    "hostname": "DP2-PC02",
+    "custodiante": "Inspetoria da 2ª DP",
+    "lotacao": "2ª DP",
+    "descricao": "Estação da inspetoria da 2ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 52,
+        "descricao": "Porta USB liberada para qualquer dispositivo",
+        "origem": 1,
+        "cvss": 3.1,
+        "situacao": 4
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 42,
+    "tipo": 4,
+    "hostname": "DP2-IMP01",
+    "custodiante": "Cartório da 2ª DP",
+    "lotacao": "2ª DP",
+    "descricao": "Impressora de rede da 2ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 28,
+        "descricao": "Firmware da impressora desatualizado",
+        "origem": 2,
+        "cvss": 3.1,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 43,
+    "tipo": 1,
+    "hostname": "DP3-PC01",
+    "custodiante": "Cartório da 3ª DP",
+    "lotacao": "3ª DP",
+    "descricao": "Estação do cartório da 3ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 53,
+        "descricao": "Credencial do PCNet salva no navegador",
+        "origem": 3,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      },
+      {
+        "equipamento_id": 44,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 44,
+    "tipo": 3,
+    "hostname": "DP3-RT01",
+    "custodiante": "Delegado da 3ª DP",
+    "lotacao": "3ª DP",
+    "descricao": "Roteador do link da 3ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 6,
+        "descricao": "Firmware do roteador desatualizado",
+        "origem": 2,
+        "cvss": 7.5,
+        "situacao": 1
+      },
+      {
+        "id": 54,
+        "descricao": "Administração do roteador por HTTP, sem criptografia",
+        "origem": 4,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.3
+      }
+    ]
+  },
+  {
+    "id": 45,
+    "tipo": 1,
+    "hostname": "DP4-PC01",
+    "custodiante": "Cartório da 4ª DP",
+    "lotacao": "4ª DP",
+    "descricao": "Estação do cartório da 4ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 24,
+        "descricao": "Windows 7, sem suporte do fabricante desde 2020",
+        "origem": 2,
+        "cvss": 9.8,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 46,
+    "tipo": 1,
+    "hostname": "DP4-PC02",
+    "custodiante": "Inspetoria da 4ª DP",
+    "lotacao": "4ª DP",
+    "descricao": "Estação da inspetoria da 4ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 55,
+        "descricao": "Senha compartilhada entre os investigadores",
+        "origem": 3,
+        "cvss": 7.5,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 47,
+    "tipo": 1,
+    "hostname": "DP5-PC01",
+    "custodiante": "Cartório da 5ª DP",
+    "lotacao": "5ª DP",
+    "descricao": "Estação do cartório da 5ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 56,
+        "descricao": "Estação sem etiqueta patrimonial",
+        "origem": 6,
+        "cvss": 3.1,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 48,
+    "tipo": 4,
+    "hostname": "DP5-IMP01",
+    "custodiante": "Cartório da 5ª DP",
+    "lotacao": "5ª DP",
+    "descricao": "Impressora de rede da 5ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 57,
+        "descricao": "Painel web da impressora sem senha",
+        "origem": 3,
+        "cvss": 3.1,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 49,
+    "tipo": 1,
+    "hostname": "DP6-PC01",
+    "custodiante": "Cartório da 6ª DP",
+    "lotacao": "6ª DP",
+    "descricao": "Estação do cartório da 6ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 43,
+        "descricao": "Usuário comum com privilégio de administrador",
+        "origem": 5,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 50,
+    "tipo": 1,
+    "hostname": "DP6-PC02",
+    "custodiante": "Inspetoria da 6ª DP",
+    "lotacao": "6ª DP",
+    "descricao": "Estação da inspetoria da 6ª DP",
+    "vulnerabilidades": [],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 51,
+    "tipo": 1,
+    "hostname": "DP7-PC01",
+    "custodiante": "Cartório da 7ª DP",
+    "lotacao": "7ª DP",
+    "descricao": "Estação do cartório da 7ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 58,
+        "descricao": "Antivírus com assinaturas vencidas",
+        "origem": 2,
+        "cvss": 5.3,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      },
+      {
+        "equipamento_id": 52,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 52,
+    "tipo": 3,
+    "hostname": "DP7-RT01",
+    "custodiante": "Delegado da 7ª DP",
+    "lotacao": "7ª DP",
+    "descricao": "Roteador do link da 7ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 59,
+        "descricao": "Senha padrão de fábrica no roteador",
+        "origem": 3,
+        "cvss": 9.8,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.3
+      }
+    ]
+  },
+  {
+    "id": 53,
+    "tipo": 1,
+    "hostname": "DP8-PC01",
+    "custodiante": "Cartório da 8ª DP",
+    "lotacao": "8ª DP",
+    "descricao": "Estação do cartório da 8ª DP",
+    "vulnerabilidades": [
+      {
+        "id": 60,
+        "descricao": "Sistema operacional sem atualizações há 4 meses",
+        "origem": 2,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 54,
+    "tipo": 1,
+    "hostname": "DP8-PC02",
+    "custodiante": "Inspetoria da 8ª DP",
+    "lotacao": "8ª DP",
+    "descricao": "Estação da inspetoria da 8ª DP",
+    "vulnerabilidades": [],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 6,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 55,
+    "tipo": 1,
+    "hostname": "DAJEC-PC01",
+    "custodiante": "Cartório da DAJEC",
+    "lotacao": "DAJEC",
+    "descricao": "Estação de lavratura de termos circunstanciados",
+    "vulnerabilidades": [
+      {
+        "id": 20,
+        "descricao": "Bloqueio automático de tela desativado",
+        "origem": 1,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 56,
+    "tipo": 1,
+    "hostname": "DAJEC-PC02",
+    "custodiante": "Inspetoria da DAJEC",
+    "lotacao": "DAJEC",
+    "descricao": "Estação da inspetoria da DAJEC",
+    "vulnerabilidades": [],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 57,
+    "tipo": 1,
+    "hostname": "DEAM-PC01",
+    "custodiante": "Delegada da DEAM",
+    "lotacao": "DEAM",
+    "descricao": "Estação da delegada titular da DEAM",
+    "vulnerabilidades": [
+      {
+        "id": 61,
+        "descricao": "Disco sem criptografia em estação com dados de vítimas",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 58,
+    "tipo": 1,
+    "hostname": "DEAM-PC02",
+    "custodiante": "Cartório da DEAM",
+    "lotacao": "DEAM",
+    "descricao": "Estação de registro de medidas protetivas",
+    "vulnerabilidades": [
+      {
+        "id": 62,
+        "descricao": "Pasta de medidas protetivas acessível por outros setores",
+        "origem": 5,
+        "cvss": 9.8,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 59,
+    "tipo": 4,
+    "hostname": "DEAM-IMP01",
+    "custodiante": "Cartório da DEAM",
+    "lotacao": "DEAM",
+    "descricao": "Impressora de rede da DEAM",
+    "vulnerabilidades": [
+      {
+        "id": 63,
+        "descricao": "Impressão sem liberação por senha em área de atendimento",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      }
+    ]
+  },
+  {
+    "id": 60,
+    "tipo": 1,
+    "hostname": "DRURAL-PC01",
+    "custodiante": "Cartório Rural",
+    "lotacao": "Delegacia Rural",
+    "descricao": "Estação do cartório da Delegacia Rural",
+    "vulnerabilidades": [
+      {
+        "id": 64,
+        "descricao": "Sistema operacional sem atualizações há 6 meses",
+        "origem": 2,
+        "cvss": 5.3,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 62,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 61,
+    "tipo": 1,
+    "hostname": "DRURAL-NB01",
+    "custodiante": "Inspetoria Rural",
+    "lotacao": "Delegacia Rural",
+    "descricao": "Notebook de apoio às diligências em área rural",
+    "vulnerabilidades": [
+      {
+        "id": 65,
+        "descricao": "Notebook usado em redes públicas sem VPN",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 62,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 62,
+    "tipo": 3,
+    "hostname": "DRURAL-RT01",
+    "custodiante": "Inspetoria Rural",
+    "lotacao": "Delegacia Rural",
+    "descricao": "Roteador 4G da base rural",
+    "vulnerabilidades": [
+      {
+        "id": 66,
+        "descricao": "Senha padrão de fábrica no roteador 4G",
+        "origem": 3,
+        "cvss": 7.5,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.3
+      }
+    ]
+  },
+  {
+    "id": 63,
+    "tipo": 1,
+    "hostname": "INTEL-PC01",
+    "custodiante": "Analista de Inteligência",
+    "lotacao": "Inteligência",
+    "descricao": "Estação de análise criminal",
+    "vulnerabilidades": [
+      {
+        "id": 67,
+        "descricao": "Gravação em mídia removível liberada",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 65,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 66,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 64,
+    "tipo": 1,
+    "hostname": "INTEL-NB01",
+    "custodiante": "Analista de Inteligência",
+    "lotacao": "Inteligência",
+    "descricao": "Notebook de apoio às operações de inteligência",
+    "vulnerabilidades": [
+      {
+        "id": 68,
+        "descricao": "Notebook sem controle de saída e devolução",
+        "origem": 6,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 65,
+    "tipo": 2,
+    "hostname": "INTEL-SRV01",
+    "custodiante": "Chefia da Inteligência",
+    "lotacao": "Inteligência",
+    "descricao": "Servidor de análise de vínculos",
+    "vulnerabilidades": [
+      {
+        "id": 69,
+        "descricao": "Acesso remoto (RDP) aberto para toda a rede interna",
+        "origem": 4,
+        "cvss": 9.8,
+        "situacao": 2
+      },
+      {
+        "id": 70,
+        "descricao": "Contas de estagiários com acesso às pastas da Inteligência",
+        "origem": 5,
+        "cvss": 9.8,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 66,
+    "tipo": 6,
+    "hostname": "INTEL-DB01",
+    "custodiante": "Chefia da Inteligência",
+    "lotacao": "Inteligência",
+    "descricao": "Banco de dados de relatórios de inteligência",
+    "vulnerabilidades": [
+      {
+        "id": 71,
+        "descricao": "Dados do banco sem criptografia em repouso",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 1,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 67,
+    "tipo": 1,
+    "hostname": "CORREG-PC01",
+    "custodiante": "Delegado Corregedor",
+    "lotacao": "Corregedoria",
+    "descricao": "Estação do delegado corregedor",
+    "vulnerabilidades": [
+      {
+        "id": 20,
+        "descricao": "Bloqueio automático de tela desativado",
+        "origem": 1,
+        "cvss": 5.3,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      },
+      {
+        "equipamento_id": 68,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 68,
+    "tipo": 6,
+    "hostname": "CORREG-DB01",
+    "custodiante": "Cartório da Corregedoria",
+    "lotacao": "Corregedoria",
+    "descricao": "Banco de dados de procedimentos disciplinares",
+    "vulnerabilidades": [
+      {
+        "id": 42,
+        "descricao": "Registro de acessos (log) desativado no banco de dados",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 2
+      },
+      {
+        "id": 72,
+        "descricao": "Perfis de acesso sem revisão periódica",
+        "origem": 5,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 1,
+        "fracao": 0.2
+      }
+    ]
+  },
+  {
+    "id": 69,
+    "tipo": 1,
+    "hostname": "HOMIC-PC01",
+    "custodiante": "Delegado de Homicídios",
+    "lotacao": "Homicídios",
+    "descricao": "Estação do delegado de homicídios",
+    "vulnerabilidades": [
+      {
+        "id": 73,
+        "descricao": "Sistema operacional sem atualizações há 3 meses",
+        "origem": 2,
+        "cvss": 5.3,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 70,
+    "tipo": 1,
+    "hostname": "HOMIC-PC02",
+    "custodiante": "Cartório de Homicídios",
+    "lotacao": "Homicídios",
+    "descricao": "Estação do cartório de homicídios",
+    "vulnerabilidades": [
+      {
+        "id": 74,
+        "descricao": "Senha do administrador local igual em todas as estações",
+        "origem": 3,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 71,
+    "tipo": 1,
+    "hostname": "HOMIC-NB01",
+    "custodiante": "Inspetoria de Homicídios",
+    "lotacao": "Homicídios",
+    "descricao": "Notebook de apoio aos locais de crime",
+    "vulnerabilidades": [
+      {
+        "id": 75,
+        "descricao": "Notebook de local de crime sem criptografia de disco",
+        "origem": 1,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 72,
+    "tipo": 1,
+    "hostname": "FRAUD-PC01",
+    "custodiante": "Delegado de Fraudes",
+    "lotacao": "Fraudes e Defraudações",
+    "descricao": "Estação de análise de documentos e extratos",
+    "vulnerabilidades": [
+      {
+        "id": 76,
+        "descricao": "E-mail sem filtro de anexos maliciosos",
+        "origem": 2,
+        "cvss": 7.5,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 73,
+    "tipo": 1,
+    "hostname": "FRAUD-PC02",
+    "custodiante": "Cartório de Fraudes",
+    "lotacao": "Fraudes e Defraudações",
+    "descricao": "Estação do cartório de fraudes",
+    "vulnerabilidades": [
+      {
+        "id": 18,
+        "descricao": "Porta USB liberada para qualquer dispositivo",
+        "origem": 1,
+        "cvss": 5.3,
+        "situacao": 2
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 74,
+    "tipo": 1,
+    "hostname": "DEIFRVA-PC01",
+    "custodiante": "Delegado da DEIFRVA",
+    "lotacao": "DEIFRVA",
+    "descricao": "Estação de consulta de veículos e chassis",
+    "vulnerabilidades": [
+      {
+        "id": 77,
+        "descricao": "Navegador desatualizado usado para consultas de veículos",
+        "origem": 2,
+        "cvss": 5.3,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 75,
+    "tipo": 1,
+    "hostname": "DEIFRVA-PC02",
+    "custodiante": "Cartório da DEIFRVA",
+    "lotacao": "DEIFRVA",
+    "descricao": "Estação do cartório da DEIFRVA",
+    "vulnerabilidades": [
+      {
+        "id": 43,
+        "descricao": "Usuário comum com privilégio de administrador",
+        "origem": 5,
+        "cvss": 5.3,
+        "situacao": 3
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.25
+      }
+    ]
+  },
+  {
+    "id": 76,
+    "tipo": 7,
+    "hostname": "DEIFRVA-CAM01",
+    "custodiante": "Inspetoria da DEIFRVA",
+    "lotacao": "DEIFRVA",
+    "descricao": "Câmera IP do pátio de veículos apreendidos",
+    "vulnerabilidades": [
+      {
+        "id": 78,
+        "descricao": "Câmera do pátio com senha padrão de fábrica",
+        "origem": 3,
+        "cvss": 7.5,
+        "situacao": 1
+      },
+      {
+        "id": 79,
+        "descricao": "Firmware da câmera sem atualização desde a instalação",
+        "origem": 2,
+        "cvss": 5.3,
+        "situacao": 4
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.2
+      },
+      {
+        "equipamento_id": 4,
+        "fracao": 0.1
+      }
+    ]
+  }
+]

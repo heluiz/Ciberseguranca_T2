@@ -1,0 +1,14 @@
+# Arquivos gerados pelo Python ao importar modulos
+__pycache__/
+*.pyc
+
+# Base de dados gerada pelo proprio programa (pasta dados/) e a copia de
+# seguranca feita ao converter uma base do Trabalho 1.
+# Repositorio guarda codigo, nao dado gerado: cada maquina cria a sua base
+# ao rodar o programa pela primeira vez. Os exemplos ficam em
+# dados_exemplo/.
+dados/
+*.t1.bak
+
+# Arquivo temporario da gravacao atomica em armazenamento.py
+*.tmp

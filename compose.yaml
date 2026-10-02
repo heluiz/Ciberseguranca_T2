@@ -1,0 +1,22 @@
+# Alternativa ao "docker run": docker compose up -d --build
+# Depois, para usar o menu: docker attach inventario
+# (para sair sem parar o programa: Ctrl+P e depois Ctrl+Q)
+services:
+  inventario:
+    build: .
+    image: inventario:1.0
+    container_name: inventario
+    # O processo principal é um menu: precisa de entrada aberta (-i) e de
+    # terminal (-t), senão input() recebe fim de entrada e o programa
+    # termina na hora.
+    stdin_open: true
+    tty: true
+    # Religa se o programa cair ou o servidor reiniciar, a não ser que
+    # alguém tenha parado de propósito (docker stop).
+    restart: unless-stopped
+    # Os dados sobrevivem ao container: ficam neste volume.
+    volumes:
+      - inventario-dados:/app/dados
+
+volumes:
+  inventario-dados:

@@ -1,0 +1,5 @@
+# Dependências de execução do programa. O Dockerfile as instala.
+# NumPy: álgebra linear do modelo de risco (risco.py). As funções usadas
+# (zeros, eye, array, linalg.solve, linalg.det, linalg.cond, linalg.norm)
+# existem sem mudança da versão 1.26 à 2.x.
+numpy>=1.26,<3

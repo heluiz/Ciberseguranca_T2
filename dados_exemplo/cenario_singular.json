@@ -1,0 +1,67 @@
+[
+  {
+    "id": 1,
+    "tipo": 7,
+    "hostname": "SING-01",
+    "custodiante": "Fulano de Tal",
+    "lotacao": "Sala técnica",
+    "descricao": "Equipamento 1 do cenário singular",
+    "vulnerabilidades": [
+      {
+        "id": 1,
+        "descricao": "Vulnerabilidade do cenário singular",
+        "origem": 6,
+        "cvss": 5.0,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.5
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.5
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "tipo": 7,
+    "hostname": "SING-02",
+    "custodiante": "Fulano de Tal",
+    "lotacao": "Sala técnica",
+    "descricao": "Equipamento 2 do cenário singular",
+    "vulnerabilidades": [],
+    "dependencias": [
+      {
+        "equipamento_id": 1,
+        "fracao": 0.5
+      },
+      {
+        "equipamento_id": 3,
+        "fracao": 0.5
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "tipo": 7,
+    "hostname": "SING-03",
+    "custodiante": "Fulano de Tal",
+    "lotacao": "Sala técnica",
+    "descricao": "Equipamento 3 do cenário singular",
+    "vulnerabilidades": [],
+    "dependencias": [
+      {
+        "equipamento_id": 1,
+        "fracao": 0.5
+      },
+      {
+        "equipamento_id": 2,
+        "fracao": 0.5
+      }
+    ]
+  }
+]

@@ -1,0 +1,12 @@
+# Fora da imagem: controle de versão, lixo do Python, dados locais
+# (os dados do container ficam no volume) e arquivos só do Docker.
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.tmp
+dados/
+Dockerfile
+compose.yaml
+.dockerignore
+README.md

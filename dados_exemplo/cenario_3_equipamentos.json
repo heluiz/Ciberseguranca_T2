@@ -1,0 +1,78 @@
+[
+  {
+    "id": 1,
+    "tipo": 1,
+    "hostname": "ESTACAO-01",
+    "custodiante": "Fulano de Tal",
+    "lotacao": "Cartório",
+    "descricao": "Estação do cenário de validação",
+    "vulnerabilidades": [
+      {
+        "id": 1,
+        "descricao": "Vulnerabilidade V1 do cenário",
+        "origem": 6,
+        "cvss": 4.0,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.5
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "tipo": 2,
+    "hostname": "SERVIDOR-01",
+    "custodiante": "Fulano de Tal",
+    "lotacao": "Sala técnica",
+    "descricao": "Servidor do cenário de validação",
+    "vulnerabilidades": [
+      {
+        "id": 1,
+        "descricao": "Vulnerabilidade V1 do cenário",
+        "origem": 6,
+        "cvss": 4.0,
+        "situacao": 1
+      },
+      {
+        "id": 2,
+        "descricao": "Vulnerabilidade V2 do cenário",
+        "origem": 6,
+        "cvss": 6.0,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 3,
+        "fracao": 0.5
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "tipo": 6,
+    "hostname": "BANCO-01",
+    "custodiante": "Fulano de Tal",
+    "lotacao": "Sala técnica",
+    "descricao": "Banco de dados do cenário de validação",
+    "vulnerabilidades": [
+      {
+        "id": 2,
+        "descricao": "Vulnerabilidade V2 do cenário",
+        "origem": 6,
+        "cvss": 6.0,
+        "situacao": 1
+      }
+    ],
+    "dependencias": [
+      {
+        "equipamento_id": 2,
+        "fracao": 0.25
+      }
+    ]
+  }
+]
