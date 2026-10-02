@@ -21,6 +21,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+import cores
 import main
 from armazenamento import ArquivoInventario, BaseInvalida
 from classificacoes import TipoEquipamento
@@ -29,8 +30,11 @@ from risco import ModeloRisco, SistemaSingular
 
 PASTA = os.path.dirname(os.path.abspath(__file__))
 
-# Sem cores nem animações: a saída capturada vira texto puro.
+# Sem cores: a saída capturada vira texto puro, mesmo rodando num
+# terminal. NO_COLOR vale para os autotestes, que rodam em outro processo;
+# desligar() vale para este, que já importou cores.py.
 os.environ["NO_COLOR"] = "1"
+cores.desligar()
 
 
 class EntradaAcabou(EOFError):
@@ -313,6 +317,58 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("M é 3 x 2", saida)
         self.assertIn("V1=4,0  V2=6,0", saida)
         self.assertRegex(saida, r"E3\s+0\s+0,25\s+0")
+        # M v, a diagonal de F e b = F (M v), conferidos à mão no README.
+        self.assertRegex(saida, r"M v .*E1=4,0  E2=10,0  E3=6,0")
+        self.assertRegex(saida, r"F .*E1=1,0  E2=1,5  E3=2,0")
+        self.assertRegex(saida, r"b = F \(M v\).*E1=4,00  E2=15,00  E3=12,00")
+        self.assertIn("det(I - A) = 0,875", saida)
+
+    def test_matrizes_de_base_grande_mostram_so_a_verificacao(self):
+        """Com 76 equipamentos a opção 15 não desenha M, mas verifica I - A."""
+        os.makedirs(os.path.dirname(self.caminho))
+        with open(os.path.join(PASTA, "dados_exemplo",
+                               "inventario_exemplo.json"),
+                  encoding="utf-8") as origem:
+            conteudo = origem.read()
+        with open(self.caminho, "w", encoding="utf-8") as destino:
+            destino.write(conteudo)
+        saida = self.rodar(["15", "0"])
+        self.assertIn("Grande demais para mostrar as matrizes", saida)
+        self.assertIn("estritamente diagonal dominante", saida)
+        self.assertIn("det(I - A) = 0,98", saida)
+
+    # --- consultas do T1 pelo menu --------------------------------------
+
+    def test_listar_e_buscar_por_id_e_por_hostname(self):
+        """Opções 2 e 3: lista tudo e acha por ID e por parte do hostname."""
+        saida = self.rodar(self.CENARIO + [
+            "2",
+            "3", "1", "2",            # busca pelo ID 2
+            "3", "2", "banco",        # busca por parte do hostname
+            "3", "1", "99",           # ID que não existe
+            "0"])
+        self.assertIn("Total: 3 equipamento(s).", saida)
+        self.assertEqual(saida.count("Hostname ...... SERVIDOR-01"), 1)
+        self.assertEqual(saida.count("Hostname ...... BANCO-01"), 1)
+        self.assertIn("Nenhum equipamento encontrado.", saida)
+
+    def test_pendentes_da_mais_grave_para_a_menos_grave(self):
+        """Opção 10: as 4 ocorrências abertas, a nota 6,0 antes da 4,0."""
+        saida = self.rodar(self.CENARIO + ["10", "0"])
+        self.assertIn("4 aberta(s) ou em tratamento", saida)
+        self.assertLess(saida.index("6,0 [2]"), saida.index("4,0 [1]"))
+
+    def test_ver_e_remover_dependencia(self):
+        """Opção 12: remove a dependência de E1 em E2, com confirmação."""
+        saida = self.rodar(self.CENARIO + ["12", "1", "2", "s", "0"])
+        self.assertIn("Dependência removida.", saida)
+        self.assertEqual(self.lido()[0]["dependencias"], [])
+
+    def test_verificacao_mostra_determinante_e_condicao(self):
+        """A opção 13 mostra det(I - A) e o número de condição, só para ver."""
+        saida = self.rodar(self.CENARIO + ["13", "0"])
+        self.assertIn("det(I - A) = 0,875 · número de condição de I - A = "
+                      "2,56", saida)
 
     # --- base do Trabalho 1 e base ruim ---------------------------------
 
@@ -451,7 +507,7 @@ class TesteDoPrograma(unittest.TestCase):
             json.dump(dados, f)
 
         saida = self.rodar(["13", "0"])
-        self.assertIn("raio espectral de A é 1,2728", saida)
+        self.assertIn("risco efetivo menor que o próprio", saida)
         self.assertIn("Nenhum risco efetivo foi calculado", saida)
         self.assertNotIn("EFETIVO", saida)
 
@@ -533,6 +589,29 @@ class TesteDoModelo(unittest.TestCase):
             inventario = Inventario.de_dict(
                 json.loads(json.dumps(inventario.para_dict())))
             self.assertEqual(inventario.para_dict(), antes)
+
+    def test_sem_fator_de_exposicao_b_e_m_v(self):
+        """Com USAR_FATOR_DE_EXPOSICAO = False, b = M v do enunciado."""
+        with mock.patch("risco.USAR_FATOR_DE_EXPOSICAO", False):
+            modelo = ModeloRisco(self.carregar("cenario_3_equipamentos.json"))
+        itens = modelo.relatorio()
+        self.assertEqual([round(i.proprio, 9) for i in itens],
+                         [4.0, 10.0, 6.0])
+        # Resolvido à mão no README: 80/7, 104/7 e 68/7.
+        for item, exato in zip(itens, (80 / 7, 104 / 7, 68 / 7)):
+            self.assertAlmostEqual(item.efetivo, exato, places=9)
+
+    def test_soma_com_erro_de_ponto_flutuante_e_recusada(self):
+        """0,7 + 0,2 + 0,1 dá 0,9999999999999999, mas é recusado."""
+        inventario = Inventario()
+        ids = [inventario.cadastrar_equipamento(
+            TipoEquipamento.OUTRO, f"EQ-0{k}", "A", "B", "C").id
+            for k in range(4)]
+        inventario.registrar_dependencia(ids[0], ids[1], 0.7)
+        inventario.registrar_dependencia(ids[0], ids[2], 0.2)
+        self.assertLess(0.7 + 0.2 + 0.1, 1)        # o float engana...
+        with self.assertRaises(ValueError):         # ...a regra, não
+            inventario.registrar_dependencia(ids[0], ids[3], 0.1)
 
     def test_todo_tipo_tem_classe_e_fator(self):
         """Cada TipoEquipamento tem uma subclasse com fator positivo."""

@@ -48,6 +48,10 @@ LIMITE_SOMA_DEPENDENCIAS = 1.0
 # Casas decimais guardadas nas frações: 0,3333 vale; 0,33333333 não.
 CASAS_DA_FRACAO = 4
 
+# A menor fração aceita (0,0001). Se a soma de uma linha já deixa só
+# isso de sobra, não cabe mais nenhuma dependência nela.
+MENOR_FRACAO = 10 ** -CASAS_DA_FRACAO
+
 
 def validar_fracao(valor):
     """Devolve a fração arredondada, ou levanta ValueError.
@@ -62,7 +66,7 @@ def validar_fracao(valor):
     if not 0.0 < fracao < 1.0:
         raise ValueError(
             "A fração deve ser maior que 0 e menor que 1 "
-            f"(mínimo {formatacao.fracao_br(10 ** -CASAS_DA_FRACAO)})")
+            f"(mínimo {formatacao.fracao_br(MENOR_FRACAO)})")
     return fracao
 
 
@@ -253,11 +257,11 @@ class Equipamento(ABC):
         # Sem a dependência que está sendo substituída, se houver.
         outras = round(sum(f for destino, f in self.dependencias.items()
                            if destino != id_destino), 9)
-        # Arredonda a soma: 0,7 + 0,3 em ponto flutuante pode dar
+        # Arredonda a soma: em ponto flutuante, 0,7 + 0,2 + 0,1 dá
         # 0,9999999999999999, que passaria no teste "< 1" por engano.
         if round(outras + fracao, 9) >= LIMITE_SOMA_DEPENDENCIAS:
             sobra = round(LIMITE_SOMA_DEPENDENCIAS - outras, 9)
-            if sobra <= 0:
+            if sobra <= MENOR_FRACAO:
                 raise ValueError(
                     f"A soma das frações de {self.hostname} já está em "
                     f"{formatacao.fracao_br(outras)}, sem espaço para "
@@ -574,15 +578,28 @@ if __name__ == "__main__":
         raise AssertionError("aceitou dependência de si mesmo")
     except ValueError as erro:
         print(f"  auto-dependência recusada: {erro}")
-    # 0,7 + 0,3: em ponto flutuante a soma pode escapar de "< 1".
+    # 0,7 + 0,2 + 0,1 dá 0,9999999999999999 em ponto flutuante: sem o
+    # arredondamento da soma, a regra "< 1" deixaria passar.
+    assert 0.7 + 0.2 + 0.1 < 1, "o exemplo de erro de ponto flutuante mudou"
     outro = criar_equipamento(TipoEquipamento.ROTEADOR, 6, "RT-01", "X",
                               "Y", "Z")
     outro.definir_dependencia(1, 0.7)
+    outro.definir_dependencia(2, 0.2)
     try:
-        outro.definir_dependencia(2, 0.3)
-        raise AssertionError("0,7 + 0,3 passou pela regra da soma")
+        outro.definir_dependencia(3, 0.1)
+        raise AssertionError("0,7 + 0,2 + 0,1 passou pela regra da soma")
     except ValueError:
-        print("  0,7 + 0,3 recusado (a soma é 1)")
+        print("  0,7 + 0,2 + 0,1 recusado (a soma é 1, mesmo que o float "
+              "dê 0,9999999999999999)")
+    # Sobra de 0,0001: não cabe nenhuma fração (a menor é 0,0001).
+    quase = criar_equipamento(TipoEquipamento.ROTEADOR, 7, "RT-02", "X",
+                              "Y", "Z")
+    quase.definir_dependencia(1, 0.9999)
+    try:
+        quase.definir_dependencia(2, 0.0001)
+        raise AssertionError("aceitou dependência sem espaço na linha")
+    except ValueError as erro:
+        assert "sem espaço" in str(erro), erro
     assert srv.remover_dependencia(3) is True
     assert srv.remover_dependencia(3) is False
 

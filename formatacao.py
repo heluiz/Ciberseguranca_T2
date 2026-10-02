@@ -7,6 +7,7 @@ voltam à grafia certa. O módulo só trata texto: não conhece equipamentos
 nem vulnerabilidades.
 """
 
+import math
 import string
 import unicodedata
 
@@ -108,6 +109,20 @@ def fracao_br(valor):
     """
     texto = f"{valor:.4f}".rstrip("0").rstrip(".")
     return texto.replace(".", ",")
+
+
+def numero_compacto(valor):
+    """Formata com 3 algarismos significativos: 0,875 ou 4,68e+32.
+
+    Serve para números de ordem de grandeza muito variável, como o
+    determinante e o número de condição de uma matriz. Infinito vira
+    "infinito", NaN vira "indefinido" e -0,0 vira 0.
+    """
+    if math.isnan(valor):
+        return "indefinido"
+    if math.isinf(valor):
+        return "infinito"
+    return f"{valor + 0.0:.3g}".replace(".", ",")
 
 
 def para_busca(texto):

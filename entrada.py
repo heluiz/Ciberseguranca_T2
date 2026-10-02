@@ -60,9 +60,10 @@ def mostrar_ajuda():
     for palavras, _, efeito in COMANDOS:
         nomes = ", ".join(palavras).ljust(9)
         print(f"    {cores.destaque(nomes)} {efeito}")
-    # "lista" fica fora de COMANDOS: só vale nas perguntas de ID.
-    print(f"    {cores.destaque('lista'.ljust(9))} nas perguntas de ID, "
-          "mostra os registros e pergunta de novo")
+    # "lista" fica fora de COMANDOS: só vale nas perguntas de ID de
+    # equipamento (e na escolha de vulnerabilidade do catálogo).
+    print(f"    {cores.destaque('lista'.ljust(9))} no ID de equipamento, "
+          "mostra a lista e pergunta de novo")
     print("  " + cores.discreto(
         "O que ainda não foi gravado é descartado ao voltar ou sair.") + "\n")
 

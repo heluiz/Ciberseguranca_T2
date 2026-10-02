@@ -197,13 +197,22 @@ def mostrar_dependencias(inventario, equipamento):
 # ----------------------------------------------------------------------
 
 def mostrar_diagnostico(diagnostico):
-    """Mostra o resultado da verificação de I - A."""
+    """Mostra o resultado da verificação de I - A.
+
+    O determinante e o número de condição aparecem sempre, para
+    conferência. Quem decide é a regra explicada no motivo: o
+    determinante sozinho não serve (veja risco.py).
+    """
     if diagnostico.utilizavel:
         print("\n  " + cores.sucesso("Verificação de I - A: ")
               + diagnostico.motivo)
     else:
         print("\n  " + cores.erro("! Verificação de I - A: ")
               + cores.erro(diagnostico.motivo))
+    print("  " + cores.discreto(
+        f"det(I - A) = {formatacao.numero_compacto(diagnostico.determinante)}"
+        f" · número de condição de I - A = "
+        f"{formatacao.numero_compacto(diagnostico.condicao)}"))
 
 
 def barra(valor, maximo, largura=20):
@@ -281,13 +290,13 @@ def mostrar_detalhe_risco(item, vulnerabilidades, parcelas):
 
 
 def mostrar_matrizes(modelo):
-    """Mostra M, v, b e A de um cenário pequeno, para conferir à mão.
+    """Mostra M, v, M v, F, b e A de um cenário pequeno, para conferir à mão.
 
     Só para poucos equipamentos: com dezenas, a matriz não cabe na tela.
     """
     ids = [e.id for e in modelo.equipamentos]
     print("\n  M (linhas: equipamentos; colunas: vulnerabilidades):")
-    cabecalho = "      " + " ".join(
+    cabecalho = "        " + " ".join(
         f"V{v.id:<3}" for v in modelo.vulnerabilidades)
     print(cores.discreto(cabecalho))
     for i, equipamento in enumerate(modelo.equipamentos):
@@ -295,8 +304,24 @@ def mostrar_matrizes(modelo):
         print(f"    E{equipamento.id:<3}{valores}")
     print("\n  v (notas CVSS): " + "  ".join(
         f"V{v.id}={numero_br(v.cvss)}" for v in modelo.vulnerabilidades))
+
+    # M leva v (uma nota por vulnerabilidade) a M v (uma soma por
+    # equipamento): é a transformação linear do modelo. F é a diagonal de
+    # uma matriz diagonal: multiplica cada linha pelo fator do tipo.
+    equipamentos = modelo.equipamentos
+
+    def por_equipamento(valores, casas):
+        return "  ".join(f"E{e.id}={numero_br(valor, casas)}"
+                         for e, valor in zip(equipamentos, valores))
+
+    print("\n  M v (soma das notas de cada equipamento):  "
+          + por_equipamento(modelo.soma_cvss, 1))
+    print("  F (fator de exposição do tipo):            "
+          + por_equipamento(modelo.fatores, 1))
+    print("  b = F (M v) (risco próprio):               "
+          + por_equipamento(modelo.b, 2))
     print("\n  A (linha i: fração herdada de cada equipamento j):")
-    print(cores.discreto("      " + " ".join(f"E{j:<5}" for j in ids)))
+    print(cores.discreto("        " + " ".join(f"E{j:<5}" for j in ids)))
     for i, equipamento in enumerate(modelo.equipamentos):
         valores = " ".join(f"{formatacao.fracao_br(x):<6}"
                            for x in modelo.A[i])

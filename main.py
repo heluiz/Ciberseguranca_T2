@@ -38,6 +38,7 @@ from entrada import (
     ler_texto,
     limpar_tela,
 )
+from equipamentos import MENOR_FRACAO
 from formatacao import fracao_br, numero_br
 from risco import ModeloRisco
 from vulnerabilidades import validar_cvss
@@ -78,7 +79,7 @@ OPCOES_MENU = (
         (12, "Ver ou remover dependências de um equipamento"),
         (13, "Risco de todos os equipamentos (próprio e efetivo)"),
         (14, "Risco de um equipamento (passo a passo)"),
-        (15, "Matrizes do modelo (M, v, A)"),
+        (15, "Matrizes do modelo (M, v, F, A) e verificação de I - A"),
     )),
     ("", ((0, "Sair"),)),
 )
@@ -248,7 +249,7 @@ class Aplicacao:
                   "use a opção 7.")
 
     def _mostrar_ficha_completa(self, equipamento):
-        """Ficha do equipamento, com vulnerabilidades e dependências."""
+        """Ficha do equipamento e as suas vulnerabilidades."""
         telas.mostrar_equipamento(equipamento)
         telas.mostrar_vulnerabilidades(
             self.inventario.vulnerabilidades_do(equipamento.id))
@@ -615,7 +616,7 @@ class Aplicacao:
         usada = round(origem.soma_dependencias - (atual or 0.0), 9)
         print(f"\n  Frações já usadas por {origem.hostname}: "
               f"{fracao_br(usada)} (a soma precisa ficar abaixo de 1).")
-        if usada >= 1:
+        if round(1 - usada, 9) <= MENOR_FRACAO:
             self._erro("Não há espaço para outra dependência: remova uma "
                        "das existentes (opção 12).")
             return
@@ -725,7 +726,7 @@ class Aplicacao:
             modelo.contribuicoes(equipamento.id))
 
     def ver_matrizes(self):
-        """Opção 15: mostra M, v, b e A, para conferir o modelo à mão."""
+        """Opção 15: mostra as matrizes e a verificação de I - A."""
         print("\n" + cores.titulo("--- MATRIZES DO MODELO DE RISCO ---"))
         if not len(self.inventario):
             print("\n  " + cores.aviso("Nenhum equipamento cadastrado ainda."))
@@ -734,17 +735,17 @@ class Aplicacao:
         n, m = modelo.M.shape
         print(f"\n  {n} equipamento(s) e {m} vulnerabilidade(s): M é "
               f"{n} x {m}, v tem {m} valor(es) e A é {n} x {n}.")
-        if n > MAXIMO_PARA_MOSTRAR_MATRIZES:
+        if max(n, m) > MAXIMO_PARA_MOSTRAR_MATRIZES:
+            # As matrizes não cabem na tela; a verificação de I - A, sim.
             print("  " + cores.aviso(
-                f"Grande demais para a tela (mostro até "
-                f"{MAXIMO_PARA_MOSTRAR_MATRIZES} equipamentos). Um cenário "
-                f"de teste está em dados_exemplo/cenario_3_equipamentos."
-                f"json."))
-            return
-        telas.mostrar_matrizes(modelo)
-        print("\n  Risco próprio b = fator x (M v):  "
-              + "  ".join(f"E{e.id}={numero_br(b, 2)}" for e, b in
-                          zip(modelo.equipamentos, modelo.b)))
+                f"Grande demais para mostrar as matrizes (mostro até "
+                f"{MAXIMO_PARA_MOSTRAR_MATRIZES} equipamentos e "
+                f"{MAXIMO_PARA_MOSTRAR_MATRIZES} vulnerabilidades). Um "
+                f"cenário pequeno está em dados_exemplo/cenario_3_"
+                f"equipamentos.json."))
+        else:
+            telas.mostrar_matrizes(modelo)
+        telas.mostrar_diagnostico(modelo.diagnosticar())
 
     # ------------------------------------------------------------------
     # O laço do programa

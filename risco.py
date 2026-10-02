@@ -6,12 +6,14 @@ Com n equipamentos e m vulnerabilidades, o modelo monta:
               afetado pela vulnerabilidade j (e ela ainda não foi
               corrigida), senão 0.
   v  (m)      nota CVSS de cada vulnerabilidade.
-  F  (n)      fator de exposição de cada equipamento, que depende do
-              tipo (Equipamento.fator_exposicao, polimórfico).
-  b  (n)      risco próprio:  b = F * (M v)  (produto elemento a
-              elemento). A soma das notas das vulnerabilidades do
-              equipamento, ponderada pelo fator do tipo. Com todos os
-              fatores iguais a 1, é exatamente b = M v.
+  F  (n x n)  matriz diagonal com o fator de exposição de cada
+              equipamento, que depende do tipo
+              (Equipamento.fator_exposicao, polimórfico). Guardada só
+              como o vetor da diagonal (self.fatores).
+  b  (n)      risco próprio:  b = F (M v). A soma das notas das
+              vulnerabilidades do equipamento, ponderada pelo fator do
+              tipo. Com USAR_FATOR_DE_EXPOSICAO = False (todos os fatores
+              iguais a 1), é exatamente o b = M v do enunciado.
   A  (n x n)  dependências: A[i][j] é a fração do risco do equipamento j
               que o equipamento i herda. A[i][i] = 0.
 
@@ -29,12 +31,11 @@ definir_dependencia). Um arquivo editado à mão pode violá-la, então a
 verificação é feita aqui também, e o usuário é informado quando o
 sistema não tem solução confiável.
 
-Sem a regra da soma, ainda há um critério exato para A com valores
-não negativos: se o raio espectral de A (o maior |autovalor|) é menor
-que 1, I - A é invertível e a solução nunca é menor que b, como se
-espera de um risco herdado. Se for 1 ou mais, ou I - A é singular, ou a
-solução tem riscos "negativos", sem sentido: nos dois casos o usuário é
-avisado e nada é calculado.
+Sem a regra da soma, o número de condição decide se I - A é
+invertível. Se for, a solução ainda é conferida: herdar risco só pode
+somar, então nenhum risco efetivo pode ficar menor que o próprio
+(x >= b). Se ficar (dependências em ciclo com frações altas demais), a
+solução não tem sentido: o usuário é avisado e nada é mostrado.
 
 O módulo não lê do teclado nem grava em disco.
 """
@@ -45,6 +46,11 @@ import numpy as np
 
 import formatacao
 
+# True: b = F (M v), com o fator de exposição de cada tipo (a dica do
+# polimorfismo no enunciado). False: todos os fatores valem 1, e b = M v,
+# a definição literal do enunciado.
+USAR_FATOR_DE_EXPOSICAO = True
+
 # Acima deste número de condição, o sistema é tratado como singular. O
 # número de condição mede quanto um erro pequeno nos dados vira erro
 # grande na solução; em ponto flutuante de 64 bits (cerca de 16 dígitos),
@@ -52,8 +58,17 @@ import formatacao
 # serve para decidir: seu tamanho depende da escala da matriz.
 LIMITE_CONDICAO = 1e12
 
+# Só para a mensagem: abaixo disto, o determinante calculado é "zero" (um
+# determinante que daria zero exato em papel quase nunca dá zero exato em
+# ponto flutuante, mas algo como 2e-16).
+TOLERANCIA_DETERMINANTE = 1e-12
+
+# Folga da conferência x >= b: diferenças menores são arredondamento.
+FOLGA_SOLUCAO = 1e-9
+
 # Folga na regra "soma da linha < 1": uma soma de 0,9999999999999999
-# vem de arredondamento de 0,7 + 0,3 e não é de verdade menor que 1.
+# vem de arredondamento (é o que 0,7 + 0,2 + 0,1 dá em ponto flutuante)
+# e não é de verdade menor que 1.
 FOLGA_DOMINANCIA = 1e-9
 
 # Cada item do relatório: o equipamento, a soma das notas CVSS das suas
@@ -62,18 +77,11 @@ RiscoEquipamento = namedtuple(
     "RiscoEquipamento", "equipamento soma_cvss fator proprio efetivo")
 
 # O que a verificação de I - A concluiu. invertivel: I - A tem inversa;
-# utilizavel: além disso, a solução tem sentido de risco (raio < 1).
+# utilizavel: além disso, a solução tem sentido de risco (x >= b).
 Diagnostico = namedtuple(
     "Diagnostico",
-    "invertivel utilizavel dominante maior_soma raio determinante "
-    "condicao motivo")
-
-
-def _cientifico(valor):
-    """Número de condição para a tela: 3,3 ou 4,7e+32 ou "infinito"."""
-    if not np.isfinite(valor):
-        return "infinito"
-    return f"{valor:.3g}".replace(".", ",")
+    "invertivel utilizavel dominante maior_soma determinante condicao "
+    "motivo")
 
 
 class SistemaSingular(Exception):
@@ -109,8 +117,12 @@ class ModeloRisco:
 
         self.v = np.array([v.cvss for v in self.vulnerabilidades],
                           dtype=float)
-        self.fatores = np.array([e.fator_exposicao
-                                 for e in self.equipamentos], dtype=float)
+        if USAR_FATOR_DE_EXPOSICAO:
+            self.fatores = np.array([e.fator_exposicao
+                                     for e in self.equipamentos],
+                                    dtype=float)
+        else:
+            self.fatores = np.ones(n)
 
         self.soma_cvss = self.M @ self.v      # M v
         self.b = self.fatores * self.soma_cvss
@@ -134,23 +146,25 @@ class ModeloRisco:
         Devolve um Diagnostico. A verificação segue esta ordem:
           1. Dominância: se a maior soma de linha de A é menor que 1,
              I - A é estritamente diagonal dominante, o que garante que
-             é invertível, com solução maior ou igual a b.
+             é invertível e que nenhum risco efetivo fica menor que o
+             próprio.
           2. Sem essa garantia, o número de condição (np.linalg.cond,
-             limite LIMITE_CONDICAO) diz se I - A é invertível, e o raio
-             espectral de A diz se a solução tem sentido (menor que 1).
+             limite LIMITE_CONDICAO) decide se I - A é invertível.
+          3. Se for invertível, a solução é conferida: risco herdado só
+             soma, então o efetivo não pode ficar menor que o próprio
+             (x >= b). Se ficar, a solução não tem sentido.
         O determinante é calculado só para informar: não decide.
         """
         n = len(self.b)
         if n == 0:
-            return Diagnostico(True, True, True, 0.0, 0.0, 1.0, 1.0,
+            return Diagnostico(True, True, True, 0.0, 1.0, 1.0,
                                "Não há equipamentos cadastrados.")
 
         K = np.eye(n) - self.A
-        # A tem só valores positivos, então a soma da linha é a soma
+        # A não tem valores negativos, então a soma da linha é a soma
         # dos valores absolutos que a dominância pede.
         maior = float(self.A.sum(axis=1).max())
         dominante = maior < 1.0 - FOLGA_DOMINANCIA
-        raio = float(np.max(np.abs(np.linalg.eigvals(self.A))))
         determinante = float(np.linalg.det(K))
         condicao = float(np.linalg.cond(K))
 
@@ -159,38 +173,51 @@ class ModeloRisco:
             motivo = (f"I - A é estritamente diagonal dominante: a maior "
                       f"soma de linha de A é {maior_br}, menor que 1. "
                       f"Invertível.")
-            return Diagnostico(True, True, True, maior, raio, determinante,
+            return Diagnostico(True, True, True, maior, determinante,
                                condicao, motivo)
 
-        condicao_br = _cientifico(condicao)
-        raio_br = formatacao.fracao_br(raio)
+        condicao_br = formatacao.numero_compacto(condicao)
+        limite_br = formatacao.numero_compacto(LIMITE_CONDICAO)
         invertivel = bool(np.isfinite(condicao) and condicao < LIMITE_CONDICAO)
         if not invertivel:
             motivo = (f"I - A não é invertível: a maior soma de linha de A "
                       f"é {maior_br} (precisa ser menor que 1) e o número "
-                      f"de condição é {condicao_br} (limite "
-                      f"{_cientifico(LIMITE_CONDICAO)}). Reduza as frações "
-                      f"de dependência de algum equipamento até a soma "
-                      f"ficar abaixo de 1.")
-            return Diagnostico(False, False, False, maior, raio,
-                               determinante, condicao, motivo)
+                      f"de condição é {condicao_br} (limite {limite_br}).")
+            if determinante == 0.0:
+                motivo += " O determinante calculado é 0."
+            elif abs(determinante) < TOLERANCIA_DETERMINANTE:
+                tolerancia_br = formatacao.numero_compacto(
+                    TOLERANCIA_DETERMINANTE)
+                motivo += (f" O determinante calculado, "
+                           f"{formatacao.numero_compacto(determinante)}, não "
+                           f"é zero exato, mas é zero dentro da tolerância "
+                           f"de {tolerancia_br}: em ponto flutuante, um "
+                           f"determinante que daria zero no papel raramente "
+                           f"dá zero exato.")
+            motivo += (" Reduza as frações de dependência de algum "
+                       "equipamento até a soma ficar abaixo de 1.")
+            return Diagnostico(False, False, False, maior, determinante,
+                               condicao, motivo)
 
-        if raio < 1.0 - FOLGA_DOMINANCIA:
+        # Invertível, mas sem a garantia da dominância: confere a solução.
+        x = np.linalg.solve(K, self.b)
+        if np.all(x >= self.b - FOLGA_SOLUCAO):
             motivo = (f"A maior soma de linha de A é {maior_br} (não é "
-                      f"menor que 1), mas o raio espectral de A é "
-                      f"{raio_br}, menor que 1, e o número de condição "
-                      f"({condicao_br}) é pequeno: invertível, com solução "
-                      f"que faz sentido.")
-            return Diagnostico(True, True, False, maior, raio,
-                               determinante, condicao, motivo)
+                      f"menor que 1), mas o número de condição "
+                      f"({condicao_br}) é pequeno: I - A é invertível. A "
+                      f"solução foi conferida: nenhum risco efetivo ficou "
+                      f"menor que o próprio.")
+            return Diagnostico(True, True, False, maior, determinante,
+                               condicao, motivo)
 
         motivo = (f"I - A é invertível (número de condição {condicao_br}), "
-                  f"mas o raio espectral de A é {raio_br}, que não é "
-                  f"menor que 1: o risco efetivo sairia menor que o "
-                  f"próprio, até negativo, o que não tem sentido. Reduza "
-                  f"as frações de dependência do ciclo de equipamentos "
-                  f"que se herdam entre si.")
-        return Diagnostico(True, False, False, maior, raio, determinante,
+                  f"mas a solução daria a algum equipamento um risco "
+                  f"efetivo menor que o próprio, até negativo, o que não "
+                  f"tem sentido: herdar risco só pode somar. Há "
+                  f"dependências em ciclo com frações altas demais; "
+                  f"reduza-as até a soma de cada linha de A ficar abaixo "
+                  f"de 1.")
+        return Diagnostico(True, False, False, maior, determinante,
                            condicao, motivo)
 
     # ------------------------------------------------------------------
@@ -407,8 +434,8 @@ if __name__ == "__main__":
     # Soma de linha maior que 1 não é, sozinha, sinal de singularidade:
     # E1 herda 0,9 de E2 e 0,9 de E3 (soma 1,8), e os outros não herdam
     # nada. I - A é triangular com 1 na diagonal: det = 1, invertível.
-    # Sem a garantia da dominância, decidem o número de condição e o raio
-    # espectral de A (aqui 0: A é "triangular", sem ciclos).
+    # Sem a garantia da dominância, decide o número de condição, e a
+    # solução é conferida (x >= b).
     triang = Inventario()
     t1, t2, t3 = [triang.cadastrar_equipamento(
         TipoEquipamento.OUTRO, f"T{k}", "A", "B", "C") for k in range(3)]
@@ -417,11 +444,10 @@ if __name__ == "__main__":
     d = ModeloRisco(triang).diagnosticar()
     print(f"\nSoma 1,8 mas triangular: {d.motivo}")
     assert d.invertivel and d.utilizavel and not d.dominante
-    assert abs(d.raio) < 1e-9
 
     # Invertível, mas sem sentido: E1 herda 0,9 de E2 e de E3, e os dois
-    # herdam 0,9 de E1. O raio espectral de A é 0,9 * raiz(2) = 1,27: o
-    # sistema tem solução, mas com riscos efetivos negativos.
+    # herdam 0,9 de E1 (o ciclo repassa mais do que recebe). O sistema
+    # tem solução, mas com riscos efetivos negativos: x1 = 5 / (1 - 1,62).
     ciclo = Inventario()
     c1, c2, c3 = [ciclo.cadastrar_equipamento(
         TipoEquipamento.OUTRO, f"C{k}", "A", "B", "C") for k in range(3)]
@@ -433,15 +459,27 @@ if __name__ == "__main__":
     d = m_ciclo.diagnosticar()
     print(f"\nInvertível mas sem sentido: {d.motivo}")
     assert d.invertivel and not d.utilizavel
-    assert abs(d.raio - 0.9 * 2 ** 0.5) < 1e-9
     assert np.linalg.solve(np.eye(3) - m_ciclo.A, m_ciclo.b).min() < 0
     try:
         m_ciclo.resolver()
         raise AssertionError("resolveu um sistema sem sentido de risco")
     except SistemaSingular as erro:
-        assert "raio espectral" in str(erro)
+        assert "menor que o próprio" in str(erro)
 
-    # Ciclo quase crítico (0,9999 nos dois sentidos): raio 0,9999 < 1.
+    # O mesmo ciclo sem vulnerabilidade nenhuma nele, mais um equipamento
+    # isolado com nota 7,5: a solução (x = b) faz sentido e é mostrada.
+    so_isolado = Inventario()
+    i1, i2, i3, i4 = [so_isolado.cadastrar_equipamento(
+        TipoEquipamento.OUTRO, f"I{k}", "A", "B", "C") for k in range(4)]
+    so_isolado.registrar_vulnerabilidade(i4.id, "x", ORIGEM, 7.5, ABERTA)
+    i1.dependencias.update({i2.id: 0.9, i3.id: 0.9})
+    i2.dependencias[i1.id] = 0.9
+    i3.dependencias[i1.id] = 0.9
+    m_isolado = ModeloRisco(so_isolado)
+    assert m_isolado.diagnosticar().utilizavel
+    assert np.allclose(m_isolado.resolver(), [0, 0, 0, 7.5])
+
+    # Ciclo quase crítico (0,9999 nos dois sentidos): ainda dominante.
     quase = Inventario()
     q1, q2 = [quase.cadastrar_equipamento(
         TipoEquipamento.OUTRO, f"Q{k}", "A", "B", "C") for k in range(2)]
@@ -505,7 +543,30 @@ if __name__ == "__main__":
             ex = exato(m.A, m.b)
             assert all(abs(float(e) - xi) < 1e-6 for e, xi in zip(ex, x)), \
                 "frações exatas discordam"
-    print("20 inventários aleatórios: solve = série de Neumann = frações "
-          "exatas.")
+    print("20 inventários aleatórios: solve = série de Neumann (e = frações "
+          "exatas nos de até 6 equipamentos).")
+
+    # --- 6. solve x inversa: o erro que cada um deixa ----------------------
+    # Um ciclo de 30 equipamentos, cada um herdando quase tudo do
+    # seguinte: I - A fica perto de singular (número de condição alto). O
+    # resíduo ||(I - A) x - b|| mede o erro que sobra em cada método. Os
+    # dois ficam pequenos aqui; o solve costuma errar um pouco menos e faz
+    # menos contas (uma fatoração, sem montar a inversa inteira).
+    print("\nsolve x inversa num sistema mal condicionado:")
+    sorteio = np.random.default_rng(7)
+    for quase_um in (0.9, 0.9999999):
+        ciclo_a = np.roll(np.eye(30), 1, axis=1) * quase_um
+        k_ciclo = np.eye(30) - ciclo_a
+        b_ciclo = sorteio.uniform(0, 20, 30)
+        com_solve = np.linalg.solve(k_ciclo, b_ciclo)
+        com_inversa = np.linalg.inv(k_ciclo) @ b_ciclo
+        residuo_solve = np.linalg.norm(k_ciclo @ com_solve - b_ciclo)
+        residuo_inversa = np.linalg.norm(k_ciclo @ com_inversa - b_ciclo)
+        numero = formatacao.numero_compacto
+        print(f"  frações {str(quase_um).replace('.', ',')}: número de "
+              f"condição {numero(np.linalg.cond(k_ciclo))}; resíduo com "
+              f"solve {numero(residuo_solve)}, com a inversa "
+              f"{numero(residuo_inversa)}")
+        assert np.allclose(com_solve, com_inversa, rtol=1e-4)
 
     print("\nOK - modelo de risco exercitado.")
