@@ -12,3 +12,7 @@ dados/
 
 # Arquivo temporario da gravacao atomica em armazenamento.py
 *.tmp
+
+# Medida de cobertura dos testes (coverage.py)
+.coverage
+htmlcov/

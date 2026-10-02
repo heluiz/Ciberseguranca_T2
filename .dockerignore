@@ -10,3 +10,6 @@ Dockerfile
 compose.yaml
 .dockerignore
 README.md
+.github/
+.coveragerc
+.coverage
