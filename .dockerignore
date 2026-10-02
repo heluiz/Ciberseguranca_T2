@@ -1,9 +1,11 @@
 # Fora da imagem: controle de versão, lixo do Python, dados locais
-# (os dados do container ficam no volume) e arquivos só do Docker.
+# (os dados do container ficam no volume), arquivos só do Docker e os
+# das ferramentas de verificação (GitHub, cobertura, Ruff).
 .git
 .gitignore
-__pycache__/
-*.pyc
+**/__pycache__/
+**/*.pyc
+.ruff_cache/
 *.tmp
 dados/
 Dockerfile
@@ -13,3 +15,4 @@ README.md
 .github/
 .coveragerc
 .coverage
+ruff.toml

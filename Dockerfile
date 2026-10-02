@@ -3,8 +3,11 @@
 # Construir:  docker build -t inventario:1.0 .
 # Executar:   veja o README (docker run -dit ... ou docker compose up -d)
 
-# Python 3.12 em Debian "slim": traz o Python e quase mais nada.
-FROM python:3.12-slim
+# Imagem oficial do Python 3.14 (em manutenção completa até 2027) sobre
+# Debian 13 "trixie", na variante "slim": o Python e quase mais nada. A
+# variante do Debian vai fixada no nome, como a página da imagem
+# recomenda, para uma versão nova do Debian não mudar a base sem aviso.
+FROM python:3.14-slim-trixie
 
 # PYTHONUNBUFFERED: o menu aparece na hora e o "docker logs" mostra tudo.
 # PYTHONDONTWRITEBYTECODE: sem arquivos .pyc na imagem.
@@ -18,8 +21,15 @@ ENV PYTHONUNBUFFERED=1 \
     INVENTARIO_DADOS=/app/dados/inventario.json \
     TERM=xterm
 
-# Usuário comum: o programa não precisa ser root dentro do container.
-RUN useradd --create-home --shell /usr/sbin/nologin inventario
+# Usuário comum, com UID e GID fixos: o programa não precisa ser root
+# dentro do container (menor privilégio). O número alto (10001) fica
+# longe dos usuários de verdade do servidor, que começam em 1000: um
+# processo que escapasse do container não teria a identidade de
+# ninguém. --no-log-init vem do exemplo da documentação do Docker; com
+# UID alto, evita criar um arquivo de log enorme.
+RUN groupadd --gid 10001 inventario \
+    && useradd --uid 10001 --gid 10001 --no-log-init \
+       --shell /usr/sbin/nologin inventario
 
 WORKDIR /app
 
