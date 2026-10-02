@@ -18,8 +18,10 @@ valendo, e o programa foi reescrito em orientação a objetos.
 - [O modelo de risco](#o-modelo-de-risco)
 - [Formato do arquivo de dados](#formato-do-arquivo-de-dados)
 - [Decisões de projeto](#decisões-de-projeto)
+- [Segurança e LGPD](#segurança-e-lgpd)
 - [Limitações conhecidas](#limitações-conhecidas)
 - [Testes](#testes)
+- [Fluxo de trabalho no Git](#fluxo-de-trabalho-no-git)
 - [Dados de exemplo](#dados-de-exemplo)
 
 ## Como executar
@@ -27,8 +29,8 @@ valendo, e o programa foi reescrito em orientação a objetos.
 ### Direto no computador
 
 Requer Python 3.10 ou superior e o NumPy (a única dependência externa, usada
-no modelo de risco). Foi desenvolvido e testado com Python 3.11 e NumPy 2.x; o
-`Dockerfile` usa Python 3.12.
+no modelo de risco). Os testes passaram com Python 3.11 (Linux) e 3.13
+(Windows), com NumPy 2.x; a imagem Docker usa Python 3.12.
 
 ```
 pip install -r requirements.txt
@@ -53,9 +55,10 @@ docker attach inventario
 
 No `docker attach` a tela costuma aparecer vazia, porque o Docker não repete
 o que já foi impresso: **tecle Enter e a tela de abertura (logotipo e menu) é
-desenhada de novo.** Para sair
-sem parar o programa, tecle **Ctrl+P e depois Ctrl+Q.** O container continua
-rodando e dá para voltar com outro `docker attach`.
+desenhada de novo** (se o programa estiver esperando a opção do menu; numa
+pergunta, o Enter vale como resposta). Para sair sem parar o programa, tecle
+**Ctrl+P e depois Ctrl+Q.** O container continua rodando e dá para voltar com outro
+`docker attach`.
 
 O `compose.yaml` é uma alternativa que faz a construção, o volume e a execução
 de uma vez: `docker compose up -d --build`, seguido de
@@ -115,6 +118,27 @@ docker run -dit --name inventario --restart unless-stopped \
   -v inventario-dados:/app/dados inventario:1.0
 ```
 
+### No servidor do docente
+
+O requisito 3 pede o container funcionando por no mínimo 24 horas num servidor
+disponibilizado pelo docente. Lá, os passos são os mesmos:
+
+```
+git clone https://github.com/heluiz/Ciberseguranca_T2.git
+cd Ciberseguranca_T2
+docker build -t inventario:1.0 .
+docker volume create inventario-dados
+docker run -dit --name inventario --restart unless-stopped \
+  -v inventario-dados:/app/dados inventario:1.0
+```
+
+Como o repositório é privado, o `git clone` pede login: no lugar da senha, use
+um token de acesso pessoal do GitHub. Para comprovar o tempo no ar,
+`docker ps` mostra `Up 24 hours` (ou mais), `docker inspect -f
+'{{.State.StartedAt}}' inventario` mostra quando o programa ligou e
+`docker inspect -f '{{.RestartCount}}' inventario` mostra quantas vezes o
+Docker precisou religá-lo.
+
 ## Como usar
 
 O menu numerado dá acesso a todas as operações. Depois de cada uma, o
@@ -127,7 +151,7 @@ qualquer pergunta do programa:
 | `sair` | Fecha o programa |
 | `limpar` | Limpa a tela; no menu, desenha o menu de novo |
 | `ajuda` ou `?` | Mostra a lista de comandos |
-| `lista` | Nas perguntas de ID, mostra os registros e repete a pergunta |
+| `lista` | Nas perguntas de ID de equipamento (e na escolha de uma vulnerabilidade do catálogo, na opção 6), mostra os registros e repete a pergunta |
 
 Números decimais aceitam vírgula ou ponto (`7,5` ou `7.5`).
 
@@ -147,7 +171,7 @@ Números decimais aceitam vírgula ou ponto (`7,5` ou `7.5`).
 | 12 | Mostra as dependências de um equipamento e permite remover uma |
 | 13 | Mostra o risco próprio e o efetivo de **todos** os equipamentos |
 | 14 | Mostra, passo a passo, como o risco de **um** equipamento foi calculado |
-| 15 | Mostra as matrizes M, v e A (para poucos equipamentos), para conferir à mão |
+| 15 | Mostra M, v, M v, F, b e A (para poucos equipamentos) e a verificação de I − A, com o determinante e o número de condição |
 
 As cores precisam de um terminal que interprete códigos ANSI. Com a variável de
 ambiente `NO_COLOR` definida, o programa imprime texto puro.
@@ -156,16 +180,18 @@ ambiente `NO_COLOR` definida, o programa imprime texto puro.
 
 | # | Requisito | Peso | Onde está |
 | --- | --- | --- | --- |
-| 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. |
+| 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. A classe "equipamentos" do enunciado é a `Equipamento`, no módulo `equipamentos.py`: o nome segue a convenção da PEP 8 para classes (CapWords) e está no singular, porque cada objeto é *um* equipamento. |
 | 2 | Armazenamento em JSON formado por um array de objetos | 20% | `armazenamento.py` grava o que `Inventario.para_dict()` monta: um array JSON na raiz, um objeto por equipamento. Veja [o formato](#formato-do-arquivo-de-dados). |
 | 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker). |
-| 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu. Veja [o modelo de risco](#o-modelo-de-risco). |
+| 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu. A matriz A fica no mesmo JSON (campo `dependencias`), e o NumPy está declarado em `requirements.txt`, que o `Dockerfile` instala. Veja [o modelo de risco](#o-modelo-de-risco). |
 
 Os requisitos do Trabalho 1 (cadastro, busca por ID e por hostname,
 atualização, exclusão com cascata, vulnerabilidades com categoria, severidade e
 status, listagem por equipamento, validações e tratamento de erros) continuam
 atendidos: as opções 1 a 10 do T1 foram mantidas, com os mesmos números e
-funções, e com os mesmos comandos globais.
+funções, e com os mesmos comandos globais. O requisito do repositório com mais
+de duas branches e merges também continua valendo: veja
+[Fluxo de trabalho no Git](#fluxo-de-trabalho-no-git).
 
 ## Estrutura
 
@@ -185,7 +211,8 @@ funções, e com os mesmos comandos globais.
 | `formatacao.py`, `cores.py`, `banner.py`, `surpresa.py` | Padronização de texto, cores ANSI, logotipo e a animação-surpresa, herdados do Trabalho 1 |
 | `testes.py` | Testes automáticos (`python testes.py`) |
 | `Dockerfile`, `compose.yaml`, `.dockerignore`, `requirements.txt` | Container |
-| `dados_exemplo/` | Base fictícia de 76 equipamentos e um cenário de 3 equipamentos para validar o modelo |
+| `.github/workflows/verificacao.yml`, `.coveragerc` | Verificação automática no GitHub (estilo, testes e imagem Docker) e configuração da medida de cobertura |
+| `dados_exemplo/` | Base fictícia de 76 equipamentos e dois cenários pequenos: um de 3 equipamentos, resolvido à mão, e um singular |
 
 Só `entrada.py` chama `input()` e só `armazenamento.py` lê e grava a base (a
 conversão manual de `migracao.py`, executada como script, também grava o arquivo
@@ -203,8 +230,8 @@ Com *n* equipamentos e *m* vulnerabilidades:
 | --- | --- | --- |
 | **M** | n × m | Incidência: `M[i][j] = 1` se o equipamento *i* é afetado pela vulnerabilidade *j* e ela ainda não foi corrigida; senão 0 |
 | **v** | m | Nota CVSS de cada vulnerabilidade |
-| **F** | n | Fator de exposição de cada equipamento, que depende do tipo |
-| **b** | n | Risco próprio: `b = F · (M v)`, produto elemento a elemento; com `F = 1`, exatamente `b = M v` |
+| **F** | n × n | Matriz diagonal com o fator de exposição de cada equipamento, que depende do tipo |
+| **b** | n | Risco próprio: `b = F (M v)`; com todos os fatores iguais a 1 (`F = I`), exatamente `b = M v` |
 | **A** | n × n | Dependências: `A[i][j]` é a fração do risco do equipamento *j* que o equipamento *i* herda; `A[i][i] = 0` |
 | **x** | n | Risco efetivo |
 
@@ -219,11 +246,21 @@ x = b + A x      <=>      (I − A) x = b
 não impedem a solução, o que é o motivo de resolver o sistema em vez de somar
 os riscos numa única passada.
 
+Em termos de transformações lineares: M leva o vetor de severidades *v* (uma
+nota por vulnerabilidade, em ℝᵐ) ao vetor *M v* (uma soma por equipamento, em
+ℝⁿ), que é a imagem de *v*. F é diagonal: só muda a escala de cada componente,
+e `F (M v) = (F M) v`. No código, F é guardada como o vetor da diagonal
+(`fatores * (M @ v)`), o que dá o mesmo resultado sem montar a matriz cheia de
+zeros. A opção 15 mostra M, v, M v, F e b.
+
 O enunciado define `b = M v` e sugere que "cada tipo de equipamento pode definir
 um fator de exposição que pondera o seu risco próprio". É o que `F` faz: `M v` é
 a soma das notas das vulnerabilidades do equipamento, e o fator do tipo a
-pondera. Quem conferir à mão sem o fator, com `b = M v`, encontra os mesmos
-números ao fazer `F = 1` para todos.
+pondera. Para usar a definição literal, `b = M v`, basta trocar
+`USAR_FATOR_DE_EXPOSICAO = True` por `False` no início de `risco.py`: todos os
+fatores passam a valer 1. A
+[validação à mão](#validação-à-mão-cenário-de-3-equipamentos) mostra a conta
+dos dois jeitos.
 
 ### Decisões do modelo
 
@@ -241,7 +278,8 @@ números ao fazer `F = 1` para todos.
   e a severidade nunca discordam.
 - **Resolve-se o sistema, não se inverte a matriz.** `numpy.linalg.solve` faz a
   fatoração LU: é mais preciso e mais rápido do que calcular a inversa de
-  `I − A` e multiplicar por *b*.
+  `I − A` e multiplicar por *b*. O `python risco.py` compara os dois num
+  sistema mal condicionado e mostra o resíduo `‖(I − A) x − b‖` de cada um.
 
 ### Verificação de invertibilidade
 
@@ -254,26 +292,30 @@ resolvido):
    cadastro de dependências **impõe essa regra** (`Equipamento.
    definir_dependencia`): uma dependência que fizesse a soma da linha chegar a
    1 é recusada, com a mensagem de quanto ainda sobra. A soma é arredondada
-   antes da comparação, porque em ponto flutuante `0,7 + 0,3` pode dar
-   `0,9999999999999999`.
+   antes da comparação, porque em ponto flutuante `0,7 + 0,2 + 0,1` dá
+   `0,9999999999999999`, que passaria no teste "menor que 1" por engano.
 2. **Número de condição.** Um arquivo editado à mão pode violar a regra. Sem a
    garantia da dominância, o número de condição (`numpy.linalg.cond`) decide se
    `I − A` é invertível: acima de 10¹², o sistema é tratado como singular.
    O determinante também é calculado, mas só para informar: em ponto
    flutuante, um determinante teoricamente nulo raramente dá zero exato, e o
    tamanho de um determinante pequeno depende da escala da matriz.
-3. **Raio espectral.** Ser invertível não basta: `I − A` pode ser invertível e
-   a solução ter riscos efetivos *menores* que o próprio, até negativos, o que
-   não é um risco herdado. Como `A` não tem valores negativos, a solução faz
-   sentido exatamente quando o raio espectral de `A` (o maior valor absoluto
-   de seus autovalores) é menor que 1. Se não for, o programa avisa e não
-   calcula, como no caso singular.
+3. **Conferência da solução.** Ser invertível não basta: com dependências em
+   ciclo que repassam frações altas demais, `I − A` pode ser invertível e a
+   solução dar a algum equipamento um risco efetivo *menor* que o próprio,
+   até negativo. Herdar risco só pode somar, então, sem a garantia da
+   dominância, a solução é conferida (`x ≥ b`); se a conferência falhar, o
+   programa avisa e não mostra nada, como no caso singular.
 
-Exemplos de arquivo que a verificação recusa: três equipamentos que herdam 0,5
-um do outro (cada linha de A soma 1), em que `I − A` tem o vetor (1, 1, 1) como
-autovetor de autovalor 0 (singular); e um equipamento que herda 0,9 de dois
-outros, que herdam 0,9 dele (invertível, mas com raio espectral 1,27 e riscos
-efetivos negativos).
+As opções 13, 14 e 15 mostram o resultado da verificação e, para conferência,
+`det(I − A)` e o número de condição de `I − A`.
+
+Exemplos de arquivo que a verificação recusa: três equipamentos em que cada
+linha de A soma 1 (0,3 + 0,7), o que faz de (1, 1, 1) um vetor que `I − A` leva
+a zero (singular: o determinante daria 0 no papel, mas o calculado sai da ordem
+de 1e-16, e o programa avisa que é zero dentro da tolerância de 1e-12); e um
+equipamento que herda 0,9 de dois outros, que herdam 0,9 dele (invertível, mas
+a solução daria riscos efetivos negativos).
 
 ### Validação à mão (cenário de 3 equipamentos)
 
@@ -298,6 +340,12 @@ Substituindo *x3* em *x2*: `x2 = 15 + 0,5 (12 + 0,25 x2) = 21 + 0,125 x2`, logo
 `0,875 x2 = 21` e **x2 = 24**. Então **x3 = 12 + 6 = 18** e **x1 = 4 + 12 =
 16**. O determinante de `I − A` é 0,875.
 
+Sem o fator de exposição (`b = M v` = 4, 10 e 6, a definição literal do
+enunciado), a mesma conta dá `x2 = 10 + 0,5 (6 + 0,25 x2) = 13 + 0,125 x2`,
+logo `x2 = 13 / 0,875 = 104/7 ≈ 14,86`, `x3 = 6 + 0,25 x2 = 68/7 ≈ 9,71` e
+`x1 = 4 + 0,5 x2 = 80/7 ≈ 11,43`. É o que o programa mostra com
+`USAR_FATOR_DE_EXPOSICAO = False`.
+
 Para conferir no programa:
 
 ```
@@ -308,9 +356,9 @@ INVENTARIO_DADOS=dados_exemplo/cenario_3_equipamentos.json python main.py
 e use as opções 15 (matrizes), 13 (risco de todos) e 14 (passo a passo). Se
 alterar algo, o programa grava nesse arquivo: trabalhe numa cópia. O
 `python risco.py` repete essa conta e mais outras: compara a solução do NumPy
-com uma solução em frações exatas e com a série de Neumann
-(`x = b + A b + A² b + ...`, que converge quando cada linha de A soma menos
-que 1) em 20 inventários aleatórios.
+com a série de Neumann (`x = b + A b + A² b + ...`, que converge quando cada
+linha de A soma menos que 1) em 20 inventários aleatórios, e com uma solução em
+frações exatas nos que têm até 6 equipamentos.
 
 ## Formato do arquivo de dados
 
@@ -323,7 +371,7 @@ vulnerabilidades e as suas dependências dentro dele.
     "id": 2,
     "tipo": 2,
     "hostname": "SERVIDOR-01",
-    "custodiante": "Fulano de Tal",
+    "custodiante": "Suporte de Informática",
     "lotacao": "Sala Técnica",
     "descricao": "Servidor",
     "vulnerabilidades": [
@@ -361,8 +409,9 @@ vulnerabilidades e as suas dependências dentro dele.
   dependência de equipamento que não existe, vulnerabilidade com dados
   diferentes em dois equipamentos, NaN. Qualquer problema para o programa com
   uma mensagem que diz o que está errado e onde, em vez de carregar pela
-  metade e apagar dados bons na próxima gravação. O texto gravado é mantido
-  como está (a padronização de maiúsculas é feita na digitação).
+  metade e apagar dados bons na próxima gravação. Descrição, responsável e
+  lotação são mantidos como estão no arquivo (a padronização de maiúsculas é
+  feita na digitação); o hostname é sempre guardado em maiúsculas.
 - A regra "soma das frações de uma linha < 1" **não** é imposta na carga, de
   propósito: quem avalia um arquivo editado à mão é o modelo de risco, que
   avisa o usuário.
@@ -370,8 +419,9 @@ vulnerabilidades e as suas dependências dentro dele.
 **Base do Trabalho 1.** Se o arquivo encontrado for do formato antigo, ele é
 convertido ao abrir (`migracao.py`) e uma cópia da original fica ao lado dele
 (`inventario.json.t1.bak`). Falhas iguais do T1 viram uma única vulnerabilidade
-(com o mesmo `id` em cada equipamento que a tinha), e a gravidade vira uma nota CVSS na mesma faixa (baixa 3,1; média
-5,3; alta 7,5; crítica 9,8). Também dá para converter à mão:
+(com o mesmo `id` em cada equipamento que a tinha), e a gravidade vira uma nota
+CVSS na mesma faixa (baixa 3,1; média 5,3; alta 7,5; crítica 9,8). Também dá
+para converter à mão:
 `python migracao.py antigo.json novo.json`.
 
 ## Decisões de projeto
@@ -402,6 +452,32 @@ convertido ao abrir (`migracao.py`) e uma cópia da original fica ao lado dele
 - **Erros esperados são exceções com mensagem.** `voltar` e `sair` são
   exceções que atravessam as funções até o menu; um erro inesperado numa ação
   é mostrado, a base é recarregada do disco e o menu continua.
+- **Pronto para virar backend.** O enunciado espera que o programa seja o
+  precursor do backend do trabalho final. As classes do domínio não leem
+  teclado nem imprimem, e `para_dict()` e `de_dict()` já fazem a ida e a volta
+  com o JSON: uma API web (Flask ou FastAPI) pode usar `Inventario`,
+  `ModeloRisco` e `ArquivoInventario` como estão, trocando só o `main.py`.
+
+## Segurança e LGPD
+
+- **Menor privilégio.** No container, o programa roda com um usuário comum
+  (`inventario`), sem ser root, e não abre nenhuma porta de rede: não há
+  serviço exposto a ataques pela rede.
+- **Entrada tratada como suspeita.** O que vem do teclado e do arquivo é
+  validado (tipos, faixas, hostname pelas RFC 952 e 1123, caracteres de
+  controle recusados). Um arquivo adulterado é recusado, sem ser sobrescrito.
+- **Dados pessoais (LGPD).** O único campo sobre pessoas é o responsável. O
+  recomendado é registrar o cargo ou o setor ("Escrivão de Plantão", "Suporte
+  de Informática"), e não o nome de alguém, como faz a base de exemplo: é o
+  princípio da necessidade da LGPD (art. 6º, III), tratar o mínimo de dado
+  pessoal que a finalidade exige.
+- **Nada sensível no repositório.** A pasta `dados/`, com a base real, fica
+  fora do Git (`.gitignore`) e da imagem (`.dockerignore`); a base de exemplo
+  é fictícia; não há senhas nem chaves no código.
+- **Sem login, por enquanto.** O programa não tem autenticação nem perfis de
+  acesso: quem consegue dar `docker attach` (ou seja, quem acessa o servidor)
+  pode alterar tudo. Autenticação e autorização ficam para o backend web do
+  trabalho final; até lá, a proteção é o acesso ao servidor.
 
 ## Limitações conhecidas
 
@@ -410,8 +486,10 @@ convertido ao abrir (`migracao.py`) e uma cópia da original fica ao lado dele
   sobrescreveriam.
 - **O programa é interativo.** O container precisa de `-it` (veja
   [Em container Docker](#em-container-docker)); não há API HTTP.
-- **A nota CVSS é guardada com uma casa decimal**: `8,25` vira `8,2`, sem
-  aviso, como no CVSS publicado.
+- **A nota CVSS é guardada com uma casa decimal**, pelo arredondamento do
+  Python: `8,25` vira `8,2`, sem aviso. A calculadora oficial do CVSS
+  arredonda para cima (daria 8,3); na prática a nota já vem com uma casa,
+  copiada da NVD.
 - **A escala do risco não é limitada.** O risco próprio e o efetivo são somas
   ponderadas de notas CVSS e podem passar de 10; servem para comparar
   equipamentos entre si, não são uma nota de 0 a 10.
@@ -428,16 +506,50 @@ convertido ao abrir (`migracao.py`) e uma cópia da original fica ao lado dele
 python testes.py
 ```
 
-São 38 testes, só com a biblioteca padrão: o programa inteiro rodando por
+São 45 testes, só com a biblioteca padrão: o programa inteiro rodando por
 dentro com o teclado simulado (do cadastro ao risco, incluindo o cenário de 3
 equipamentos), a recusa de bases inválidas e do sistema singular, a conversão da
 base do Trabalho 1, o comportamento no container (inclusive `sair` e Ctrl+D) e o
-modelo de risco sobre os arquivos de exemplo. O último teste roda o autoteste de cada módulo. Nada toca
-em `dados/inventario.json`: os testes usam pastas temporárias.
+modelo de risco sobre os arquivos de exemplo. O último teste roda o autoteste
+de cada módulo. Nada toca em `dados/inventario.json`: os testes usam pastas
+temporárias.
+
+Cobertura, com o coverage.py (configurado em `.coveragerc`): os testes passam
+por 82% das linhas do programa, sem contar os autotestes dos módulos, que rodam
+em outro processo.
+
+```
+pip install coverage
+coverage run testes.py
+coverage report
+```
 
 Estilo: `flake8 --max-line-length 79` e `pydocstyle --convention=pep257
 --add-ignore=D401` (a regra D401, que pede o verbo no imperativo, é desligada: as
 docstrings usam "Devolve...", "Verifica...") não apontam nada.
+
+O GitHub roda o estilo e os testes sozinho a cada push: veja a seção seguinte.
+
+## Fluxo de trabalho no Git
+
+O requisito 10 do Trabalho 1 (repositório com mais de duas branches e merge)
+continua valendo. Cada mudança é feita numa branch própria e integrada à `main`
+por merge, com `git merge --no-ff`, que registra o ponto de junção no
+histórico mesmo quando não há conflito:
+
+| Prefixo | Uso | Exemplo neste repositório |
+| --- | --- | --- |
+| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico` |
+| `fix/` | Correção de defeito | — |
+| `docs/` | Documentação | `docs/revisao-requisitos` |
+| `ci/` | Integração contínua | `ci/verificacao-automatica` |
+
+`git log --graph --oneline --all` mostra as branches e os merges.
+
+A cada push e a cada pull request, o GitHub Actions
+(`.github/workflows/verificacao.yml`) roda o flake8, o pydocstyle e os testes,
+constrói a imagem Docker e roda, dentro dela, o autoteste do modelo de risco. O
+resultado aparece na aba Actions do repositório.
 
 ## Dados de exemplo
 
@@ -455,8 +567,9 @@ mkdir dados
 cp dados_exemplo/inventario_exemplo.json dados/inventario.json
 ```
 
-(`copy` no lugar de `cp` no Prompt de Comando.) No container, antes de ligá-lo
-pela primeira vez:
+(No PowerShell, os dois comandos funcionam como estão. No Prompt de Comando:
+`copy dados_exemplo\inventario_exemplo.json dados\inventario.json`.) No
+container, antes de ligá-lo pela primeira vez:
 
 ```
 docker volume create inventario-dados
@@ -465,12 +578,16 @@ docker cp dados_exemplo/inventario_exemplo.json semente:/app/dados/inventario.js
 docker rm semente
 ```
 
-Depois é só executar o `docker run` normal. Copiar o arquivo com o programa já
-rodando não adianta, porque a base é lida uma vez, ao abrir.
+Depois é só executar o `docker run` normal. Com o container já rodando, copie
+com `docker cp dados_exemplo/inventario_exemplo.json
+inventario:/app/dados/inventario.json` e reinicie com
+`docker restart inventario`: a base é lida uma vez, ao abrir.
 
 `dados_exemplo/cenario_3_equipamentos.json` é o cenário resolvido à mão em
 [Validação à mão](#validação-à-mão-cenário-de-3-equipamentos).
 
-`dados_exemplo/cenario_singular.json` tem três equipamentos que herdam 0,5 um do
-outro (cada linha de A soma 1): o programa abre, mas o modelo de risco avisa que
-`I − A` não é invertível e não calcula nada. Serve para demonstrar a verificação.
+`dados_exemplo/cenario_singular.json` tem três equipamentos cujas frações de
+dependência somam 1 em cada linha de A (0,3 + 0,7): o programa abre, mas o
+modelo de risco avisa que `I − A` não é invertível e não calcula nada. Serve
+para demonstrar a verificação, o número de condição e o determinante que dá
+quase zero, mas não zero exato.
