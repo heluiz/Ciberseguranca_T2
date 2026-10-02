@@ -1,4 +1,4 @@
-"""A classe Inventario: o conjunto dos equipamentos e das vulnerabilidades.
+"""A classe Inventario: o conjunto de equipamentos e vulnerabilidades.
 
 Coordena as regras que envolvem mais de um objeto: hostname único,
 exclusão em cascata, vulnerabilidades compartilhadas entre
@@ -33,14 +33,14 @@ ResultadoExclusao = namedtuple(
 
 
 class Inventario:
-    """Equipamentos, catálogo de vulnerabilidades e as regras entre eles."""
+    """Os equipamentos, o catálogo de vulnerabilidades e suas regras."""
 
     def __init__(self):
         """Cria um inventário vazio."""
         self._equipamentos = {}
         self._vulnerabilidades = {}
-        # Maior id já entregue em cada coleção (marca d'água): enquanto o
-        # programa roda, um id excluído nunca volta a ser usado. O
+        # Maior id já entregue em cada coleção (marca d'água): enquanto
+        # o programa roda, um id excluído nunca volta a ser usado. O
         # arquivo é só uma lista de equipamentos e não guarda esse
         # número; ao carregar, vale o maior id que existe nele.
         self._marca = {"equipamentos": 0, "vulnerabilidades": 0}
@@ -279,7 +279,7 @@ class Inventario:
 
     def alterar_situacao(self, id_equipamento, id_vulnerabilidade,
                          situacao):
-        """Muda a situação do tratamento da vulnerabilidade no equipamento.
+        """Muda a situação da vulnerabilidade num equipamento.
 
         Vale só para este equipamento: o mesmo problema pode estar
         corrigido num e aberto em outro.
@@ -358,7 +358,7 @@ class Inventario:
     # ------------------------------------------------------------------
 
     def _exigir_equipamento(self, id_equipamento):
-        """Devolve o equipamento ou levanta ValueError se não existir."""
+        """Busca o equipamento; levanta ValueError se não existir."""
         equipamento = self._equipamentos.get(id_equipamento)
         if equipamento is None:
             raise ValueError(f"Nenhum equipamento com o ID {id_equipamento}")
@@ -465,7 +465,7 @@ if __name__ == "__main__":
     ABERTA = SituacaoTratamento.ABERTA
     FALTA_ATUALIZACAO = OrigemVulnerabilidade.FALTA_ATUALIZACAO
 
-    # --- Cadastro e hostname único --------------------------------------
+    # --- Cadastro e hostname único ------------------------------------
     pc = inv.cadastrar_equipamento(ESTACAO, "PC-CARTORIO-01",
                                    "escrivão de plantão", "cartório",
                                    "estação de atendimento")
@@ -482,7 +482,7 @@ if __name__ == "__main__":
         print(f"Hostname repetido recusado: {erro}")
     assert inv.problema_no_hostname("SRV-ARQUIVO", ignorar_id=2) is None
 
-    # --- Buscas ---------------------------------------------------------
+    # --- Buscas -------------------------------------------------------
     assert inv.buscar_por_id(2) is srv and inv.buscar_por_id(99) is None
     assert inv.buscar_por_texto("hostname", "cart") == [pc]
     assert inv.buscar_por_texto("custodiante", "escrivao") == [pc]
@@ -493,7 +493,7 @@ if __name__ == "__main__":
     except ValueError:
         pass
 
-    # --- Vulnerabilidades compartilhadas --------------------------------
+    # --- Vulnerabilidades compartilhadas ------------------------------
     v1 = inv.registrar_vulnerabilidade(
         1, "sistema sem atualização há 8 meses", FALTA_ATUALIZACAO, 7.5,
         ABERTA)
@@ -527,7 +527,7 @@ if __name__ == "__main__":
     assert inv.vulnerabilidades_do(2)[1][0].cvss == 5.0, \
         "a nota deveria valer para todos os equipamentos"
 
-    # --- Atualização, inclusive troca de tipo ---------------------------
+    # --- Atualização, inclusive troca de tipo -------------------------
     inv.atualizar_equipamento(1, {"custodiante": "outro escrivão"})
     assert inv.buscar_por_id(1).custodiante == "Outro Escrivão"
     try:
@@ -546,7 +546,7 @@ if __name__ == "__main__":
         pass
     assert inv.buscar_por_id(1).descricao == "Estação de atendimento"
 
-    # --- Dependências ---------------------------------------------------
+    # --- Dependências -------------------------------------------------
     assert inv.registrar_dependencia(1, 2, 0.4) is None
     assert inv.registrar_dependencia(1, 2, 0.6) == 0.4   # substituiu
     assert inv.dependentes_de(2) == [(inv.buscar_por_id(1), 0.6)]
@@ -557,13 +557,13 @@ if __name__ == "__main__":
         pass
     inv.registrar_dependencia(2, 1, 0.3)
 
-    # --- Ida e volta pelo formato do arquivo ----------------------------
+    # --- Ida e volta pelo formato do arquivo --------------------------
     texto = json.dumps(inv.para_dict(), ensure_ascii=False)
     copia = Inventario.de_dict(json.loads(texto))
     assert copia.para_dict() == inv.para_dict(), "ida e volta mudou o dado"
     assert [type(e) for e in copia.todos()] == [type(e) for e in inv.todos()]
 
-    # --- Cascata da exclusão --------------------------------------------
+    # --- Cascata da exclusão ------------------------------------------
     res = inv.excluir_equipamento(2)
     print(f"\nExcluído o 2: {res}")
     # Perdeu o vínculo do v2 (só o 2 o tinha, saiu do catálogo); o v1
@@ -583,8 +583,8 @@ if __name__ == "__main__":
     assert v3.id == 3, f"id de vulnerabilidade reaproveitado: {v3.id}"
     print("Ids de equipamento e de vulnerabilidade não são reaproveitados.")
 
-    # --- Arquivos adulterados -------------------------------------------
-    # Um inventário com dois equipamentos que compartilham a vulnerabilidade.
+    # --- Arquivos adulterados -----------------------------------------
+    # Dois equipamentos que compartilham uma vulnerabilidade.
     bom = Inventario()
     bom.cadastrar_equipamento(ESTACAO, "PC-A", "X", "Y", "Z")
     bom.cadastrar_equipamento(SERVIDOR, "SRV-A", "X", "Y", "Z")
@@ -602,7 +602,7 @@ if __name__ == "__main__":
         return copia
 
     def sem_campo(campo):
-        """Cópia do conteúdo bom sem um campo do primeiro equipamento."""
+        """Cópia do conteúdo bom, sem um campo do primeiro objeto."""
         copia = json.loads(json.dumps(bom))
         del copia[0][campo]
         return copia
@@ -631,7 +631,7 @@ if __name__ == "__main__":
         except ValueError as erro:
             print(f"Recusado ({nome}): {erro}")
 
-    # Ida e volta: a vulnerabilidade compartilhada volta como um só objeto.
+    # Ida e volta: a vulnerabilidade compartilhada continua uma só.
     volta = Inventario.de_dict(json.loads(json.dumps(bom)))
     assert volta.buscar_vulnerabilidade(vc.id) is not None
     assert len(volta.vulnerabilidades()) == 1

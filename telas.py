@@ -30,7 +30,7 @@ def linha_da_tabela(valores, larguras, a_direita):
     """Monta uma linha da tabela, com dois espaços entre as colunas."""
     celulas = [coluna(valor, largura, direita)
                for valor, largura, direita
-               in zip(valores, larguras, a_direita)]
+               in zip(valores, larguras, a_direita, strict=True)]
     return "  " + "  ".join(celulas)
 
 
@@ -247,8 +247,9 @@ def mostrar_relatorio_risco(itens):
 def mostrar_detalhe_risco(item, vulnerabilidades, parcelas):
     """Mostra como o risco de um equipamento foi calculado.
 
-    item é o RiscoEquipamento; vulnerabilidades, os pares (vulnerabilidade,
-    situação) dele; parcelas, o que devolve ModeloRisco.contribuicoes().
+    item é o RiscoEquipamento; vulnerabilidades, os pares
+    (vulnerabilidade, situação) dele; parcelas, o que devolve
+    ModeloRisco.contribuicoes().
     """
     e = item.equipamento
     print(f"\n  {cores.titulo(e.hostname)} - {e.tipo.rotulo}")
@@ -290,7 +291,7 @@ def mostrar_detalhe_risco(item, vulnerabilidades, parcelas):
 
 
 def mostrar_matrizes(modelo):
-    """Mostra M, v, M v, F, b e A de um cenário pequeno, para conferir à mão.
+    """Mostra M, v, M v, F, b e A, para conferir a conta à mão.
 
     Só para poucos equipamentos: com dezenas, a matriz não cabe na tela.
     """
@@ -306,13 +307,14 @@ def mostrar_matrizes(modelo):
         f"V{v.id}={numero_br(v.cvss)}" for v in modelo.vulnerabilidades))
 
     # M leva v (uma nota por vulnerabilidade) a M v (uma soma por
-    # equipamento): é a transformação linear do modelo. F é a diagonal de
-    # uma matriz diagonal: multiplica cada linha pelo fator do tipo.
+    # equipamento): é a transformação linear do modelo. F é diagonal
+    # (só a diagonal aparece): multiplica cada linha pelo fator do tipo.
     equipamentos = modelo.equipamentos
 
     def por_equipamento(valores, casas):
         return "  ".join(f"E{e.id}={numero_br(valor, casas)}"
-                         for e, valor in zip(equipamentos, valores))
+                         for e, valor in zip(equipamentos, valores,
+                                             strict=True))
 
     print("\n  M v (soma das notas de cada equipamento):  "
           + por_equipamento(modelo.soma_cvss, 1))

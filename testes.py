@@ -23,16 +23,21 @@ from unittest import mock
 
 import cores
 import main
-from armazenamento import ArquivoInventario, BaseInvalida
-from classificacoes import TipoEquipamento
+from armazenamento import ArquivoInventario, BaseInvalidaError
+from classificacoes import (
+    OrigemVulnerabilidade,
+    SituacaoTratamento,
+    TipoEquipamento,
+)
+from equipamentos import criar_equipamento
 from inventario import Inventario
-from risco import ModeloRisco, SistemaSingular
+from risco import ModeloRisco, SistemaSingularError
 
 PASTA = os.path.dirname(os.path.abspath(__file__))
 
 # Sem cores: a saída capturada vira texto puro, mesmo rodando num
-# terminal. NO_COLOR vale para os autotestes, que rodam em outro processo;
-# desligar() vale para este, que já importou cores.py.
+# terminal. NO_COLOR vale para os autotestes, que rodam em outro
+# processo; desligar() vale para este, que já importou cores.py.
 os.environ["NO_COLOR"] = "1"
 cores.desligar()
 
@@ -42,7 +47,7 @@ class EntradaAcabou(EOFError):
 
 
 class TesteDoPrograma(unittest.TestCase):
-    """Roda o menu de verdade, com teclado simulado e base temporária."""
+    """Roda o menu real, com teclado simulado e base temporária."""
 
     def setUp(self):
         """Cria uma pasta temporária para a base de cada teste."""
@@ -52,7 +57,7 @@ class TesteDoPrograma(unittest.TestCase):
                                     "inventario.json")
 
     def rodar(self, respostas):
-        """Executa o programa com as respostas e devolve o que foi impresso.
+        """Roda o programa com as respostas e devolve a saída impressa.
 
         As respostas são as linhas digitadas, na ordem. O programa é
         encerrado pela última, que deve ser "0" (ou o teste falha por
@@ -86,7 +91,7 @@ class TesteDoPrograma(unittest.TestCase):
         with open(self.caminho, encoding="utf-8") as f:
             return json.load(f)
 
-    # --- cenário do enunciado, pelo menu --------------------------------
+    # --- cenário do enunciado, pelo menu ------------------------------
 
     CENARIO = [
         # E1 estação com V1 (4,0)
@@ -99,14 +104,15 @@ class TesteDoPrograma(unittest.TestCase):
         # E3 banco com V2 (já existente)
         "1", "BANCO-01", "Fulano de Tal", "Sala técnica", "Banco", "6",
         "s", "1", "2", "1", "n",
-        # dependências: 1 herda 0,5 de 2; 2 herda 0,5 de 3; 3 herda 0,25 de 2
+        # dependências: 1 herda 0,5 de 2; 2 herda 0,5 de 3;
+        # 3 herda 0,25 de 2
         "11", "1", "2", "0,5",
         "11", "2", "3", "0,5",
         "11", "3", "2", "0,25",
     ]
 
     def test_cenario_de_3_equipamentos_pelo_menu(self):
-        """Do cadastro ao risco: a resposta resolvida à mão (16, 24, 18)."""
+        """Do cadastro ao risco: a conta feita à mão (16, 24, 18)."""
         saida = self.rodar(self.CENARIO + ["13", "0"])
 
         self.assertIn("estritamente diagonal dominante", saida)
@@ -157,7 +163,7 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertRegex(saida, r"SERVIDOR-01\s+Servidor\s+4,0\s+1,5\s+"
                                 r"6,00\s+13,71")
 
-    # --- regras de dependência ------------------------------------------
+    # --- regras de dependência ----------------------------------------
 
     def test_soma_das_fracoes_nao_pode_chegar_a_1(self):
         """0,5 + 0,5 é recusado e nada é gravado; 0,49 passa."""
@@ -173,7 +179,7 @@ class TesteDoPrograma(unittest.TestCase):
             {"equipamento_id": 3, "fracao": 0.5}])
 
     def test_dependencia_de_si_mesmo_e_destino_inexistente(self):
-        """A[i][i] = 0: não há auto-dependência; o destino precisa existir."""
+        """A[i][i] = 0, sem auto-dependência; o destino deve existir."""
         saida = self.rodar(self.CENARIO + [
             "11", "1", "1",            # de si mesmo
             "11", "1", "99",           # destino inexistente
@@ -198,10 +204,10 @@ class TesteDoPrograma(unittest.TestCase):
             {"equipamento_id": 1, "fracao": 0.2},
             {"equipamento_id": 2, "fracao": 0.25}])
 
-    # --- sistema singular -----------------------------------------------
+    # --- sistema singular ---------------------------------------------
 
     def test_sistema_singular_e_informado_e_nao_resolvido(self):
-        """Arquivo editado à mão com linhas somando 1: avisa, não calcula."""
+        """Arquivo editado com linhas somando 1: avisa, não calcula."""
         self.rodar(self.CENARIO + ["0"])
         dados = self.lido()
         for equipamento in dados:
@@ -222,10 +228,10 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertNotIn("EFETIVO", saida)
         self.assertNotIn("Traceback", saida)
 
-    # --- exclusão em cascata --------------------------------------------
+    # --- exclusão em cascata ------------------------------------------
 
     def test_excluir_equipamento_leva_o_que_estava_ligado(self):
-        """Excluir o servidor remove dependências que apontavam para ele."""
+        """Excluir o servidor remove as dependências ligadas a ele."""
         saida = self.rodar(self.CENARIO + ["5", "2", "s", "0"])
         self.assertIn("2 vulnerabilidade(s) registrada(s) nele e 2 "
                       "dependência(s)", saida)
@@ -246,14 +252,14 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertEqual(self.lido()[0]["vulnerabilidades"], [])
 
     def test_id_excluido_nao_volta_enquanto_o_programa_roda(self):
-        """O id 3, excluído, não é entregue de novo ao próximo cadastro."""
+        """O id 3, excluído, não é reaproveitado no próximo cadastro."""
         self.rodar(self.CENARIO + [
             "5", "3", "s",
             "1", "NOVO-01", "Fulano de Tal", "Setor", "Estação", "1", "n",
             "0"])
         self.assertEqual([e["id"] for e in self.lido()], [1, 2, 4])
 
-    # --- validações do cadastro -----------------------------------------
+    # --- validações do cadastro ---------------------------------------
 
     def test_hostname_invalido_e_repetido_perguntam_de_novo(self):
         """O menu insiste até vir um hostname válido e único."""
@@ -270,17 +276,18 @@ class TesteDoPrograma(unittest.TestCase):
                          ["PC-01", "PC-02"])
 
     def test_nota_cvss_invalida_pergunta_de_novo(self):
-        """Nota fora de 0,1 a 10,0, NaN e texto não passam; 7,5 passa."""
+        """Fora da faixa, 2 casas, NaN e texto não passam; 7,5 passa."""
         saida = self.rodar([
             "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1",
-            "s", "Falha qualquer", "6", "0", "11", "nan", "abc", "7,5", "1",
-            "n", "0"])
+            "s", "Falha qualquer", "6", "0", "11", "8,25", "nan", "abc",
+            "7,5", "1", "n", "0"])
         self.assertIn("A nota CVSS deve ficar entre 0,1 e 10,0", saida)
+        self.assertIn("A nota CVSS tem uma casa decimal só", saida)
         self.assertIn("severidade Alta, nota 7,5", saida)
         self.assertEqual(self.lido()[0]["vulnerabilidades"][0]["cvss"], 7.5)
 
     def test_mudar_o_tipo_troca_a_classe_e_mantem_as_relacoes(self):
-        """Mudar o tipo do servidor para banco muda o fator, não os dados."""
+        """Servidor que vira banco muda o fator, mas não os dados."""
         saida = self.rodar(self.CENARIO + [
             "4", "2", "", "", "", "", "6", "13", "0"])
         self.assertIn("Equipamento atualizado (1 campo(s))", saida)
@@ -289,7 +296,7 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertRegex(saida, r"SERVIDOR-01\s+Banco de dados\s+10,0\s+2,0"
                                 r"\s+20,00")
 
-    # --- comandos globais e robustez ------------------------------------
+    # --- comandos globais e robustez ----------------------------------
 
     def test_voltar_descarta_o_que_nao_foi_gravado(self):
         """Digitar voltar no meio de um cadastro não grava nada."""
@@ -317,14 +324,14 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("M é 3 x 2", saida)
         self.assertIn("V1=4,0  V2=6,0", saida)
         self.assertRegex(saida, r"E3\s+0\s+0,25\s+0")
-        # M v, a diagonal de F e b = F (M v), conferidos à mão no README.
+        # M v, a diagonal de F e b = F (M v), feitos à mão no README.
         self.assertRegex(saida, r"M v .*E1=4,0  E2=10,0  E3=6,0")
         self.assertRegex(saida, r"F .*E1=1,0  E2=1,5  E3=2,0")
         self.assertRegex(saida, r"b = F \(M v\).*E1=4,00  E2=15,00  E3=12,00")
         self.assertIn("det(I - A) = 0,875", saida)
 
     def test_matrizes_de_base_grande_mostram_so_a_verificacao(self):
-        """Com 76 equipamentos a opção 15 não desenha M, mas verifica I - A."""
+        """Base grande: a opção 15 não desenha M, mas verifica I - A."""
         os.makedirs(os.path.dirname(self.caminho))
         with open(os.path.join(PASTA, "dados_exemplo",
                                "inventario_exemplo.json"),
@@ -337,10 +344,10 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("estritamente diagonal dominante", saida)
         self.assertIn("det(I - A) = 0,98", saida)
 
-    # --- consultas do T1 pelo menu --------------------------------------
+    # --- consultas do T1 pelo menu ------------------------------------
 
     def test_listar_e_buscar_por_id_e_por_hostname(self):
-        """Opções 2 e 3: lista tudo e acha por ID e por parte do hostname."""
+        """Opções 2 e 3: lista e acha por ID e por parte do hostname."""
         saida = self.rodar(self.CENARIO + [
             "2",
             "3", "1", "2",            # busca pelo ID 2
@@ -353,27 +360,27 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("Nenhum equipamento encontrado.", saida)
 
     def test_pendentes_da_mais_grave_para_a_menos_grave(self):
-        """Opção 10: as 4 ocorrências abertas, a nota 6,0 antes da 4,0."""
+        """Opção 10: as 4 ocorrências abertas, 6,0 antes de 4,0."""
         saida = self.rodar(self.CENARIO + ["10", "0"])
         self.assertIn("4 aberta(s) ou em tratamento", saida)
         self.assertLess(saida.index("6,0 [2]"), saida.index("4,0 [1]"))
 
     def test_ver_e_remover_dependencia(self):
-        """Opção 12: remove a dependência de E1 em E2, com confirmação."""
+        """Opção 12: tira a dependência de E1 em E2, com confirmação."""
         saida = self.rodar(self.CENARIO + ["12", "1", "2", "s", "0"])
         self.assertIn("Dependência removida.", saida)
         self.assertEqual(self.lido()[0]["dependencias"], [])
 
     def test_verificacao_mostra_determinante_e_condicao(self):
-        """A opção 13 mostra det(I - A) e o número de condição, só para ver."""
+        """A opção 13 mostra det(I - A) e o número de condição."""
         saida = self.rodar(self.CENARIO + ["13", "0"])
         self.assertIn("det(I - A) = 0,875 · número de condição de I - A = "
                       "2,56", saida)
 
-    # --- base do Trabalho 1 e base ruim ---------------------------------
+    # --- base do Trabalho 1 e base ruim -------------------------------
 
     def test_base_do_trabalho_1_e_convertida_com_copia(self):
-        """Um arquivo do T1 é convertido ao abrir, e a original guardada."""
+        """Base do T1: convertida ao abrir, com a original guardada."""
         t1 = {"ativos": {"1": {"hostname": "PC-01", "custodiante": "A",
                                "lotacao": "B", "descricao": "C",
                                "categoria": 2}},
@@ -396,7 +403,7 @@ class TesteDoPrograma(unittest.TestCase):
             self.assertEqual(json.load(f), t1)
 
     def test_base_invalida_para_o_programa_sem_sobrescrever(self):
-        """Arquivo corrompido: mensagem clara, código 1, arquivo intacto."""
+        """Base corrompida: aviso claro, código 1 e arquivo intacto."""
         os.makedirs(os.path.dirname(self.caminho))
         with open(self.caminho, "w", encoding="utf-8") as f:
             f.write('[{"id": 1, "tipo": ')
@@ -412,10 +419,10 @@ class TesteDoPrograma(unittest.TestCase):
         with open(self.caminho, encoding="utf-8") as f:
             self.assertEqual(f.read(), '[{"id": 1, "tipo": ')
 
-    # --- container ------------------------------------------------------
+    # --- container ----------------------------------------------------
 
     def test_container_sem_terminal_explica_e_para(self):
-        """Sem terminal (docker run -d): mensagem clara em vez de EOFError."""
+        """Sem terminal (docker run -d): aviso claro, não EOFError."""
         with (mock.patch.dict(os.environ,
                               {main.VARIAVEL_CONTAINER: "1"}),
               mock.patch("sys.stdin", io.StringIO()),
@@ -424,7 +431,7 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("docker run -dit", str(parada.exception))
 
     def test_container_ignora_ctrl_c_e_trata_sigterm(self):
-        """Ctrl+C no docker attach não derruba; docker stop sai com 0."""
+        """Ctrl+C no attach não derruba; docker stop sai com 0."""
         terminal = mock.Mock()
         terminal.isatty.return_value = True
         with (mock.patch("sys.stdin", terminal),
@@ -454,7 +461,7 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertFalse(os.path.exists(self.caminho))  # nada gravado
 
     def test_container_ctrl_d_e_ignorado(self):
-        """Ctrl+D (fim da entrada) no container não encerra o programa."""
+        """No container, Ctrl+D (fim da entrada) não encerra o menu."""
         with mock.patch.dict(os.environ, {main.VARIAVEL_CONTAINER: "1"}):
             saida = self.rodar([EOFError, "1", "PC-01", EOFError, "0", "s"])
         self.assertEqual(saida.count("Ctrl+D não encerra"), 2)
@@ -466,7 +473,7 @@ class TesteDoPrograma(unittest.TestCase):
             self.rodar([EOFError])
 
     def test_enter_sozinho_redesenha_o_menu(self):
-        """Depois do docker attach a tela está vazia: Enter mostra o menu."""
+        """Após o attach a tela está vazia: o Enter mostra o menu."""
         saida = self.rodar(["", "0"])
         self.assertEqual(saida.count("Cadastrar equipamento"), 2)
         self.assertNotIn("Digite apenas números", saida)
@@ -475,7 +482,7 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("Digite apenas números", saida)
 
     def test_container_enter_mostra_logotipo_e_menu(self):
-        """No container, Enter no menu traz a tela de abertura de volta."""
+        """No container, Enter no menu traz de volta a abertura."""
         with (mock.patch.dict(os.environ, {main.VARIAVEL_CONTAINER: "1"}),
               mock.patch("main.limpar_tela") as limpou):
             saida = self.rodar(["", "0", "s"])
@@ -487,14 +494,14 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertEqual(saida.count("Cadastrar equipamento"), 2)
 
     def test_fora_do_container_enter_mostra_so_o_menu(self):
-        """Fora do container, o Enter redesenha só o menu, sem limpar."""
+        """Fora do container, Enter redesenha só o menu, sem limpar."""
         with mock.patch("main.limpar_tela") as limpou:
             saida = self.rodar(["", "0"])
         limpou.assert_not_called()
         self.assertEqual(saida.count("▓▓▓▓▓▓▓▓▓▓"), 1)
 
     def test_matriz_invertivel_mas_sem_sentido_nao_e_resolvida(self):
-        """Raio espectral >= 1: invertível, mas risco negativo; avisa."""
+        """Invertível, mas com risco efetivo negativo: só avisa."""
         self.rodar(self.CENARIO + ["0"])
         dados = self.lido()
         # 1 herda 0,9 de 2 e de 3; 2 e 3 herdam 0,9 de 1.
@@ -537,7 +544,7 @@ class TesteDoModelo(unittest.TestCase):
             os.path.join(PASTA, "dados_exemplo", nome)).carregar()
 
     def test_cenario_de_validacao(self):
-        """dados_exemplo/cenario_3_equipamentos.json: x = (16, 24, 18)."""
+        """cenario_3_equipamentos.json dá x = (16, 24, 18)."""
         modelo = ModeloRisco(self.carregar("cenario_3_equipamentos.json"))
         self.assertEqual([round(i.proprio, 9) for i in modelo.relatorio()],
                          [4.0, 15.0, 12.0])
@@ -545,16 +552,16 @@ class TesteDoModelo(unittest.TestCase):
                          [16.0, 24.0, 18.0])
 
     def test_cenario_singular_e_recusado_pelo_modelo(self):
-        """dados_exemplo/cenario_singular.json carrega, mas não se resolve."""
+        """cenario_singular.json carrega, mas não se resolve."""
         modelo = ModeloRisco(self.carregar("cenario_singular.json"))
         diagnostico = modelo.diagnosticar()
         self.assertFalse(diagnostico.invertivel)
         self.assertFalse(diagnostico.utilizavel)
-        with self.assertRaises(SistemaSingular):
+        with self.assertRaises(SistemaSingularError):
             modelo.resolver()
 
     def test_base_de_exemplo_tem_solucao(self):
-        """A base de exemplo (76 equipamentos) é invertível e coerente."""
+        """Base de exemplo (76 equipamentos): invertível e coerente."""
         inventario = self.carregar("inventario_exemplo.json")
         self.assertEqual(len(inventario), 76)
         modelo = ModeloRisco(inventario)
@@ -576,8 +583,7 @@ class TesteDoModelo(unittest.TestCase):
                              original.para_dict())
 
     def test_ler_e_gravar_nao_muda_o_texto(self):
-        """Textos como X Y e a SSH voltam do arquivo como foram gravados."""
-        from classificacoes import OrigemVulnerabilidade, SituacaoTratamento
+        """Textos como X Y e a SSH voltam do arquivo sem mudança."""
         inventario = Inventario()
         pc = inventario.cadastrar_equipamento(
             TipoEquipamento.OUTRO, "PC-01", "TI SETOR", "TI Setor", "x Y")
@@ -598,7 +604,8 @@ class TesteDoModelo(unittest.TestCase):
         self.assertEqual([round(i.proprio, 9) for i in itens],
                          [4.0, 10.0, 6.0])
         # Resolvido à mão no README: 80/7, 104/7 e 68/7.
-        for item, exato in zip(itens, (80 / 7, 104 / 7, 68 / 7)):
+        for item, exato in zip(itens, (80 / 7, 104 / 7, 68 / 7),
+                               strict=True):
             self.assertAlmostEqual(item.efetivo, exato, places=9)
 
     def test_soma_com_erro_de_ponto_flutuante_e_recusada(self):
@@ -615,14 +622,13 @@ class TesteDoModelo(unittest.TestCase):
 
     def test_todo_tipo_tem_classe_e_fator(self):
         """Cada TipoEquipamento tem uma subclasse com fator positivo."""
-        from equipamentos import criar_equipamento
         for tipo in TipoEquipamento:
             equipamento = criar_equipamento(tipo, 1, "EQ-01", "A", "B", "C")
             self.assertGreater(equipamento.fator_exposicao, 0)
             self.assertIs(equipamento.tipo, tipo)
 
     def test_matriz_invalida_do_arquivo_e_recusada(self):
-        """Arquivo com dependência de equipamento inexistente não carrega."""
+        """Arquivo com dependência para id inexistente não carrega."""
         with tempfile.TemporaryDirectory() as pasta:
             caminho = os.path.join(pasta, "x.json")
             with open(caminho, "w", encoding="utf-8") as f:
@@ -632,8 +638,42 @@ class TesteDoModelo(unittest.TestCase):
                     "descricao": "C", "vulnerabilidades": [],
                     "dependencias": [{"equipamento_id": 9,
                                       "fracao": 0.3}]}]))
-            with self.assertRaises(BaseInvalida):
+            with self.assertRaises(BaseInvalidaError):
                 ArquivoInventario(caminho).carregar()
+
+    def test_nome_repetido_num_objeto_e_recusado(self):
+        """RFC 8259: "cvss" duas vezes no mesmo objeto é recusado."""
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = os.path.join(pasta, "x.json")
+            with open(caminho, "w", encoding="utf-8") as f:
+                f.write('[{"id": 1, "tipo": 1, "hostname": "PC-01", '
+                        '"custodiante": "A", "lotacao": "B", '
+                        '"descricao": "C", "dependencias": [], '
+                        '"vulnerabilidades": [{"id": 1, "descricao": "D", '
+                        '"origem": 1, "cvss": 9.8, "cvss": 1.0, '
+                        '"situacao": 1}]}]')
+            with self.assertRaises(BaseInvalidaError) as erro:
+                ArquivoInventario(caminho).carregar()
+        self.assertIn("'cvss' aparece duas vezes", str(erro.exception))
+
+    def test_arquivo_gravado_e_json_estrito(self):
+        """O JSON gravado é UTF-8 sem BOM e relido pelo json estrito."""
+        inventario = Inventario()
+        inventario.cadastrar_equipamento(TipoEquipamento.OUTRO, "PC-01",
+                                         "Suporte", "Sala", "Estação")
+        with tempfile.TemporaryDirectory() as pasta:
+            arquivo = ArquivoInventario(os.path.join(pasta, "x.json"))
+            arquivo.salvar(inventario)
+            with open(arquivo.caminho, "rb") as f:
+                bruto = f.read()
+
+        def recusar(constante):
+            raise ValueError(f"constante fora do JSON: {constante}")
+
+        self.assertFalse(bruto.startswith(b"\xef\xbb\xbf"))   # sem BOM
+        dados = json.loads(bruto.decode("utf-8"),
+                           parse_constant=recusar)  # NaN, Infinity
+        self.assertEqual(dados[0]["hostname"], "PC-01")
 
 
 class TesteDosAutotestes(unittest.TestCase):

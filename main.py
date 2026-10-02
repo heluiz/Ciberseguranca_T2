@@ -19,7 +19,7 @@ import time
 import banner
 import cores
 import telas
-from armazenamento import ArquivoInventario, BaseInvalida
+from armazenamento import ArquivoInventario, BaseInvalidaError
 from classificacoes import (
     OrigemVulnerabilidade,
     SituacaoTratamento,
@@ -47,7 +47,7 @@ from vulnerabilidades import validar_cvss
 # sair do container sem derrubá-lo e não morre com Ctrl+C.
 VARIAVEL_CONTAINER = "INVENTARIO_EM_CONTAINER"
 
-# Acima disto, a matriz não cabe na tela e a opção 15 mostra só o tamanho.
+# Acima disto a matriz não cabe na tela: a opção 15 mostra só o tamanho.
 MAXIMO_PARA_MOSTRAR_MATRIZES = 12
 
 # Buscas por texto da opção 3: número da opção -> (campo, pergunta).
@@ -94,7 +94,7 @@ class Aplicacao:
     """O programa: carrega a base e repete o menu até o usuário sair."""
 
     def __init__(self, arquivo):
-        """Recebe o ArquivoInventario de onde a base é lida e gravada."""
+        """Recebe o ArquivoInventario onde a base é lida e gravada."""
         self.arquivo = arquivo
         self.inventario = None
         # Fins de entrada seguidos (Ctrl+D), para não girar sem parar.
@@ -143,11 +143,11 @@ class Aplicacao:
         print()
 
     def _ler_id_equipamento(self, mensagem="  ID do equipamento: "):
-        """Lê o ID de um equipamento; "lista" mostra a tabela e repete."""
+        """Lê o ID; "lista" mostra a tabela e pergunta de novo."""
         return ler_inteiro(mensagem, mostrar_lista=self._listar_para_id)
 
     def _ler_equipamento(self, mensagem="  ID do equipamento: "):
-        """Lê um ID e devolve o equipamento; None (e avisa) se não existe."""
+        """Lê um ID e devolve o equipamento, ou avisa e devolve None."""
         id_equipamento = self._ler_id_equipamento(mensagem)
         equipamento = self.inventario.buscar_por_id(id_equipamento)
         if equipamento is None:
@@ -156,7 +156,7 @@ class Aplicacao:
 
     @staticmethod
     def _ler_nota_cvss(mensagem, opcional=False):
-        """Lê uma nota CVSS válida, repetindo até vir uma. Enter: None."""
+        """Lê uma nota CVSS, repetindo até ser válida. Enter: None."""
         while True:
             nota = ler_decimal(mensagem, opcional=opcional)
             if nota is None:
@@ -171,7 +171,7 @@ class Aplicacao:
     # ------------------------------------------------------------------
 
     def cadastrar_equipamento(self):
-        """Opção 1: cadastra um equipamento e as vulnerabilidades iniciais."""
+        """Opção 1: cadastra um equipamento e suas vulnerabilidades."""
         print("\n" + cores.titulo("--- CADASTRAR EQUIPAMENTO ---") + "\n")
         hostname = ler_hostname("  Hostname: ",
                                 self.inventario.problema_no_hostname)
@@ -209,7 +209,7 @@ class Aplicacao:
         print(f"\n  Total: {len(self.inventario)} equipamento(s).")
 
     def buscar_equipamento(self):
-        """Opção 3: busca equipamentos por id, hostname ou outros campos.
+        """Opção 3: acha equipamentos por id, hostname ou outros campos.
 
         O requisito 4 do T1 pede id e hostname; responsável, lotação e
         tipo vão além. Um resultado mostra a ficha completa; vários, a
@@ -255,7 +255,7 @@ class Aplicacao:
             self.inventario.vulnerabilidades_do(equipamento.id))
 
     def atualizar_equipamento(self):
-        """Opção 4: altera os campos de um equipamento (requisito 5 do T1).
+        """Opção 4: altera campos de um equipamento (requisito 5 do T1).
 
         Enter mantém o valor atual. As mudanças vão juntas para o
         inventário, que recusa todas se alguma for inválida.
@@ -441,7 +441,7 @@ class Aplicacao:
             self._mostrar_ficha_completa(equipamento)
 
     def _ler_vulnerabilidade_do_equipamento(self, equipamento):
-        """Mostra as do equipamento e pergunta qual. None se não houver."""
+        """Mostra as do equipamento e pede uma. None se não houver."""
         pares = self.inventario.vulnerabilidades_do(equipamento.id)
         if not pares:
             print("\n  " + cores.aviso(
@@ -458,9 +458,9 @@ class Aplicacao:
     def atualizar_vulnerabilidade(self):
         """Opção 8: corrige uma vulnerabilidade ou muda o tratamento.
 
-        Mesma mecânica da opção 4: Enter mantém o valor atual. Descrição,
-        categoria e nota são da vulnerabilidade e valem para todos os
-        equipamentos que a têm; o status é de cada equipamento.
+        Mesma mecânica da opção 4: Enter mantém o valor atual.
+        Descrição, categoria e nota são da vulnerabilidade e valem para
+        todos os equipamentos que a têm; o status é de cada equipamento.
         """
         print("\n" + cores.titulo("--- ATUALIZAR VULNERABILIDADE ---") + "\n")
         equipamento = self._ler_equipamento()
@@ -588,7 +588,7 @@ class Aplicacao:
     # ------------------------------------------------------------------
 
     def cadastrar_dependencia(self):
-        """Opção 11: registra que um equipamento herda risco de outro."""
+        """Opção 11: registra uma dependência (herança de risco)."""
         print("\n" + cores.titulo("--- CADASTRAR DEPENDÊNCIA ---") + "\n")
         print("  Se o equipamento B for comprometido, o equipamento A "
               "herda uma fração\n  do risco de B (a fração fica na "
@@ -620,7 +620,7 @@ class Aplicacao:
             self._erro("Não há espaço para outra dependência: remova uma "
                        "das existentes (opção 12).")
             return
-        # Fração recusada (zero, 1 ou acima do que cabe): pergunta de novo.
+        # Fração recusada (0, 1 ou além do que cabe): pergunta de novo.
         while True:
             fracao = ler_decimal(
                 f"  Fração do risco de {destino.hostname} que "
@@ -690,13 +690,13 @@ class Aplicacao:
         return modelo
 
     def risco_de_todos(self):
-        """Opção 13: risco próprio e efetivo de todos os equipamentos."""
+        """Opção 13: risco próprio e efetivo de cada equipamento."""
         print("\n" + cores.titulo("--- RISCO DOS EQUIPAMENTOS ---"))
         modelo = self._montar_modelo()
         if modelo is None:
             return
 
-        # Do mais para o menos arriscado; no empate, a ordem de cadastro.
+        # Do mais ao menos arriscado; no empate, a ordem de cadastro.
         itens = sorted(modelo.relatorio(),
                        key=lambda i: (-i.efetivo, i.equipamento.id))
         telas.mostrar_relatorio_risco(itens)
@@ -712,7 +712,7 @@ class Aplicacao:
         print("  Para ver como um deles foi calculado, use a opção 14.")
 
     def risco_de_um(self):
-        """Opção 14: risco próprio e efetivo de um equipamento, em passos."""
+        """Opção 14: o risco de um equipamento, passo a passo."""
         print("\n" + cores.titulo("--- RISCO DE UM EQUIPAMENTO ---") + "\n")
         equipamento = self._ler_equipamento()
         if equipamento is None:
@@ -736,7 +736,7 @@ class Aplicacao:
         print(f"\n  {n} equipamento(s) e {m} vulnerabilidade(s): M é "
               f"{n} x {m}, v tem {m} valor(es) e A é {n} x {n}.")
         if max(n, m) > MAXIMO_PARA_MOSTRAR_MATRIZES:
-            # As matrizes não cabem na tela; a verificação de I - A, sim.
+            # As matrizes não cabem; a verificação de I - A, sim.
             print("  " + cores.aviso(
                 f"Grande demais para mostrar as matrizes (mostro até "
                 f"{MAXIMO_PARA_MOSTRAR_MATRIZES} equipamentos e "
@@ -785,11 +785,12 @@ class Aplicacao:
             try:
                 opcao = int(bruto)
             except ValueError:
-                # Enter sozinho ou texto: desenha o menu de novo. Depois
-                # de um "docker attach" a tela está vazia (o Docker não
-                # repete o que já foi impresso), e o Enter é como o
-                # usuário pede para vê-la. No container, o Enter sozinho
-                # limpa a tela e traz também o logotipo, como na abertura.
+                # Enter sozinho ou texto: desenha o menu de novo.
+                # Depois de um "docker attach" a tela está vazia (o
+                # Docker não repete o que já foi impresso), e o Enter é
+                # como o usuário pede para vê-la. No container, o Enter
+                # sozinho limpa a tela e traz também o logotipo, como
+                # na abertura.
                 if not bruto and em_container():
                     limpar_tela()
                     self.exibir_abertura()
@@ -802,7 +803,7 @@ class Aplicacao:
 
     @staticmethod
     def pausar():
-        """Espera o Enter antes de o menu voltar, para o resultado ser lido.
+        """Espera o Enter antes de o menu voltar à tela.
 
         Sem a pausa, o menu seria impresso logo abaixo do resultado e
         empurraria o começo de uma listagem longa para fora da tela.
@@ -824,9 +825,10 @@ class Aplicacao:
         ter parado entre a memória e o disco. "voltar" não precisa
         recarregar: as ações só mexem na base depois da última pergunta.
         """
-        # A ordem dos except importa: o Python usa o primeiro que servir.
-        # Os pedidos do usuário vêm antes do "except Exception" genérico,
-        # senão "voltar" e "sair" seriam tratados como erro inesperado.
+        # A ordem dos except importa: o Python usa o primeiro que
+        # servir. Os pedidos do usuário vêm antes do "except Exception"
+        # genérico, senão "voltar" e "sair" seriam tratados como erro
+        # inesperado.
         try:
             acao()
         except VoltarAoMenu:
@@ -888,7 +890,7 @@ class Aplicacao:
         print("\n  " + cores.titulo("Até logo.") + "\n")
 
     def _repetir_menu(self):
-        """Mostra o menu e executa as opções até a saída ser confirmada."""
+        """Mostra o menu e executa as opções até confirmar a saída."""
         while True:
             self.exibir_menu()
             opcao = self.ler_opcao_do_menu()
@@ -980,7 +982,7 @@ def main():
     aplicacao = Aplicacao(ArquivoInventario())
     try:
         aplicacao.iniciar()
-    except BaseInvalida as erro:
+    except BaseInvalidaError as erro:
         # Não abre base ruim: a primeira gravação apagaria o original.
         print("\n  " + cores.erro(
             f"! Não foi possível carregar a base de dados: {erro}"))
@@ -992,8 +994,9 @@ def main():
         print(cores.erro("    e o programa começa uma base nova.") + "\n")
         sys.exit(1)
     except OSError as erro:
-        # Só chega aqui um erro de arquivo durante a carga (nas ações
-        # do menu, executar() trata): pasta sem permissão, disco cheio...
+        # Só chega aqui um erro de arquivo durante a carga (nas
+        # ações do menu, executar() trata): pasta sem permissão,
+        # disco cheio...
         print("\n  " + cores.erro(
             f"! Não foi possível ler ou gravar o arquivo de dados: {erro}")
             + "\n")

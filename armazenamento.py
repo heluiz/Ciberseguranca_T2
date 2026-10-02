@@ -5,7 +5,7 @@ só aqui. O arquivo é um array (lista) de objetos JSON, um por
 equipamento, cada um com as suas vulnerabilidades e dependências. O
 conteúdo é montado e conferido por
 Inventario.para_dict() e Inventario.de_dict(); este módulo só lê, grava
-e traduz erros de leitura em BaseInvalida.
+e traduz erros de leitura em BaseInvalidaError.
 
 Onde fica o arquivo: dados/inventario.json ao lado do código, ou o
 caminho da variável de ambiente INVENTARIO_DADOS (é o que o Docker usa,
@@ -20,8 +20,23 @@ import migracao
 from inventario import Inventario
 
 
-class BaseInvalida(Exception):
+class BaseInvalidaError(Exception):
     """A base em disco está ilegível, corrompida ou adulterada."""
+
+
+def _objeto_sem_nome_repetido(pares):
+    """Monta um objeto JSON e recusa nome repetido nele.
+
+    A RFC 8259 (seção 4) pede nomes únicos num objeto; sozinho, o módulo
+    json ficaria em silêncio com o último valor de um nome repetido.
+    """
+    objeto = {}
+    for nome, valor in pares:
+        if nome in objeto:
+            raise ValueError(f"o nome {nome!r} aparece duas vezes no "
+                             f"mesmo objeto")
+        objeto[nome] = valor
+    return objeto
 
 
 # Caminho absoluto: a base fica ao lado do código, de onde quer que o
@@ -62,8 +77,10 @@ class ArquivoInventario:
 
         temporario = self.caminho + ".tmp"
         with open(temporario, "w", encoding="utf-8") as f:
+            # allow_nan=False: NaN e Infinity não existem em JSON (RFC
+            # 8259, seção 6); o json do Python os gravaria por padrão.
             json.dump(inventario.para_dict(), f, indent=2,
-                      ensure_ascii=False)
+                      ensure_ascii=False, allow_nan=False)
             f.write("\n")
             # Garante o conteúdo no disco antes da troca de nome.
             f.flush()
@@ -75,8 +92,8 @@ class ArquivoInventario:
 
         Sem arquivo, devolve um inventário vazio (primeira execução).
         Um arquivo do Trabalho 1 é convertido (migracao.py), depois de
-        uma cópia de segurança ao lado dele. Levanta BaseInvalida se o
-        arquivo existir mas não puder ser lido ou estiver fora do
+        uma cópia de segurança ao lado dele. Levanta BaseInvalidaError
+        se o arquivo existir mas não puder ser lido ou estiver fora do
         formato: carregar pela metade faria a próxima gravação apagar
         os dados bons.
         """
@@ -84,20 +101,24 @@ class ArquivoInventario:
         if not os.path.exists(self.caminho):
             return Inventario()
 
-        # utf-8-sig aceita o arquivo com ou sem BOM (Bloco de Notas).
+        # utf-8-sig aceita o arquivo com ou sem BOM (o Bloco de Notas
+        # põe um). A RFC 8259 permite ignorar o BOM na leitura; ao
+        # gravar, o json do Python não põe BOM.
         try:
-            with open(self.caminho, "r", encoding="utf-8-sig") as f:
-                dados = json.load(f)
+            with open(self.caminho, encoding="utf-8-sig") as f:
+                dados = json.load(
+                    f, object_pairs_hook=_objeto_sem_nome_repetido)
         except OSError as erro:
-            raise BaseInvalida(
+            raise BaseInvalidaError(
                 f"não foi possível abrir o arquivo ({erro})") from erro
         except UnicodeDecodeError as erro:
             # Vem antes do ValueError, do qual é subclasse.
-            raise BaseInvalida("o arquivo não está em UTF-8 - foi salvo em "
-                               "outra codificação") from erro
+            raise BaseInvalidaError("o arquivo não está em UTF-8 - foi "
+                                    "salvo em outra codificação") from erro
         except (ValueError, RecursionError) as erro:
             # JSON malformado ou aninhado demais.
-            raise BaseInvalida(f"não é um JSON válido ({erro})") from erro
+            raise BaseInvalidaError(
+                f"não é um JSON válido ({erro})") from erro
 
         avisos = None
         try:
@@ -105,21 +126,21 @@ class ArquivoInventario:
                 dados, avisos = migracao.converter(dados)
             inventario = Inventario.de_dict(dados)
         except (KeyError, ValueError, TypeError, AttributeError) as erro:
-            raise BaseInvalida(f"conteúdo fora do formato esperado "
-                               f"({erro})") from erro
+            raise BaseInvalidaError(
+                f"conteúdo fora do formato esperado ({erro})") from erro
 
         if avisos is not None:
             try:
                 self.migracao_feita = (self._guardar_copia_t1(), avisos)
             except OSError as erro:
-                raise BaseInvalida(
+                raise BaseInvalidaError(
                     f"a base é do Trabalho 1 e não foi possível guardar a "
                     f"cópia de segurança antes de converter ({erro})"
                 ) from erro
         return inventario
 
     def _guardar_copia_t1(self):
-        """Copia o arquivo do Trabalho 1 para ao lado dele e devolve onde.
+        """Copia o arquivo do T1 para junto dele e devolve o caminho.
 
         A cópia só é feita uma vez: se já existe, ela é a original e
         não é sobrescrita.
@@ -198,7 +219,7 @@ if __name__ == "__main__":
         try:
             arquivo.carregar()
             raise AssertionError(f"aceitou a base adulterada: {nome}")
-        except BaseInvalida as erro:
+        except BaseInvalidaError as erro:
             print(f"Recusada ({nome}): {erro}")
 
     # Arquivo do Trabalho 1: convertido, com cópia de segurança.

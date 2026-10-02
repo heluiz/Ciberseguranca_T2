@@ -1,4 +1,4 @@
-"""A classe Vulnerabilidade: uma entrada do catálogo de vulnerabilidades.
+"""A classe Vulnerabilidade: um item do catálogo de vulnerabilidades.
 
 Uma vulnerabilidade existe uma vez só, com a descrição, a origem e a
 nota CVSS, e pode afetar vários equipamentos. Quem diz quais é o
@@ -27,17 +27,20 @@ CVSS_MAXIMO = 10.0
 
 
 def validar_cvss(valor):
-    """Devolve a nota CVSS com uma casa decimal, ou levanta ValueError.
+    """Devolve a nota CVSS como float, ou levanta ValueError.
 
-    A nota é um número de 0,1 a 10,0. bool e NaN são recusados: float()
-    aceitaria "nan" digitado, e um NaN na matriz estragaria todo o
-    cálculo de risco.
+    A nota vai de 0,1 a 10,0 e tem uma casa decimal, como as notas
+    publicadas pelo FIRST e pela NVD: 8,25 é recusada, e não
+    arredondada em silêncio. bool e NaN são recusados: float() aceitaria
+    "nan" digitado, e um NaN na matriz estragaria o cálculo de risco.
     """
     if isinstance(valor, bool) or not isinstance(valor, (int, float)):
         raise ValueError(f"A nota CVSS deve ser um número, veio {valor!r}")
     if not math.isfinite(valor):
         raise ValueError("A nota CVSS deve ser um número finito")
-    nota = round(float(valor), 1)
+    nota = float(valor)
+    if round(nota, 1) != nota:
+        raise ValueError("A nota CVSS tem uma casa decimal só, como 7,5")
     if not CVSS_MINIMO <= nota <= CVSS_MAXIMO:
         raise ValueError(f"A nota CVSS deve ficar entre "
                          f"{formatacao.numero_br(CVSS_MINIMO)} e "
@@ -56,7 +59,7 @@ class Vulnerabilidade:
     CAMPOS_EDITAVEIS = ("descricao", "origem", "cvss")
 
     def __init__(self, id_vulnerabilidade, descricao, origem, cvss):
-        """Cria a vulnerabilidade; ValueError se algum dado for inválido."""
+        """Cria a vulnerabilidade; dado inválido levanta ValueError."""
         if not isinstance(origem, OrigemVulnerabilidade):
             raise ValueError("A origem deve ser uma OrigemVulnerabilidade")
         if not descricao.strip():
@@ -100,7 +103,7 @@ class Vulnerabilidade:
             setattr(self, campo, valor)
 
     def para_dict(self):
-        """Devolve o objeto JSON da vulnerabilidade (só tipos do JSON)."""
+        """Devolve o objeto JSON da vulnerabilidade (só tipos JSON)."""
         return {
             "id": self.id,
             "descricao": self.descricao,
@@ -138,7 +141,7 @@ class Vulnerabilidade:
         return vulnerabilidade
 
     def __eq__(self, outro):
-        """Duas vulnerabilidades são iguais se tiverem os mesmos dados."""
+        """Vulnerabilidades com os mesmos dados são iguais."""
         if not isinstance(outro, Vulnerabilidade):
             return NotImplemented
         return self.para_dict() == outro.para_dict()
@@ -151,9 +154,9 @@ class Vulnerabilidade:
 # Teste: exercita a classe sem ninguém digitar nada.
 if __name__ == "__main__":
     v = Vulnerabilidade(1, "porta RDP exposta na rede interna",
-                        OrigemVulnerabilidade.SERVICO_EXPOSTO, 7.54)
+                        OrigemVulnerabilidade.SERVICO_EXPOSTO, 7.5)
     print(f"{v!r}: {v.descricao} | {v.gravidade.rotulo}")
-    assert v.cvss == 7.5, "a nota deveria ter uma casa decimal"
+    assert v.cvss == 7.5
     assert v.descricao == "Porta RDP exposta na rede interna"
     assert v.gravidade is NivelGravidade.ALTA
 
@@ -174,14 +177,14 @@ if __name__ == "__main__":
     except ValueError as erro:
         print(f"Campo protegido: {erro}")
 
-    for ruim in (0, 0.04, 10.5, -3, float("nan"), float("inf"),
+    for ruim in (0, 0.04, 8.25, 10.5, -3, float("nan"), float("inf"),
                  "7.5", None, True):
         try:
             validar_cvss(ruim)
             raise AssertionError(f"aceitou a nota {ruim!r}")
         except ValueError:
             pass
-    print("Notas inválidas (0, 10.5, NaN, texto...) recusadas.")
+    print("Notas inválidas (0, 8.25, 10.5, NaN, texto...) recusadas.")
 
     # Ida e volta pelo formato do arquivo.
     copia = Vulnerabilidade.de_dict(v.para_dict())

@@ -1,4 +1,4 @@
-"""Listas fechadas do sistema: tipos de equipamento e classificação de falhas.
+"""Listas fechadas: tipos de equipamento e classificação de falhas.
 
 Cada lista é um Enum: o valor inteiro vai para o arquivo, e o rótulo
 com acento, para a tela. Atende aos requisitos 2 e 7 do Trabalho 1 e,
@@ -137,7 +137,7 @@ class SituacaoTratamento(Enum):
 
     @property
     def conta_no_risco(self):
-        """Diz se a vulnerabilidade entra na matriz M do modelo de risco.
+        """Diz se a vulnerabilidade entra na matriz M (modelo de risco).
 
         Só a corrigida sai: corrigir deve baixar o risco. A aceita como
         risco continua entrando, porque aceitar não elimina a falha.

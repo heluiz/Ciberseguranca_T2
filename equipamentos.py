@@ -80,8 +80,8 @@ class Equipamento(ABC):
     # Cada subclasse define o seu tipo; é o valor gravado no arquivo.
     TIPO = None
 
-    # O id fica de fora: dependências e vínculos apontam para ele. O tipo
-    # também: mudá-lo troca a classe do objeto, o que é tarefa do
+    # O id fica de fora: dependências e vínculos apontam para ele. O
+    # tipo também: mudá-lo troca a classe do objeto, o que é tarefa do
     # Inventario (converter_para).
     CAMPOS_EDITAVEIS = ("hostname", "custodiante", "lotacao", "descricao")
 
@@ -234,11 +234,11 @@ class Equipamento(ABC):
 
     @property
     def soma_dependencias(self):
-        """Soma das frações de dependência: a soma da linha na matriz A."""
+        """Soma das frações de dependência (a soma da linha em A)."""
         return round(sum(self.dependencias.values()), 9)
 
     def definir_dependencia(self, id_destino, fracao):
-        """Registra que este equipamento herda parte do risco do destino.
+        """Registra que o equipamento herda parte do risco do destino.
 
         Se a dependência já existe, a fração é substituída. Levanta
         ValueError se o destino for o próprio equipamento (A[i][i] = 0),
@@ -308,10 +308,10 @@ class Equipamento(ABC):
     def de_dict(dados):
         """Reconstrói um equipamento a partir do objeto do arquivo.
 
-        Devolve um objeto da subclasse que o campo "tipo" indica. Levanta
-        ValueError, com a localização do problema, se o objeto estiver
-        fora do formato. Confere cada objeto isoladamente; que os ids
-        apontados existam é conferido pelo Inventario.
+        Devolve um objeto da subclasse que o campo "tipo" indica.
+        Levanta ValueError, com a localização do problema, se o objeto
+        estiver fora do formato. Confere cada objeto isoladamente; que
+        os ids apontados existam é conferido pelo Inventario.
 
         A regra "soma das frações < 1" não é imposta aqui, de propósito:
         um arquivo editado à mão pode violá-la, e quem decide o que
@@ -434,7 +434,7 @@ class ImpressoraRede(Equipamento):
 
     @property
     def fator_exposicao(self):
-        """0,5: alcance limitado, embora guarde documentos digitalizados."""
+        """0,5: alcance limitado, mas guarda cópias digitalizadas."""
         return 0.5
 
 
@@ -445,7 +445,7 @@ class SistemaInterno(Equipamento):
 
     @property
     def fator_exposicao(self):
-        """1,4: dá acesso a dados sensíveis de inquéritos e ocorrências."""
+        """1,4: acessa dados sensíveis de inquéritos e ocorrências."""
         return 1.4
 
 
@@ -456,7 +456,7 @@ class BancoDados(Equipamento):
 
     @property
     def fator_exposicao(self):
-        """2,0: o dado sensível fica concentrado aqui, o impacto dobra."""
+        """2,0: o dado sensível se concentra aqui, o impacto dobra."""
         return 2.0
 
 
@@ -495,7 +495,7 @@ def criar_equipamento(tipo, id_equipamento, hostname, custodiante, lotacao,
 
 # Teste: exercita a classe sem ninguém digitar nada.
 if __name__ == "__main__":
-    # --- Uma subclasse para cada tipo, e o polimorfismo -------------
+    # --- Uma subclasse para cada tipo, e o polimorfismo ---------------
     assert set(CLASSE_DO_TIPO) == set(TipoEquipamento), \
         "algum tipo ficou sem classe"
     try:
@@ -512,7 +512,7 @@ if __name__ == "__main__":
         assert objeto.fator_exposicao > 0
         assert objeto.tipo is tipo
 
-    # --- Dados e normalização ---------------------------------------
+    # --- Dados e normalização -----------------------------------------
     srv = criar_equipamento(TipoEquipamento.SERVIDOR, 2, " srv-arquivo ",
                             "chefe de equipe", "SALA TÉCNICA",
                             "servidor de arquivos")
@@ -544,7 +544,7 @@ if __name__ == "__main__":
     srv.atualizar({"custodiante": "investigador de plantão"})
     assert srv.custodiante == "Investigador de Plantão"
 
-    # --- Vulnerabilidades --------------------------------------------
+    # --- Vulnerabilidades ---------------------------------------------
     srv.vincular_vulnerabilidade(7, SituacaoTratamento.ABERTA)
     try:
         srv.vincular_vulnerabilidade(7, SituacaoTratamento.ABERTA)
@@ -603,7 +603,7 @@ if __name__ == "__main__":
     assert srv.remover_dependencia(3) is True
     assert srv.remover_dependencia(3) is False
 
-    # --- Mudança de tipo: outro objeto, mesmos dados ---------------------
+    # --- Mudança de tipo: outro objeto, mesmos dados ------------------
     srv.vincular_vulnerabilidade(8, SituacaoTratamento.ABERTA)
     banco = srv.converter_para(TipoEquipamento.BANCO_DADOS)
     print(f"\n{srv!r} virou {banco!r}; fator {srv.fator_exposicao} -> "
@@ -613,7 +613,7 @@ if __name__ == "__main__":
     assert banco.dependencias == srv.dependencias
     assert banco.dependencias is not srv.dependencias, "dict compartilhado"
 
-    # --- Ida e volta pelo formato do arquivo --------------------------------
+    # --- Ida e volta pelo formato do arquivo --------------------------
     for tipo in TipoEquipamento:
         original = criar_equipamento(tipo, 3, "EQ-01", "Fulano", "Setor",
                                      "Descrição")
@@ -625,7 +625,7 @@ if __name__ == "__main__":
     print("Ida e volta pelo JSON: as 7 subclasses voltam como eram.")
     print(f"Exemplo: {srv.para_dict()}")
 
-    # --- Objetos adulterados ----------------------------------------------
+    # --- Objetos adulterados ------------------------------------------
     base = srv.para_dict()
     adulterados = {
         "sem tipo": {k: v for k, v in base.items() if k != "tipo"},

@@ -1,0 +1,18 @@
+# Configuração do Ruff, o verificador de estilo usado no projeto. Ele
+# aplica as regras do flake8 (pycodestyle e pyflakes: PEP 8) e as do
+# pydocstyle (PEP 257). O pydocstyle foi descontinuado em 2023 e indica
+# o Ruff no lugar. Uso:  pip install ruff  e depois  ruff check .
+line-length = 79
+
+[lint]
+select = ["E", "W", "F", "D"]
+# D401 pede o resumo da docstring no imperativo do inglês ("Return...").
+# As docstrings do projeto são em português, na 3ª pessoa ("Devolve...").
+ignore = ["D401"]
+
+[lint.pydocstyle]
+convention = "pep257"
+
+[lint.pycodestyle]
+# PEP 8: código até 79 colunas; comentários e docstrings até 72.
+max-doc-length = 72

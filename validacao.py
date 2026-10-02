@@ -5,7 +5,7 @@ tomado como certo. Cada função confere um tipo e devolve o valor, ou
 levanta ValueError com uma frase que diz o que está errado e onde
 ("equipamento 3: campo 'hostname' ..."). O argumento "nome" é essa
 localização. As classes usam estas funções em de_dict(), e o
-armazenamento transforma o ValueError em BaseInvalida.
+armazenamento transforma o ValueError em BaseInvalidaError.
 """
 
 import math

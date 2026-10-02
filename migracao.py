@@ -21,7 +21,6 @@ Trabalho 1. Também dá para converter à mão:
     python migracao.py inventario_antigo.json inventario_novo.json
 """
 
-import json
 import sys
 
 from validacao import (
@@ -138,22 +137,23 @@ def converter(dados_t1):
 
 
 # Uso: python migracao.py origem.json destino.json
+# A leitura e a gravação são as do programa (armazenamento.py), com as
+# mesmas conferências: o arquivo novo sai igual ao que o menu gravaria.
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print(__doc__)
         sys.exit(2)
 
-    from inventario import Inventario
+    from armazenamento import ArquivoInventario, BaseInvalidaError
 
-    with open(sys.argv[1], encoding="utf-8-sig") as arquivo_origem:
-        antigo = json.load(arquivo_origem)
-    if not eh_formato_t1(antigo):
+    origem = ArquivoInventario(sys.argv[1])
+    try:
+        inventario = origem.carregar()      # converte e faz o .t1.bak
+    except BaseInvalidaError as erro:
+        sys.exit(f"Não foi possível ler {sys.argv[1]}: {erro}")
+    if origem.migracao_feita is None:
         sys.exit("O arquivo de origem não está no formato do Trabalho 1.")
-    novo, notas = converter(antigo)
-    Inventario.de_dict(novo)      # confere o resultado antes de gravar
-    with open(sys.argv[2], "w", encoding="utf-8") as arquivo_destino:
-        json.dump(novo, arquivo_destino, indent=2, ensure_ascii=False)
-        arquivo_destino.write("\n")
-    for nota in notas:
+    ArquivoInventario(sys.argv[2]).salvar(inventario)
+    for nota in origem.migracao_feita[1]:
         print("Aviso:", nota)
-    print(f"{len(novo)} equipamento(s) gravados em {sys.argv[2]}")
+    print(f"{len(inventario)} equipamento(s) gravados em {sys.argv[2]}")
