@@ -2,9 +2,9 @@
 
 Só a tela usa este módulo: nada colorido vai para o arquivo de dados.
 As funções devolvem o texto pintado, não imprimem; quem imprime são o
-main.py e o telas.py. O texto volta sem código nenhum quando a saída não é um
-terminal (redirecionada para arquivo), quando o programa roda no IDLE
-ou quando a variável de ambiente NO_COLOR está definida.
+main.py e o telas.py. O texto volta sem código nenhum quando a saída
+não é um terminal (redirecionada para arquivo), quando o programa
+roda no IDLE ou quando a variável de ambiente NO_COLOR está definida.
 """
 
 import os
@@ -43,8 +43,8 @@ def ativar():
 def desligar():
     """Desliga as cores de vez (os testes automáticos usam).
 
-    A decisão de ligar é tomada quando o módulo é importado; quem precisa
-    de texto puro mesmo num terminal chama esta função.
+    A decisão de ligar é tomada quando o módulo é importado; quem
+    precisa de texto puro mesmo num terminal chama esta função.
     """
     global _LIGADAS
     _LIGADAS = False

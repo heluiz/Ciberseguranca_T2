@@ -48,7 +48,7 @@ _LARGURA_ARTE = max(len(linha) for linha in ARTE)
 
 
 def _pintar_linha(linha):
-    """Pinta o escudo de ciano e o circuito de azul, em trechos seguidos.
+    """Pinta o escudo de ciano e o circuito de azul, trecho a trecho.
 
     Agrupa os caracteres iguais para gerar um código de cor por trecho,
     e não um por caractere.
@@ -71,7 +71,7 @@ def _pintar_linha(linha):
 
 
 def montar():
-    """Devolve o logotipo centralizado na largura da tela, pronto para print.
+    """Devolve o logotipo centralizado na tela, pronto para o print.
 
     O recuo é calculado sobre o texto puro, antes de pintar: os códigos
     de cor contam como caracteres e descentralizariam a arte.

@@ -117,18 +117,18 @@ _PELOS = "░▒▓"
 
 
 def ativa():
-    """Diz se a animação pode rodar: só em terminal com cores ligadas."""
+    """Diz se a animação pode rodar (terminal com cores ligadas)."""
     return (sys.stdin.isatty() and sys.stdout.isatty()
             and cores.pintar("x", cores.NEGRITO) != "x")
 
 
 def e_pedido(texto):
-    """Diz se o texto digitado é a palavra da surpresa e ela pode rodar."""
+    """Diz se o texto é a palavra da surpresa e se ela pode rodar."""
     return formatacao.para_busca(texto) == PALAVRA and ativa()
 
 
 def _pintar(linha):
-    """Rosto em amarelo e pelos em branco negrito, caractere a caractere."""
+    """Pinta o rosto de amarelo e os pelos de branco negrito."""
     pedacos = []
     for caractere in linha:
         if caractere in _PELOS:

@@ -102,7 +102,7 @@ def numero_br(valor, casas=1):
 
 
 def fracao_br(valor):
-    """Formata uma fração sem zeros inúteis: 0.3 -> "0,3", 0.25 -> "0,25".
+    """Formata frações sem zeros inúteis: 0.3 -> "0,3", 0.25 -> "0,25".
 
     Mostra até quatro casas, que é a precisão guardada para as frações
     das dependências.
