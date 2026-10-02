@@ -1,0 +1,13 @@
+# Configuração do coverage.py (medida de cobertura dos testes):
+#   pip install coverage
+#   coverage run testes.py
+#   coverage report
+# Os blocos "if __name__ == '__main__':" são os autotestes de cada módulo:
+# rodam em outro processo e ficam fora da conta.
+[run]
+source = .
+omit = testes.py
+
+[report]
+exclude_also =
+    if __name__ == .__main__.:

@@ -1,0 +1,37 @@
+# Integração contínua: a cada push e a cada pull request, o GitHub roda
+# as mesmas verificações feitas à mão antes de entregar.
+#   - estilo: flake8 (PEP 8) e pydocstyle (PEP 257);
+#   - testes: python testes.py (inclui o autoteste de cada módulo);
+#   - container: constrói a imagem do Dockerfile e roda, dentro dela, o
+#     autoteste do modelo de risco (confere o NumPy instalado na imagem).
+name: Verificação
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  estilo-e-testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Instalar dependências
+        run: pip install -r requirements.txt flake8 pydocstyle
+      - name: Estilo (PEP 8 e PEP 257)
+        run: |
+          flake8 --max-line-length 79 .
+          pydocstyle --convention=pep257 --add-ignore=D401 .
+      - name: Testes
+        run: python testes.py
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Construir a imagem
+        run: docker build -t inventario:ci .
+      - name: Autoteste do modelo de risco dentro da imagem
+        run: docker run --rm inventario:ci python risco.py

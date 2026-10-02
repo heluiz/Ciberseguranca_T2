@@ -20,3 +20,6 @@ services:
 
 volumes:
   inventario-dados:
+    # Nome fixo: sem ele, o Compose chamaria o volume de
+    # "<pasta>_inventario-dados", diferente do usado com "docker run".
+    name: inventario-dados
