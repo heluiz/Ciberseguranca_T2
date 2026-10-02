@@ -19,6 +19,7 @@ valendo, e o programa foi reescrito em orientação a objetos.
 - [Formato do arquivo de dados](#formato-do-arquivo-de-dados)
 - [Decisões de projeto](#decisões-de-projeto)
 - [Segurança e LGPD](#segurança-e-lgpd)
+- [Normas seguidas](#normas-seguidas)
 - [Limitações conhecidas](#limitações-conhecidas)
 - [Testes](#testes)
 - [Fluxo de trabalho no Git](#fluxo-de-trabalho-no-git)
@@ -28,9 +29,11 @@ valendo, e o programa foi reescrito em orientação a objetos.
 
 ### Direto no computador
 
-Requer Python 3.10 ou superior e o NumPy (a única dependência externa, usada
-no modelo de risco). Os testes passaram com Python 3.11 (Linux) e 3.13
-(Windows), com NumPy 2.x; a imagem Docker usa Python 3.12.
+Requer Python 3.11 ou superior e o NumPy (a única dependência externa, usada
+no modelo de risco). O Python 3.10 parou de receber correções de segurança em
+1º de outubro de 2026, por isso não é mais indicado. Os testes passaram com
+Python 3.11, 3.12, 3.13 e 3.14, com NumPy 2.4 e 2.5; a imagem Docker usa
+Python 3.14.
 
 ```
 pip install -r requirements.txt
@@ -48,10 +51,14 @@ docker build -t inventario:1.0 .
 docker volume create inventario-dados
 
 docker run -dit --name inventario --restart unless-stopped \
+  --read-only --security-opt no-new-privileges \
   -v inventario-dados:/app/dados inventario:1.0
 
 docker attach inventario
 ```
+
+(No PowerShell, a barra invertida no fim da linha não continua o comando:
+escreva o `docker run` numa linha só, sem as barras.)
 
 No `docker attach` a tela costuma aparecer vazia, porque o Docker não repete
 o que já foi impresso: **tecle Enter e a tela de abertura (logotipo e menu) é
@@ -61,7 +68,7 @@ pergunta, o Enter vale como resposta). Para sair sem parar o programa, tecle
 `docker attach`.
 
 O `compose.yaml` é uma alternativa que faz a construção, o volume e a execução
-de uma vez: `docker compose up -d --build`, seguido de
+de uma vez, com as mesmas opções: `docker compose up -d --build`, seguido de
 `docker attach inventario`.
 
 | Opção | Por quê |
@@ -69,6 +76,8 @@ de uma vez: `docker compose up -d --build`, seguido de
 | `-d` | O container roda em segundo plano (*detached*). |
 | `-i` e `-t` | Mantêm a entrada aberta e alocam um terminal. O processo principal é um menu que espera o teclado com `input()`; sem terminal, `input()` recebe fim de entrada e o programa terminaria na hora. Por isso é `-dit` e não só `-d`. Sem terminal, o programa explica isso e para. |
 | `--restart unless-stopped` | O Docker religa o programa se ele cair ou se o servidor reiniciar, a não ser que alguém tenha parado o container de propósito (`docker stop`). |
+| `--read-only` | O sistema de arquivos do container fica só para leitura; o programa grava apenas no volume dos dados. Quem conseguisse rodar algo lá dentro não poderia alterar o código nem instalar nada. |
+| `--security-opt no-new-privileges` | Nenhum processo do container consegue ganhar mais privilégios do que já tem (por exemplo, por um programa com *setuid*). |
 | `-v inventario-dados:/app/dados` | Os dados ficam num *volume*: sobrevivem a `docker rm` e à troca da imagem por uma versão nova. |
 
 Dentro do container o programa se comporta de forma diferente em cinco pontos,
@@ -104,18 +113,30 @@ continua legível e válido; `docker ps` mostra `(healthy)` enquanto estiver.
 
 Se o arquivo de dados ficar inválido (editado à mão com erro, por exemplo), o
 programa recusa a base e termina com código 1, sem sobrescrever nada; com
-`--restart unless-stopped` o Docker tentaria de novo sem parar. Para consertar:
+`--restart unless-stopped`, o Docker tenta religá-lo de novo e de novo, com um
+intervalo que dobra a cada tentativa (até 1 minuto). Para consertar:
 `docker stop inventario`, depois corrija o arquivo dentro do volume (por
 exemplo, `docker run --rm -it -v inventario-dados:/d alpine vi /d/inventario.json`)
 ou mova-o para outro nome, e `docker start inventario`.
 
-Para atualizar o programa, mantendo os dados:
+Para atualizar o programa, mantendo os dados (o `docker run` é o mesmo de
+antes):
 
 ```
 docker build -t inventario:1.0 .
 docker rm -f inventario
 docker run -dit --name inventario --restart unless-stopped \
+  --read-only --security-opt no-new-privileges \
   -v inventario-dados:/app/dados inventario:1.0
+```
+
+Se o volume foi criado por uma versão anterior da imagem, em que o usuário do
+programa tinha o UID 1000 (hoje é 10001), rode uma vez, entre o `docker rm` e o
+`docker run`, o comando abaixo, que passa os arquivos do volume para o usuário
+novo. Sem ele, o programa lê a base, mas não consegue gravar:
+
+```
+docker run --rm --user root -v inventario-dados:/app/dados inventario:1.0 chown -R 10001:10001 /app/dados
 ```
 
 ### No servidor do docente
@@ -129,6 +150,7 @@ cd Ciberseguranca_T2
 docker build -t inventario:1.0 .
 docker volume create inventario-dados
 docker run -dit --name inventario --restart unless-stopped \
+  --read-only --security-opt no-new-privileges \
   -v inventario-dados:/app/dados inventario:1.0
 ```
 
@@ -211,6 +233,7 @@ de duas branches e merges também continua valendo: veja
 | `formatacao.py`, `cores.py`, `banner.py`, `surpresa.py` | Padronização de texto, cores ANSI, logotipo e a animação-surpresa, herdados do Trabalho 1 |
 | `testes.py` | Testes automáticos (`python testes.py`) |
 | `Dockerfile`, `compose.yaml`, `.dockerignore`, `requirements.txt` | Container |
+| `ruff.toml` | Regras de estilo conferidas pelo Ruff: PEP 8 e PEP 257 |
 | `.github/workflows/verificacao.yml`, `.coveragerc` | Verificação automática no GitHub (estilo, testes e imagem Docker) e configuração da medida de cobertura |
 | `dados_exemplo/` | Base fictícia de 76 equipamentos e dois cenários pequenos: um de 3 equipamentos, resolvido à mão, e um singular |
 
@@ -273,9 +296,16 @@ dos dois jeitos.
 - **Vulnerabilidade corrigida não entra em M.** Corrigir deve baixar o risco.
   As situações *Aberta*, *Em tratamento* e *Aceita como risco* contam: aceitar
   um risco não o elimina.
-- **A severidade vem da nota CVSS**, pela escala do CVSS v3.x (0,1–3,9 baixa;
-  4,0–6,9 média; 7,0–8,9 alta; 9,0–10,0 crítica), e não é gravada: assim a nota
-  e a severidade nunca discordam.
+- **A severidade vem da nota CVSS**, pela escala do CVSS, que é a mesma na
+  v3.1 e na v4.0 (0,1–3,9 baixa; 4,0–6,9 média; 7,0–8,9 alta; 9,0–10,0
+  crítica), e não é gravada: assim a nota e a severidade nunca discordam. A
+  escala oficial também tem o nível *Nenhuma* (0,0); o programa aceita notas de
+  0,1 a 10,0, porque uma falha sem impacto não pesa no risco nem pede
+  tratamento.
+- **A nota tem uma casa decimal**, como as publicadas pela NVD. `8,25` é
+  recusada em vez de arredondada: o `round()` do Python arredonda o empate para
+  o número par (daria 8,2), enquanto o CVSS arredonda para cima (daria 8,3).
+  Quem digitou escolhe a nota certa.
 - **Resolve-se o sistema, não se inverte a matriz.** `numpy.linalg.solve` faz a
   fatoração LU: é mais preciso e mais rápido do que calcular a inversa de
   `I − A` e multiplicar por *b*. O `python risco.py` compara os dois num
@@ -403,15 +433,23 @@ vulnerabilidades e as suas dependências dentro dele.
   reiniciar o próximo id é o maior existente mais 1.
 - Na memória, os equipamentos ficam num dicionário (id → objeto), para a busca
   por id ser direta; a lista só existe no arquivo.
+- O arquivo segue a RFC 8259, a norma do JSON: é gravado em UTF-8 sem BOM e
+  nunca leva `NaN` nem `Infinity`, que não existem em JSON (a gravação usa
+  `allow_nan=False`; o padrão do Python, `True`, gravaria esses valores). Na
+  leitura, um BOM no início é aceito, como a RFC permite (o Bloco de Notas do
+  Windows pode gravar um), e o mesmo nome duas vezes num objeto faz o arquivo
+  ser recusado: sozinho, o módulo `json` do Python ficaria com o último valor,
+  sem avisar.
 - A gravação vai para um arquivo temporário que depois substitui o definitivo
   (`os.replace`): se ela for interrompida, a base anterior continua inteira.
 - A carga confere o arquivo inteiro: tipos, ids repetidos, hostname repetido,
   dependência de equipamento que não existe, vulnerabilidade com dados
-  diferentes em dois equipamentos, NaN. Qualquer problema para o programa com
-  uma mensagem que diz o que está errado e onde, em vez de carregar pela
-  metade e apagar dados bons na próxima gravação. Descrição, responsável e
-  lotação são mantidos como estão no arquivo (a padronização de maiúsculas é
-  feita na digitação); o hostname é sempre guardado em maiúsculas.
+  diferentes em dois equipamentos, o mesmo nome duas vezes num objeto, NaN.
+  Qualquer problema para o programa com uma mensagem que diz o que está
+  errado e onde, em vez de carregar pela metade e apagar dados bons na
+  próxima gravação. Descrição, responsável e lotação são mantidos como estão
+  no arquivo (a padronização de maiúsculas é feita na digitação); o hostname
+  é sempre guardado em maiúsculas.
 - A regra "soma das frações de uma linha < 1" **não** é imposta na carga, de
   propósito: quem avalia um arquivo editado à mão é o modelo de risco, que
   avisa o usuário.
@@ -461,16 +499,31 @@ para converter à mão:
 ## Segurança e LGPD
 
 - **Menor privilégio.** No container, o programa roda com um usuário comum
-  (`inventario`), sem ser root, e não abre nenhuma porta de rede: não há
-  serviço exposto a ataques pela rede.
+  (`inventario`, UID 10001), sem ser root; o sistema de arquivos é só para
+  leitura, menos o volume dos dados (`--read-only`); nenhum processo pode
+  ganhar privilégio (`no-new-privileges`); e nenhuma porta de rede é aberta:
+  não há serviço exposto a ataques pela rede.
+- **Normas de segurança de containers.** O CIS Docker Benchmark e o guia NIST
+  SP 800-190 recomendam o que o projeto faz: usuário que não é root, imagem
+  oficial, `HEALTHCHECK`, nenhum segredo na imagem, sistema de arquivos só para
+  leitura e `no-new-privileges`. Um desvio é consciente: o CIS recomenda a
+  política de religamento `on-failure` com no máximo 5 tentativas, e o projeto
+  usa `unless-stopped`, porque o requisito de 24 horas no ar pede que o
+  container volte sozinho quando o servidor reinicia, o que o `on-failure` não
+  faz. Limites de memória e de processos (`--memory`, `--pids-limit`), também
+  recomendados, não foram fixados: dependem da máquina do docente.
 - **Entrada tratada como suspeita.** O que vem do teclado e do arquivo é
-  validado (tipos, faixas, hostname pelas RFC 952 e 1123, caracteres de
-  controle recusados). Um arquivo adulterado é recusado, sem ser sobrescrito.
+  validado (tipos, faixas, hostname pelas RFC 952, 1123 e 1035, caracteres
+  de controle recusados). Um arquivo adulterado é recusado, sem ser sobrescrito.
 - **Dados pessoais (LGPD).** O único campo sobre pessoas é o responsável. O
   recomendado é registrar o cargo ou o setor ("Escrivão de Plantão", "Suporte
   de Informática"), e não o nome de alguém, como faz a base de exemplo: é o
   princípio da necessidade da LGPD (art. 6º, III), tratar o mínimo de dado
-  pessoal que a finalidade exige.
+  pessoal que a finalidade exige. Mesmo assim, o campo merece cuidado: a lei
+  protege também a pessoa *identificável* (art. 5º, I), e num setor pequeno o
+  cargo junto com a lotação pode apontar alguém. As medidas desta seção são as
+  que o princípio da segurança (art. 6º, VII) e o art. 46 pedem: proteger os
+  dados de acesso não autorizado, de perda e de alteração.
 - **Nada sensível no repositório.** A pasta `dados/`, com a base real, fica
   fora do Git (`.gitignore`) e da imagem (`.dockerignore`); a base de exemplo
   é fictícia; não há senhas nem chaves no código.
@@ -479,6 +532,27 @@ para converter à mão:
   pode alterar tudo. Autenticação e autorização ficam para o backend web do
   trabalho final; até lá, a proteção é o acesso ao servidor.
 
+## Normas seguidas
+
+A tabela resume as normas e documentações oficiais que regem o projeto, como
+cada uma foi aplicada e os desvios escolhidos de propósito.
+
+| Norma | Assunto | Como o projeto segue |
+| --- | --- | --- |
+| [PEP 8](https://peps.python.org/pep-0008/) | Estilo do código Python | 79 colunas no código e 72 em comentários e docstrings; classes em CapWords; exceções que são erros terminam em `Error` (`BaseInvalidaError`, `SistemaSingularError`); imports no topo, em três grupos (os autotestes importam dentro do próprio bloco o que só eles usam). `VoltarAoMenu` e `SairDoPrograma` não levam o sufixo porque não são erros, são pedidos do usuário. O Ruff confere tudo (`ruff.toml`). |
+| [PEP 257](https://peps.python.org/pep-0257/) | Docstrings | Todo módulo, classe e função pública tem docstring, com uma primeira linha curta. Desvio: a PEP pede a primeira linha como uma ordem ("Devolva..."); aqui ela está na 3ª pessoa ("Devolve..."), como é costume em português. |
+| [PEP 20](https://peps.python.org/pep-0020/) | Princípios do Python | "Errors should never pass silently": base inválida, nota com duas casas decimais e nome repetido no JSON são recusados com mensagem, nunca corrigidos em silêncio. |
+| [Versões do Python](https://devguide.python.org/versions/) | Versão em uso | Imagem e verificação automática no Python 3.14 (em manutenção completa); 3.11 ou superior fora do container. O 3.10 chegou ao fim da vida em 2026-10-01. |
+| [NumPy](https://numpy.org/doc/stable/reference/generated/numpy.linalg.solve.html) | Álgebra linear | `linalg.solve` resolve o sistema sem inverter a matriz; `linalg.cond` decide a invertibilidade; `linalg.det` só informa; `LinAlgError` é tratado. |
+| [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259) e [módulo json](https://docs.python.org/3/library/json.html) | Formato do arquivo | Array JSON na raiz, UTF-8 sem BOM, sem `NaN` nem `Infinity`, nomes únicos em cada objeto. Veja [o formato](#formato-do-arquivo-de-dados). |
+| [CVSS v3.1](https://www.first.org/cvss/v3.1/specification-document) e [v4.0](https://www.first.org/cvss/v4.0/specification-document) | Nota e severidade | Escala qualitativa oficial (igual nas duas versões) e nota com uma casa decimal. Desvio: 0,0 (*Nenhuma*) não é aceita. |
+| [RFC 952](https://www.rfc-editor.org/rfc/rfc952), [1123](https://www.rfc-editor.org/rfc/rfc1123) e [1035](https://www.rfc-editor.org/rfc/rfc1035) | Hostname | Veja [Limitações conhecidas](#limitações-conhecidas). |
+| [LGPD](https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm) (Lei 13.709/2018) | Dados pessoais | Art. 6º, III (necessidade); art. 6º, VII e art. 46 (segurança). Veja [Segurança e LGPD](#segurança-e-lgpd). |
+| [Boas práticas do Docker](https://docs.docker.com/build/building/best-practices/) e [referência do Dockerfile](https://docs.docker.com/reference/dockerfile/) | Imagem | Imagem oficial `python:3.14-slim-trixie`, com a versão do Debian fixada no nome; dependências antes do código, para aproveitar o cache; usuário com UID fixo, sem ser root; `CMD` na forma exec e SIGTERM tratado; `VOLUME` para os dados; `.dockerignore`; `HEALTHCHECK` que termina com 0 ou 1. |
+| [docker run](https://docs.docker.com/reference/cli/docker/container/run/) e [Compose](https://docs.docker.com/reference/compose-file/) | Execução | `-it` para o menu, `--restart unless-stopped`, volume com nome fixo, `compose.yaml` (o nome preferido) sem o campo `version`, que é obsoleto. |
+| [CIS Docker Benchmark](https://www.cisecurity.org/benchmark/docker) e [NIST SP 800-190](https://csrc.nist.gov/pubs/sp/800/190/final) | Segurança de containers | Veja [Segurança e LGPD](#segurança-e-lgpd). Desvio: `unless-stopped` em vez de `on-failure`. |
+| [GitHub Actions](https://docs.github.com/en/actions/reference/security/secure-use) | Verificação automática | Token só com leitura (`permissions: contents: read`) e versões atuais das actions oficiais (`checkout@v7`, `setup-python@v7`). |
+
 ## Limitações conhecidas
 
 - **Um usuário por vez.** O arquivo é lido uma vez, ao abrir, e cada alteração
@@ -486,10 +560,6 @@ para converter à mão:
   sobrescreveriam.
 - **O programa é interativo.** O container precisa de `-it` (veja
   [Em container Docker](#em-container-docker)); não há API HTTP.
-- **A nota CVSS é guardada com uma casa decimal**, pelo arredondamento do
-  Python: `8,25` vira `8,2`, sem aviso. A calculadora oficial do CVSS
-  arredonda para cima (daria 8,3); na prática a nota já vem com uma casa,
-  copiada da NVD.
 - **A escala do risco não é limitada.** O risco próprio e o efetivo são somas
   ponderadas de notas CVSS e podem passar de 10; servem para comparar
   equipamentos entre si, não são uma nota de 0 a 10.
@@ -497,8 +567,12 @@ para converter à mão:
   quem usa o programa: o modelo não as deduz da rede real.
 - **Limite do número de condição.** O valor 10¹² é uma escolha prática (deixa
   uns 4 dígitos confiáveis em ponto flutuante de 64 bits), não um teorema.
-- **Acentos em hostname** não são aceitos (regra de nome de máquina, RFC 952 e
-  1123), como no Trabalho 1.
+- **O hostname é um nome simples, sem domínio** (sem pontos): de 1 a 63
+  caracteres, só letras sem acento, números e hífen, sem hífen nas pontas,
+  pelas RFC 952, 1123 e 1035, como no Trabalho 1. Duas escolhas do projeto: um
+  nome só de números é recusado (a RFC 1123 diz que um nome válido nunca é só
+  de números no último trecho, para não ser confundido com um endereço IP); e
+  um nome de uma letra é aceito (a RFC 952 o proibia, mas a 1035 permite).
 
 ## Testes
 
@@ -506,16 +580,16 @@ para converter à mão:
 python testes.py
 ```
 
-São 45 testes, só com a biblioteca padrão: o programa inteiro rodando por
+São 47 testes, só com a biblioteca padrão: o programa inteiro rodando por
 dentro com o teclado simulado (do cadastro ao risco, incluindo o cenário de 3
-equipamentos), a recusa de bases inválidas e do sistema singular, a conversão da
-base do Trabalho 1, o comportamento no container (inclusive `sair` e Ctrl+D) e o
-modelo de risco sobre os arquivos de exemplo. O último teste roda o autoteste
-de cada módulo. Nada toca em `dados/inventario.json`: os testes usam pastas
-temporárias.
+equipamentos), a recusa de bases inválidas (inclusive JSON fora da norma) e do
+sistema singular, a conversão da base do Trabalho 1, o comportamento no
+container (inclusive `sair` e Ctrl+D) e o modelo de risco sobre os arquivos de
+exemplo. O último teste roda o autoteste de cada módulo. Nada toca em
+`dados/inventario.json`: os testes usam pastas temporárias.
 
 Cobertura, com o coverage.py (configurado em `.coveragerc`): os testes passam
-por 82% das linhas do programa, sem contar os autotestes dos módulos, que rodam
+por 83% das linhas do programa, sem contar os autotestes dos módulos, que rodam
 em outro processo.
 
 ```
@@ -524,9 +598,20 @@ coverage run testes.py
 coverage report
 ```
 
-Estilo: `flake8 --max-line-length 79` e `pydocstyle --convention=pep257
---add-ignore=D401` (a regra D401, que pede o verbo no imperativo, é desligada: as
-docstrings usam "Devolve...", "Verifica...") não apontam nada.
+Estilo: o Ruff confere a PEP 8 (79 colunas no código e 72 em comentários e
+docstrings, como a PEP pede) e a PEP 257 (docstrings), com a configuração em
+`ruff.toml`, e não aponta nada:
+
+```
+pip install ruff
+ruff check .
+```
+
+A regra D401, que pede a primeira linha da docstring como uma ordem, fica
+desligada: as docstrings usam a 3ª pessoa ("Devolve...", "Verifica..."), e a
+regra só reconhece verbos em inglês. O Ruff substitui o flake8 e o pydocstyle
+usados antes: o pydocstyle foi descontinuado em 2023, e o próprio projeto
+indica o Ruff no lugar.
 
 O GitHub roda o estilo e os testes sozinho a cada push: veja a seção seguinte.
 
@@ -540,16 +625,18 @@ histórico mesmo quando não há conflito:
 | Prefixo | Uso | Exemplo neste repositório |
 | --- | --- | --- |
 | `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico` |
-| `fix/` | Correção de defeito | — |
-| `docs/` | Documentação | `docs/revisao-requisitos` |
-| `ci/` | Integração contínua | `ci/verificacao-automatica` |
+| `fix/` | Correção de defeito | `fix/normas-oficiais` |
+| `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas` |
+| `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
 
 `git log --graph --oneline --all` mostra as branches e os merges.
 
 A cada push e a cada pull request, o GitHub Actions
-(`.github/workflows/verificacao.yml`) roda o flake8, o pydocstyle e os testes,
-constrói a imagem Docker e roda, dentro dela, o autoteste do modelo de risco. O
-resultado aparece na aba Actions do repositório.
+(`.github/workflows/verificacao.yml`) roda o Ruff e os testes no Python 3.14,
+constrói a imagem Docker e roda, dentro dela e com o sistema de arquivos só para
+leitura, o autoteste do modelo de risco. O token do workflow só pode ler o
+repositório (`permissions: contents: read`), como recomenda a documentação de
+segurança do GitHub. O resultado aparece na aba Actions do repositório.
 
 ## Dados de exemplo
 
