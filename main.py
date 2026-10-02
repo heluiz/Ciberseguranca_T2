@@ -36,6 +36,7 @@ from entrada import (
     ler_inteiro,
     ler_resposta,
     ler_texto,
+    limpar_tela,
 )
 from formatacao import fracao_br, numero_br
 from risco import ModeloRisco
@@ -784,8 +785,13 @@ class Aplicacao:
                 opcao = int(bruto)
             except ValueError:
                 # Enter sozinho ou texto: desenha o menu de novo. Depois
-                # de um "docker attach" a tela está vazia, e o Enter é
-                # como o usuário pede para vê-lo.
+                # de um "docker attach" a tela está vazia (o Docker não
+                # repete o que já foi impresso), e o Enter é como o
+                # usuário pede para vê-la. No container, o Enter sozinho
+                # limpa a tela e traz também o logotipo, como na abertura.
+                if not bruto and em_container():
+                    limpar_tela()
+                    self.exibir_abertura()
                 self.exibir_menu()
                 if bruto:
                     print("  " + cores.erro("! Digite apenas números."))
@@ -840,14 +846,19 @@ class Aplicacao:
                 "gravado foi descartado."))
         self.pausar()
 
-    def iniciar(self):
-        """Carrega a base e repete o menu até o usuário escolher 0."""
-        cores.ativar()
+    @staticmethod
+    def exibir_abertura():
+        """Mostra o logotipo do cadeado e o título do programa."""
         print("\n" + banner.montar())
         print("\n" + cores.titulo("=" * telas.LARGURA_MENU))
         print(cores.titulo("INVENTÁRIO DE EQUIPAMENTOS E VULNERABILIDADES"
                            .center(telas.LARGURA_MENU)))
         print(cores.titulo("=" * telas.LARGURA_MENU))
+
+    def iniciar(self):
+        """Carrega a base e repete o menu até o usuário escolher 0."""
+        cores.ativar()
+        self.exibir_abertura()
 
         # A base é lida uma vez; cada alteração é gravada na hora.
         self.inventario = self.arquivo.carregar()

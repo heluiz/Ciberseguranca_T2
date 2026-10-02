@@ -52,7 +52,8 @@ docker attach inventario
 ```
 
 No `docker attach` a tela costuma aparecer vazia, porque o Docker não repete
-o que já foi impresso: **tecle Enter e o menu é desenhado de novo.** Para sair
+o que já foi impresso: **tecle Enter e a tela de abertura (logotipo e menu) é
+desenhada de novo.** Para sair
 sem parar o programa, tecle **Ctrl+P e depois Ctrl+Q.** O container continua
 rodando e dá para voltar com outro `docker attach`.
 
@@ -67,7 +68,7 @@ de uma vez: `docker compose up -d --build`, seguido de
 | `--restart unless-stopped` | O Docker religa o programa se ele cair ou se o servidor reiniciar, a não ser que alguém tenha parado o container de propósito (`docker stop`). |
 | `-v inventario-dados:/app/dados` | Os dados ficam num *volume*: sobrevivem a `docker rm` e à troca da imagem por uma versão nova. |
 
-Dentro do container o programa se comporta de forma diferente em quatro pontos,
+Dentro do container o programa se comporta de forma diferente em cinco pontos,
 ligados pela variável de ambiente `INVENTARIO_EM_CONTAINER` (definida no
 `Dockerfile`):
 
@@ -77,6 +78,10 @@ ligados pela variável de ambiente `INVENTARIO_EM_CONTAINER` (definida no
   qualquer pergunta, porque encerrar o programa para o container (o Docker o
   religa, mas o tempo de atividade recomeça).
 - **Ctrl+D é ignorado** (com um aviso), pelo mesmo motivo.
+- **Enter no menu traz a tela de abertura**: limpa a tela e mostra o logotipo
+  e o menu, porque depois do `docker attach` a tela fica vazia. O Docker só
+  avisa o programa da conexão quando o tamanho da janela muda, então não dá
+  para desenhar a tela sozinho em todo `attach`.
 - **`docker stop` encerra na hora.** O programa trata o sinal SIGTERM; sem
   isso, o processo número 1 do container o ignoraria e o Docker esperaria 10
   segundos antes de matá-lo.
@@ -423,7 +428,7 @@ convertido ao abrir (`migracao.py`) e uma cópia da original fica ao lado dele
 python testes.py
 ```
 
-São 36 testes, só com a biblioteca padrão: o programa inteiro rodando por
+São 38 testes, só com a biblioteca padrão: o programa inteiro rodando por
 dentro com o teclado simulado (do cadastro ao risco, incluindo o cenário de 3
 equipamentos), a recusa de bases inválidas e do sistema singular, a conversão da
 base do Trabalho 1, o comportamento no container (inclusive `sair` e Ctrl+D) e o

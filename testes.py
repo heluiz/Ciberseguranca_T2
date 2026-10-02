@@ -418,6 +418,25 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertEqual(saida.count("Cadastrar equipamento"), 2)
         self.assertIn("Digite apenas números", saida)
 
+    def test_container_enter_mostra_logotipo_e_menu(self):
+        """No container, Enter no menu traz a tela de abertura de volta."""
+        with (mock.patch.dict(os.environ, {main.VARIAVEL_CONTAINER: "1"}),
+              mock.patch("main.limpar_tela") as limpou):
+            saida = self.rodar(["", "0", "s"])
+        limpou.assert_called_once()
+        # Uma vez na abertura do programa e outra depois do Enter.
+        self.assertEqual(saida.count("INVENTÁRIO DE EQUIPAMENTOS E "
+                                     "VULNERABILIDADES"), 2)
+        self.assertEqual(saida.count("▓▓▓▓▓▓▓▓▓▓"), 2)
+        self.assertEqual(saida.count("Cadastrar equipamento"), 2)
+
+    def test_fora_do_container_enter_mostra_so_o_menu(self):
+        """Fora do container, o Enter redesenha só o menu, sem limpar."""
+        with mock.patch("main.limpar_tela") as limpou:
+            saida = self.rodar(["", "0"])
+        limpou.assert_not_called()
+        self.assertEqual(saida.count("▓▓▓▓▓▓▓▓▓▓"), 1)
+
     def test_matriz_invertivel_mas_sem_sentido_nao_e_resolvida(self):
         """Raio espectral >= 1: invertível, mas risco negativo; avisa."""
         self.rodar(self.CENARIO + ["0"])
