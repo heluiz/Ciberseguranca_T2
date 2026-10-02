@@ -3,7 +3,7 @@
     "id": 1,
     "tipo": 1,
     "hostname": "ESTACAO-01",
-    "custodiante": "Fulano de Tal",
+    "custodiante": "Suporte de Informática",
     "lotacao": "Cartório",
     "descricao": "Estação do cenário de validação",
     "vulnerabilidades": [
@@ -26,7 +26,7 @@
     "id": 2,
     "tipo": 2,
     "hostname": "SERVIDOR-01",
-    "custodiante": "Fulano de Tal",
+    "custodiante": "Suporte de Informática",
     "lotacao": "Sala técnica",
     "descricao": "Servidor do cenário de validação",
     "vulnerabilidades": [
@@ -56,7 +56,7 @@
     "id": 3,
     "tipo": 6,
     "hostname": "BANCO-01",
-    "custodiante": "Fulano de Tal",
+    "custodiante": "Suporte de Informática",
     "lotacao": "Sala técnica",
     "descricao": "Banco de dados do cenário de validação",
     "vulnerabilidades": [

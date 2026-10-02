@@ -3,7 +3,7 @@
     "id": 1,
     "tipo": 7,
     "hostname": "SING-01",
-    "custodiante": "Fulano de Tal",
+    "custodiante": "Suporte de Informática",
     "lotacao": "Sala técnica",
     "descricao": "Equipamento 1 do cenário singular",
     "vulnerabilidades": [
@@ -18,11 +18,11 @@
     "dependencias": [
       {
         "equipamento_id": 2,
-        "fracao": 0.5
+        "fracao": 0.3
       },
       {
         "equipamento_id": 3,
-        "fracao": 0.5
+        "fracao": 0.7
       }
     ]
   },
@@ -30,18 +30,18 @@
     "id": 2,
     "tipo": 7,
     "hostname": "SING-02",
-    "custodiante": "Fulano de Tal",
+    "custodiante": "Suporte de Informática",
     "lotacao": "Sala técnica",
     "descricao": "Equipamento 2 do cenário singular",
     "vulnerabilidades": [],
     "dependencias": [
       {
         "equipamento_id": 1,
-        "fracao": 0.5
+        "fracao": 0.3
       },
       {
         "equipamento_id": 3,
-        "fracao": 0.5
+        "fracao": 0.7
       }
     ]
   },
@@ -49,18 +49,18 @@
     "id": 3,
     "tipo": 7,
     "hostname": "SING-03",
-    "custodiante": "Fulano de Tal",
+    "custodiante": "Suporte de Informática",
     "lotacao": "Sala técnica",
     "descricao": "Equipamento 3 do cenário singular",
     "vulnerabilidades": [],
     "dependencias": [
       {
         "equipamento_id": 1,
-        "fracao": 0.5
+        "fracao": 0.7
       },
       {
         "equipamento_id": 2,
-        "fracao": 0.5
+        "fracao": 0.3
       }
     ]
   }

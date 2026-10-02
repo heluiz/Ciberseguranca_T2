@@ -31,7 +31,8 @@ from validacao import (
 )
 
 # Uma nota para cada gravidade do Trabalho 1 (1 baixa ... 4 crítica),
-# no meio da faixa do CVSS v3.x e entre as mais comuns na prática.
+# dentro da faixa dessa gravidade no CVSS v3.x e entre as notas mais
+# comuns na prática.
 CVSS_REPRESENTATIVO = {1: 3.1, 2: 5.3, 3: 7.5, 4: 9.8}
 
 
