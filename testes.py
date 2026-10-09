@@ -286,6 +286,125 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("severidade Alta, nota 7,5", saida)
         self.assertEqual(self.lido()[0]["vulnerabilidades"][0]["cvss"], 7.5)
 
+    # --- nota CVSS pelo vetor e pelas perguntas -----------------------
+
+    # Um equipamento cadastrado, até a pergunta da nota CVSS.
+    ATE_A_NOTA = ["1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1",
+                  "s", "Falha qualquer", "6"]
+    # Respostas da calculadora: Enter (versão 4.0) e as 11 perguntas,
+    # que dão o vetor de uma falha explorável pela rede, sem login.
+    PERGUNTAS_40 = ["", "1", "1", "1", "1", "1", "1", "1", "1",
+                    "3", "3", "3"]
+    VETOR_40 = ("CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/"
+                "SI:N/SA:N")
+    VETOR_31 = "CVSS:3.1/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+
+    def test_calcular_a_nota_respondendo_as_perguntas(self):
+        """Com "calcular", o programa faz as perguntas do CVSS 4.0."""
+        saida = self.rodar(self.ATE_A_NOTA + ["calcular"]
+                           + self.PERGUNTAS_40 + ["", "1", "n", "0"])
+        # O Enter em "Usar esta nota? (S/n)" aceitou a nota.
+        self.assertIn("[1/11] Vetor de ataque (AV)", saida)
+        self.assertIn("De onde o atacante consegue explorar a falha?", saida)
+        self.assertIn("explorável remotamente", saida)
+        self.assertIn("[11/11] Disponibilidade nos sistemas subsequentes",
+                      saida)
+        self.assertIn(f"Vetor: {self.VETOR_40}", saida)
+        self.assertIn("severidade Crítica, nota 9,3", saida)
+        vuln = self.lido()[0]["vulnerabilidades"][0]
+        self.assertEqual((vuln["cvss"], vuln["vetor"]), (9.3, self.VETOR_40))
+
+    def test_letra_anterior_e_cancelar_nas_perguntas(self):
+        """Letra vale como resposta; anterior volta; cancelar sai."""
+        # Versão "4.0"; AV pela letra (A), "anterior" e AV de novo (N);
+        # "limpar" redesenha a pergunta; o resto pela primeira opção,
+        # com os impactos nos outros sistemas em N.
+        respostas = ["4.0", "a", "anterior", "n", "limpar", "l", "1",
+                     "1", "1", "1", "1", "1", "n", "n", "n", "s"]
+        saida = self.rodar(self.ATE_A_NOTA + ["calcular", "cancelar",
+                                              "calcular"] + respostas
+                           + ["1", "n", "0"])
+        self.assertIn("Cálculo cancelado.", saida)
+        self.assertGreaterEqual(saida.count("[2/11] Complexidade do ataque"),
+                                2)           # "limpar" desenhou de novo
+        vuln = self.lido()[0]["vulnerabilidades"][0]
+        self.assertEqual((vuln["cvss"], vuln["vetor"]), (9.3, self.VETOR_40))
+
+    def test_colar_o_vetor_da_calculadora(self):
+        """O vetor colado (3.1) vira a nota 8,8 e fica gravado."""
+        saida = self.rodar(self.ATE_A_NOTA + [self.VETOR_31.lower(), "1",
+                                              "n", "7", "1", "0"])
+        self.assertIn("Nota calculada pelo vetor: 8,8", saida)
+        self.assertIn("severidade Alta, nota 8,8", saida)
+        self.assertIn(self.VETOR_31, saida)          # a ficha mostra
+        vuln = self.lido()[0]["vulnerabilidades"][0]
+        self.assertEqual((vuln["cvss"], vuln["vetor"]), (8.8, self.VETOR_31))
+
+    def test_vetor_com_metricas_nao_definidas_e_aceito(self):
+        """Métricas X (não definidas) são ignoradas no vetor."""
+        saida = self.rodar(self.ATE_A_NOTA + [
+            self.VETOR_31 + "/E:X/RL:X/RC:X", "1", "n", "0"])
+        self.assertIn("Nota calculada pelo vetor: 8,8", saida)
+        self.assertEqual(self.lido()[0]["vulnerabilidades"][0]["vetor"],
+                         self.VETOR_31)
+
+    def test_vetor_invalido_e_nota_zero_perguntam_de_novo(self):
+        """Vetor incompleto, sem começo, com sobra ou nota 0,0: não."""
+        saida = self.rodar(self.ATE_A_NOTA + [
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H",
+            self.VETOR_31 + "/E:U", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N", "abc",
+            "7,5", "1", "n", "0"])
+        self.assertIn("Faltam métricas no vetor: A", saida)
+        self.assertIn("E:U é uma métrica temporal", saida)
+        self.assertIn("O vetor deve começar com CVSS:4.0/, CVSS:3.1/", saida)
+        self.assertIn("O vetor dá nota 0,0", saida)
+        self.assertIn('cole o vetor CVSS ou digite "calcular"', saida)
+        vuln = self.lido()[0]["vulnerabilidades"][0]
+        self.assertEqual(vuln["cvss"], 7.5)
+        self.assertNotIn("vetor", vuln)
+
+    def test_desistir_do_calculo_volta_a_pergunta(self):
+        """Nota recusada (3.1) ou nota 0,0: a pergunta volta."""
+        perguntas_31 = ["2", "2", "1", "1", "1", "1", "1", "1", "1"]
+        sem_impacto = ["", "1", "1", "1", "1", "1", "3", "3", "3",
+                       "3", "3", "3"]
+        saida = self.rodar(self.ATE_A_NOTA + ["calcular"] + perguntas_31
+                           + ["n", "calcular"] + sem_impacto
+                           + ["4,0", "1", "n", "0"])
+        self.assertIn("[8/8] Disponibilidade (A)", saida)
+        self.assertIn(f"Vetor: {self.VETOR_31}", saida)
+        self.assertIn("Nota descartada", saida)
+        self.assertIn("As respostas dão nota 0,0", saida)
+        vuln = self.lido()[0]["vulnerabilidades"][0]
+        self.assertEqual(vuln["cvss"], 4.0)
+        self.assertNotIn("vetor", vuln)
+
+    def test_nota_digitada_na_atualizacao_tira_o_vetor(self):
+        """Opção 8: o vetor novo muda a nota; a nota digitada o tira."""
+        saida = self.rodar(self.ATE_A_NOTA + [
+            self.VETOR_31, "1", "n",
+            "8", "1", "1", "", "", "calcular"] + self.PERGUNTAS_40 + [
+            "s", "",
+            "8", "1", "1", "", "", "6,5", ""] + ["0"])
+        self.assertIn("Vetor CVSS .... " + self.VETOR_31, saida)
+        self.assertIn("Vetor CVSS .... " + self.VETOR_40, saida)
+        self.assertIn("o vetor antigo foi retirado", saida)
+        self.assertEqual(saida.count("Vulnerabilidade atualizada "
+                                     "(1 campo(s))"), 2)
+        vuln = self.lido()[0]["vulnerabilidades"][0]
+        self.assertEqual(vuln["cvss"], 6.5)
+        self.assertNotIn("vetor", vuln)
+
+    def test_atualizar_com_os_mesmos_valores_nao_muda_nada(self):
+        """Mesma descrição, categoria e nota: nada muda."""
+        saida = self.rodar(self.ATE_A_NOTA + [
+            self.VETOR_31, "1", "n",
+            "8", "1", "1", "falha qualquer", "6", "8,8", "", "0"])
+        self.assertIn("Nada foi alterado.", saida)
+        self.assertEqual(self.lido()[0]["vulnerabilidades"][0]["vetor"],
+                         self.VETOR_31)
+
     def test_mudar_o_tipo_troca_a_classe_e_mantem_as_relacoes(self):
         """Servidor que vira banco muda o fator, mas não os dados."""
         saida = self.rodar(self.CENARIO + [
@@ -656,6 +775,57 @@ class TesteDoModelo(unittest.TestCase):
                 ArquivoInventario(caminho).carregar()
         self.assertIn("'cvss' aparece duas vezes", str(erro.exception))
 
+    def test_vetor_no_arquivo_tem_de_conferir_com_a_nota(self):
+        """Com vetor no arquivo, a nota é a dele; senão, é recusado."""
+        vetor = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+        inventario = Inventario()
+        pc = inventario.cadastrar_equipamento(
+            TipoEquipamento.SERVIDOR, "SRV-01", "TI", "Sala", "Servidor")
+        outro = inventario.cadastrar_equipamento(
+            TipoEquipamento.ESTACAO_TRABALHO, "PC-01", "TI", "Sala", "PC")
+        v = inventario.registrar_vulnerabilidade(
+            pc.id, "RDP exposto", OrigemVulnerabilidade.SERVICO_EXPOSTO,
+            9.8, SituacaoTratamento.ABERTA, vetor)
+        inventario.registrar_vulnerabilidade_existente(
+            outro.id, v.id, SituacaoTratamento.ABERTA)
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = os.path.join(pasta, "x.json")
+            ArquivoInventario(caminho).salvar(inventario)
+            with open(caminho, encoding="utf-8") as f:
+                dados = json.load(f)
+            self.assertEqual(dados[0]["vulnerabilidades"][0]["vetor"], vetor)
+            self.assertEqual(
+                ArquivoInventario(caminho).carregar().para_dict(), dados)
+
+            # A nota adulterada não confere com o vetor.
+            dados[0]["vulnerabilidades"][0]["cvss"] = 5.0
+            dados[1]["vulnerabilidades"][0]["cvss"] = 5.0
+            with open(caminho, "w", encoding="utf-8") as f:
+                json.dump(dados, f)
+            with self.assertRaisesRegex(BaseInvalidaError,
+                                        "não confere com o vetor"):
+                ArquivoInventario(caminho).carregar()
+
+            # "vetor": null nas duas cópias vale como sem vetor.
+            for copia in (dados[0], dados[1]):
+                copia["vulnerabilidades"][0].update(cvss=9.8, vetor=None)
+            with open(caminho, "w", encoding="utf-8") as f:
+                json.dump(dados, f)
+            carregado = ArquivoInventario(caminho).carregar()
+            self.assertIsNone(carregado.buscar_vulnerabilidade(v.id).vetor)
+            for copia in (dados[0], dados[1]):
+                copia["vulnerabilidades"][0]["vetor"] = vetor
+
+            # O vetor tirado de uma só das cópias: as duas discordam.
+            dados[0]["vulnerabilidades"][0]["cvss"] = 9.8
+            dados[1]["vulnerabilidades"][0]["cvss"] = 9.8
+            del dados[1]["vulnerabilidades"][0]["vetor"]
+            with open(caminho, "w", encoding="utf-8") as f:
+                json.dump(dados, f)
+            with self.assertRaisesRegex(BaseInvalidaError,
+                                        "nota ou vetor diferente"):
+                ArquivoInventario(caminho).carregar()
+
     def test_arquivo_gravado_e_json_estrito(self):
         """O JSON gravado é UTF-8 sem BOM e relido pelo json estrito."""
         inventario = Inventario()
@@ -682,8 +852,9 @@ class TesteDosAutotestes(unittest.TestCase):
     def test_autotestes_dos_modulos(self):
         """Cada módulo com bloco de teste termina com código 0."""
         for modulo in ("classificacoes", "formatacao", "validacao",
-                       "vulnerabilidades", "equipamentos", "inventario",
-                       "armazenamento", "risco"):
+                       "calculadora_cvss", "vulnerabilidades",
+                       "equipamentos", "inventario", "armazenamento",
+                       "risco"):
             with self.subTest(modulo=modulo):
                 resultado = subprocess.run(
                     [sys.executable, os.path.join(PASTA, modulo + ".py")],

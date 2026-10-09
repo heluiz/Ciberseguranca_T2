@@ -91,10 +91,10 @@ class NivelGravidade(Enum):
     def do_cvss(cls, nota):
         """Devolve o nível da nota CVSS (0,1 a 10,0).
 
-        Escala do CVSS v3.x: 0,1-3,9 baixa; 4,0-6,9 média; 7,0-8,9
-        alta; 9,0-10,0 crítica. A nota tem uma casa decimal, então os
-        limites são testados com ">=" sem risco de uma nota cair entre
-        duas faixas.
+        Escala do CVSS, a mesma na v3.1 e na v4.0: 0,1-3,9 baixa;
+        4,0-6,9 média; 7,0-8,9 alta; 9,0-10,0 crítica. A nota tem uma
+        casa decimal, então os limites são testados com ">=" sem risco
+        de uma nota cair entre duas faixas.
         """
         if nota >= 9.0:
             return cls.CRITICA

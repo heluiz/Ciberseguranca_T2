@@ -1,7 +1,8 @@
 """A classe Vulnerabilidade: um item do catálogo de vulnerabilidades.
 
-Uma vulnerabilidade existe uma vez só, com a descrição, a origem e a
-nota CVSS, e pode afetar vários equipamentos. Quem diz quais é o
+Uma vulnerabilidade existe uma vez só, com a descrição, a origem, a
+nota CVSS e, se houver, o vetor CVSS de onde a nota saiu, e pode
+afetar vários equipamentos. Quem diz quais é o
 próprio equipamento (equipamentos.py), junto com a situação do
 tratamento naquele equipamento. É essa relação "equipamento i tem a
 vulnerabilidade j" que vira a matriz M do modelo de risco (risco.py).
@@ -12,6 +13,7 @@ A classe não lê do teclado nem grava em disco.
 import math
 
 import formatacao
+from calculadora_cvss import analisar_vetor
 from classificacoes import NivelGravidade, OrigemVulnerabilidade
 from validacao import (
     exigir_campo,
@@ -48,26 +50,46 @@ def validar_cvss(valor):
     return nota
 
 
+def conferir_vetor(vetor, nota):
+    """Devolve o vetor CVSS arrumado, se ele der exatamente a nota.
+
+    Levanta ValueError se o vetor for inválido ou se a nota for outra:
+    com vetor, a nota é a que ele dá, e as duas nunca discordam.
+    """
+    arrumado, nota_do_vetor = analisar_vetor(vetor)
+    if nota_do_vetor != nota:
+        raise ValueError(
+            f"A nota {formatacao.numero_br(nota)} não confere com o vetor "
+            f"CVSS, que dá {formatacao.numero_br(nota_do_vetor)}")
+    return arrumado
+
+
 class Vulnerabilidade:
     """Vulnerabilidade do catálogo: descrição, origem e nota CVSS.
 
     A severidade (baixa, média, alta, crítica) não é guardada: é
     calculada da nota quando pedida, para as duas nunca discordarem.
+    O vetor CVSS é opcional; quando existe, a nota é a que ele dá.
     """
 
     # O id fica de fora: os equipamentos apontam para ele.
-    CAMPOS_EDITAVEIS = ("descricao", "origem", "cvss")
+    CAMPOS_EDITAVEIS = ("descricao", "origem", "cvss", "vetor")
 
-    def __init__(self, id_vulnerabilidade, descricao, origem, cvss):
+    def __init__(self, id_vulnerabilidade, descricao, origem, cvss,
+                 vetor=None):
         """Cria a vulnerabilidade; dado inválido levanta ValueError."""
         if not isinstance(origem, OrigemVulnerabilidade):
             raise ValueError("A origem deve ser uma OrigemVulnerabilidade")
         if not descricao.strip():
             raise ValueError("A descrição não pode ficar vazia")
+        nota = validar_cvss(cvss)
+        if vetor is not None:
+            vetor = conferir_vetor(vetor, nota)
         self.id = id_vulnerabilidade
         self.descricao = formatacao.frase(descricao)
         self.origem = origem
-        self.cvss = validar_cvss(cvss)
+        self.cvss = nota
+        self.vetor = vetor
 
     @property
     def gravidade(self):
@@ -77,9 +99,11 @@ class Vulnerabilidade:
     def atualizar(self, alteracoes):
         """Aplica as alterações {campo: valor} à vulnerabilidade.
 
-        Levanta ValueError em campo protegido ou valor inválido; nesse
-        caso nada muda: a validação termina antes de qualquer
-        atribuição.
+        "vetor" com um texto troca o vetor e a nota passa a ser a dele;
+        "vetor" None tira o vetor. Levanta ValueError em campo
+        protegido, valor inválido ou nota que não confere com o vetor
+        que fica; nesse caso nada muda: a validação termina antes de
+        qualquer atribuição.
         """
         for campo in alteracoes:
             if campo not in self.CAMPOS_EDITAVEIS:
@@ -96,20 +120,43 @@ class Vulnerabilidade:
                 raise ValueError("A origem deve ser uma "
                                  "OrigemVulnerabilidade")
             novos["origem"] = alteracoes["origem"]
-        if "cvss" in alteracoes:
-            novos["cvss"] = validar_cvss(alteracoes["cvss"])
+        novos["cvss"], novos["vetor"] = self._nota_e_vetor(alteracoes)
 
         for campo, valor in novos.items():
             setattr(self, campo, valor)
 
+    def _nota_e_vetor(self, alteracoes):
+        """Devolve a nota e o vetor que ficam depois das alterações.
+
+        Um vetor novo dá a nota; uma nota digitada vale se não houver
+        vetor ou se for a mesma que o vetor que fica dá.
+        """
+        vetor = alteracoes.get("vetor", self.vetor)
+        nota = self.cvss
+        if alteracoes.get("vetor") is not None:
+            vetor, nota = analisar_vetor(vetor)
+        if "cvss" in alteracoes:
+            nota = alteracoes["cvss"]
+        nota = validar_cvss(nota)
+        if vetor is not None:
+            vetor = conferir_vetor(vetor, nota)
+        return nota, vetor
+
     def para_dict(self):
-        """Devolve o objeto JSON da vulnerabilidade (só tipos JSON)."""
-        return {
+        """Devolve o objeto JSON da vulnerabilidade (só tipos JSON).
+
+        O campo "vetor" só aparece quando existe: um arquivo sem
+        vetores fica igual ao de antes deste campo existir.
+        """
+        objeto = {
             "id": self.id,
             "descricao": self.descricao,
             "origem": self.origem.value,
             "cvss": self.cvss,
         }
+        if self.vetor is not None:
+            objeto["vetor"] = self.vetor
+        return objeto
 
     @classmethod
     def de_dict(cls, dados):
@@ -131,8 +178,12 @@ class Vulnerabilidade:
             f"{nome}: campo 'origem'")
         cvss = exigir_numero(
             exigir_campo(dados, "cvss", nome), f"{nome}: campo 'cvss'")
+        # Campo opcional: ausente ou null quer dizer "sem vetor".
+        vetor = dados.get("vetor")
+        if vetor is not None:
+            vetor = exigir_texto(vetor, f"{nome}: campo 'vetor'")
         try:
-            vulnerabilidade = cls(id_vuln, descricao, origem, cvss)
+            vulnerabilidade = cls(id_vuln, descricao, origem, cvss, vetor)
         except ValueError as erro:
             raise ValueError(f"{nome}: {erro}") from erro
         # Vale o texto gravado: formatar de novo mudaria o arquivo a
@@ -186,6 +237,31 @@ if __name__ == "__main__":
             pass
     print("Notas inválidas (0, 8.25, 10.5, NaN, texto...) recusadas.")
 
+    # Com vetor, a nota é a que ele dá; nota digitada tira o vetor.
+    rdp = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+    v.atualizar({"vetor": rdp})
+    assert (v.cvss, v.vetor) == (9.8, rdp)
+    try:
+        Vulnerabilidade(2, "x", OrigemVulnerabilidade.OUTRA, 7.0, rdp)
+        raise AssertionError("aceitou nota que não confere com o vetor")
+    except ValueError as erro:
+        print(f"Nota contra o vetor: {erro}")
+    try:
+        v.atualizar({"cvss": 7.0})
+        raise AssertionError("aceitou nota diferente com o vetor mantido")
+    except ValueError:
+        assert v.cvss == 9.8
+    v.atualizar({"cvss": 7.0, "vetor": None})
+    assert (v.cvss, v.vetor) == (7.0, None)
+    v.atualizar({"vetor": rdp})
+    print(f"Pelo vetor: {v.para_dict()}")
+
+    # "vetor": null no arquivo vale como sem vetor.
+    sem_vetor = Vulnerabilidade.de_dict({"id": 3, "descricao": "x",
+                                         "origem": 1, "cvss": 5.0,
+                                         "vetor": None})
+    assert sem_vetor.vetor is None and "vetor" not in sem_vetor.para_dict()
+
     # Ida e volta pelo formato do arquivo.
     copia = Vulnerabilidade.de_dict(v.para_dict())
     assert copia == v, "a cópia lida difere da original"
@@ -198,7 +274,12 @@ if __name__ == "__main__":
             ("cvss texto", {"id": 1, "descricao": "x", "origem": 1,
                             "cvss": "alto"}),
             ("descrição nula", {"id": 1, "descricao": None, "origem": 1,
-                                "cvss": 5})):
+                                "cvss": 5}),
+            ("vetor contra a nota", {"id": 1, "descricao": "x",
+                                     "origem": 1, "cvss": 5.0,
+                                     "vetor": rdp}),
+            ("vetor número", {"id": 1, "descricao": "x", "origem": 1,
+                              "cvss": 5.0, "vetor": 5})):
         try:
             Vulnerabilidade.de_dict(dados)
             raise AssertionError(f"aceitou o objeto adulterado: {nome}")
