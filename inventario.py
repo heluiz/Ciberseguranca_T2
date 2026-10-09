@@ -230,11 +230,12 @@ class Inventario:
         return pares
 
     def registrar_vulnerabilidade(self, id_equipamento, descricao, origem,
-                                  cvss, situacao):
+                                  cvss, situacao, vetor=None):
         """Cria uma vulnerabilidade nova e a registra no equipamento.
 
-        Devolve a Vulnerabilidade criada (requisito 7 do T1). Tudo é
-        conferido antes de gravar, então um dado inválido não deixa
+        Devolve a Vulnerabilidade criada (requisito 7 do T1). O vetor
+        CVSS é opcional; com ele, a nota tem de ser a que ele dá. Tudo
+        é conferido antes de gravar, então um dado inválido não deixa
         vulnerabilidade solta no catálogo.
         """
         equipamento = self._exigir_equipamento(id_equipamento)
@@ -243,7 +244,7 @@ class Inventario:
         # Cria o objeto primeiro, com id provisório: se algum dado for
         # inválido, o erro sai aqui, antes de o id ser gasto e de
         # qualquer mudança.
-        vulnerabilidade = Vulnerabilidade(0, descricao, origem, cvss)
+        vulnerabilidade = Vulnerabilidade(0, descricao, origem, cvss, vetor)
         vulnerabilidade.id = self._novo_id(self._vulnerabilidades,
                                            "vulnerabilidades")
         equipamento.vincular_vulnerabilidade(vulnerabilidade.id, situacao)
@@ -265,7 +266,7 @@ class Inventario:
         equipamento.vincular_vulnerabilidade(id_vulnerabilidade, situacao)
 
     def atualizar_vulnerabilidade(self, id_vulnerabilidade, alteracoes):
-        """Altera descrição, origem ou nota CVSS no catálogo.
+        """Altera descrição, origem, nota ou vetor CVSS no catálogo.
 
         Vale para todos os equipamentos afetados. Devolve False se o id
         não existe; levanta ValueError em campo protegido ou valor
@@ -421,7 +422,7 @@ class Inventario:
                     raise ValueError(
                         f"{nome}: a vulnerabilidade {vulnerabilidade.id} "
                         f"aparece em outro equipamento com descrição, "
-                        f"origem ou nota diferente")
+                        f"origem, nota ou vetor diferente")
                 reduzido["vulnerabilidades"].append(
                     {c: vuln[c] for c in ("id", "situacao") if c in vuln})
 

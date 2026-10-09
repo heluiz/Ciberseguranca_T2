@@ -11,12 +11,14 @@ em JSON como lista de objetos, calcula o risco de cada equipamento com
 álgebra linear e roda em container Docker.
 """
 
+import functools
 import os
 import signal
 import sys
 import time
 
 import banner
+import calculadora_cvss
 import cores
 import telas
 from armazenamento import ArquivoInventario, BaseInvalidaError
@@ -29,19 +31,21 @@ from entrada import (
     SairDoPrograma,
     VoltarAoMenu,
     confirmar,
+    converter_decimal,
     ler_campo,
     ler_decimal,
     ler_enum,
     ler_hostname,
     ler_inteiro,
+    ler_opcao,
     ler_resposta,
     ler_texto,
     limpar_tela,
 )
 from equipamentos import MENOR_FRACAO
-from formatacao import fracao_br, numero_br
+from formatacao import fracao_br, frase, numero_br
 from risco import ModeloRisco
-from vulnerabilidades import validar_cvss
+from vulnerabilidades import CVSS_MINIMO, validar_cvss
 
 # Com a variável definida (o Dockerfile a define), o programa avisa como
 # sair do container sem derrubá-lo e não morre com Ctrl+C.
@@ -49,6 +53,22 @@ VARIAVEL_CONTAINER = "INVENTARIO_EM_CONTAINER"
 
 # Acima disto a matriz não cabe na tela: a opção 15 mostra só o tamanho.
 MAXIMO_PARA_MOSTRAR_MATRIZES = 12
+
+# Na pergunta da nota CVSS, esta palavra abre as perguntas do CVSS.
+PALAVRA_CALCULAR = "calcular"
+# Nas perguntas do CVSS: volta uma pergunta / desiste do cálculo.
+ANTERIOR = "anterior"
+CANCELAR = "cancelar"
+# Respostas aceitas na escolha da versão do CVSS (Enter: a 4.0).
+VERSAO_DIGITADA = {"": "4.0", "1": "4.0", "4": "4.0", "4.0": "4.0",
+                   "2": "3.1", "3": "3.1", "3.1": "3.1"}
+
+# Mostrado antes da pergunta da nota, no cadastro da vulnerabilidade.
+EXPLICACAO_NOTA = (
+    "  Nota CVSS: digite a nota (0,1 a 10,0), cole o vetor da calculadora "
+    "do\n  FIRST (CVSS:4.0/..., CVSS:3.1/... ou CVSS:3.0/...) ou digite\n"
+    f"  \"{PALAVRA_CALCULAR}\" para chegar à nota respondendo às perguntas "
+    "do CVSS,\n  com a explicação de cada uma.")
 
 # Buscas por texto da opção 3: número da opção -> (campo, pergunta).
 BUSCAS_POR_TEXTO = {
@@ -154,17 +174,147 @@ class Aplicacao:
             self._erro(f"Nenhum equipamento com o ID {id_equipamento}.")
         return equipamento
 
-    @staticmethod
-    def _ler_nota_cvss(mensagem, opcional=False):
-        """Lê uma nota CVSS, repetindo até ser válida. Enter: None."""
+    def _ler_nota_cvss(self, mensagem, opcional=False):
+        """Lê a nota CVSS: o número, o vetor ou "calcular".
+
+        Devolve (nota, vetor), com vetor None quando a nota foi
+        digitada, ou None quando opcional e o usuário tecla Enter.
+        Repete a pergunta até vir uma resposta válida.
+        """
         while True:
-            nota = ler_decimal(mensagem, opcional=opcional)
-            if nota is None:
+            bruto = ler_resposta(mensagem)
+            if not bruto and opcional:
                 return None
             try:
-                return validar_cvss(nota)
+                resposta = self._interpretar_nota(bruto)
             except ValueError as erro:
                 print("  " + cores.erro(f"! {erro}."))
+                continue
+            if resposta is not None:      # None: desistiu do cálculo
+                return resposta
+
+    def _interpretar_nota(self, bruto):
+        """Transforma a resposta em (nota, vetor); None se desistiu.
+
+        Levanta ValueError, com o motivo, se a resposta não servir.
+        """
+        if bruto.casefold() == PALAVRA_CALCULAR:
+            return self._calcular_cvss()
+        # ":" sem "CVSS:" é um vetor sem o começo: o motivo vem de lá.
+        if bruto.upper().startswith("CVSS:") or ":" in bruto:
+            vetor, nota = calculadora_cvss.analisar_vetor(bruto)
+            self._exigir_nota_com_impacto(nota)
+            print("  " + cores.sucesso(
+                f"Nota calculada pelo vetor: {numero_br(nota)}."))
+            return nota, vetor
+        try:
+            numero = converter_decimal(bruto)
+        except ValueError:
+            raise ValueError(
+                f"Digite a nota, como 7,5, cole o vetor CVSS ou digite "
+                f"\"{PALAVRA_CALCULAR}\"") from None
+        return validar_cvss(numero), None
+
+    @staticmethod
+    def _exigir_nota_com_impacto(nota):
+        """Recusa a nota 0,0, que o CVSS chama de "Nenhuma"."""
+        if nota < CVSS_MINIMO:
+            raise ValueError(
+                f"O vetor dá nota {numero_br(nota)} (\"Nenhuma\" no CVSS): "
+                f"a falha não tem impacto e não entra no inventário")
+
+    def _calcular_cvss(self):
+        """Faz as perguntas do CVSS e devolve (nota, vetor), ou None.
+
+        Cada pergunta mostra o que cada opção quer dizer. "anterior"
+        volta uma pergunta e "cancelar" desiste do cálculo (None). No
+        fim, mostra o vetor e a nota e pede confirmação.
+        """
+        telas.mostrar_inicio_calculadora_cvss()
+        versao = self._ler_versao_cvss()
+        if versao is None:
+            print("  " + cores.aviso("Cálculo cancelado."))
+            return None
+        metricas = calculadora_cvss.VERSOES[versao]
+        escolhas = {}
+        posicao = 0
+        while posicao < len(metricas):
+            metrica = metricas[posicao]
+            redesenhar = functools.partial(
+                telas.mostrar_pergunta_cvss, posicao + 1, len(metricas),
+                metrica)
+            redesenhar()
+            resposta = self._ler_opcao_cvss(metrica, redesenhar)
+            if resposta == CANCELAR:
+                print("  " + cores.aviso("Cálculo cancelado."))
+                return None
+            if resposta == ANTERIOR:
+                posicao = max(posicao - 1, 0)
+                continue
+            escolhas[metrica.codigo] = resposta
+            posicao += 1
+        return self._confirmar_nota_calculada(versao, escolhas)
+
+    @staticmethod
+    def _ler_versao_cvss():
+        """Lê a versão do CVSS: 1 (ou Enter) é a 4.0; 2, a 3.1.
+
+        Devolve None se o usuário digitar "cancelar".
+        """
+        while True:
+            bruto = ler_resposta("  Versão [1]: ").replace(",", ".")
+            if bruto.casefold() == CANCELAR:
+                return None
+            versao = VERSAO_DIGITADA.get(bruto)
+            if versao is not None:
+                return versao
+            print("  " + cores.erro(
+                f"! Digite 1 (versão 4.0) ou 2 (versão 3.1), ou "
+                f"\"{CANCELAR}\"."))
+
+    @staticmethod
+    def _ler_opcao_cvss(metrica, redesenhar):
+        """Lê a resposta de uma pergunta do CVSS.
+
+        Aceita o número da opção ou a letra do vetor (N, L...) e devolve
+        o código da opção, como "N"; "anterior" e "cancelar" voltam como
+        estão. "limpar" redesenha a pergunta.
+        """
+        codigos = [opcao.codigo for opcao in metrica.opcoes]
+        while True:
+            bruto = ler_resposta("  Opção: ", depois_de_limpar=redesenhar)
+            if bruto.casefold() in (ANTERIOR, CANCELAR):
+                return bruto.casefold()
+            if bruto.isdecimal() and 1 <= int(bruto) <= len(codigos):
+                return codigos[int(bruto) - 1]
+            if bruto.upper() in codigos:
+                return bruto.upper()
+            print("  " + cores.erro(
+                f"! Digite um número de 1 a {len(codigos)} (ou a letra "
+                f"entre parênteses), \"{ANTERIOR}\" ou \"{CANCELAR}\"."))
+
+    @staticmethod
+    def _confirmar_nota_calculada(versao, escolhas):
+        """Mostra o vetor e a nota das respostas e pede para usar.
+
+        Devolve (nota, vetor), ou None se o usuário não quiser a nota ou
+        se ela der 0,0.
+        """
+        vetor, nota = calculadora_cvss.analisar_vetor(
+            calculadora_cvss.montar_vetor(versao, escolhas))
+        if nota < CVSS_MINIMO:
+            print(f"\n  Vetor: {vetor}")
+            print("  " + cores.aviso(
+                "As respostas dão nota 0,0 (\"Nenhuma\" no CVSS): a falha "
+                "não tem impacto e não entra no inventário."))
+            return None
+        telas.mostrar_resultado_cvss(vetor, nota)
+        if confirmar("\n  Usar esta nota?", padrao=True):
+            return nota, vetor
+        print("  " + cores.aviso(
+            f"Nota descartada. Digite a nota, cole um vetor ou digite "
+            f"\"{PALAVRA_CALCULAR}\" para responder de novo."))
+        return None
 
     # ------------------------------------------------------------------
     # Equipamentos (opções 1 a 5)
@@ -391,18 +541,15 @@ class Aplicacao:
                   f"vulnerabilidade já cadastrada ({len(disponiveis)} "
                   f"disponível(is))")
             print(f"    {cores.destaque('2')} - Cadastrar uma nova")
-            escolha = ler_inteiro("  Opção: ")
-            while escolha not in (1, 2):
-                print("  " + cores.erro("! Digite 1 ou 2."))
-                escolha = ler_inteiro("  Opção: ")
-            if escolha == 1:
+            if ler_opcao("  Opção: ", 2) == 1:
                 id_existente = self._ler_vulnerabilidade_do_catalogo(
                     equipamento)
 
         if id_existente is None:
             descricao = ler_campo("  Descrição da vulnerabilidade: ")
             origem = ler_enum("  Categoria:", OrigemVulnerabilidade)
-            nota = self._ler_nota_cvss("\n  Nota CVSS (0,1 a 10,0): ")
+            print("\n" + EXPLICACAO_NOTA)
+            nota, vetor = self._ler_nota_cvss("  Nota CVSS: ")
         situacao = ler_enum("  Status neste equipamento:",
                             SituacaoTratamento)
 
@@ -410,7 +557,8 @@ class Aplicacao:
         try:
             if id_existente is None:
                 vuln = self.inventario.registrar_vulnerabilidade(
-                    equipamento.id, descricao, origem, nota, situacao)
+                    equipamento.id, descricao, origem, nota, situacao,
+                    vetor)
             else:
                 self.inventario.registrar_vulnerabilidade_existente(
                     equipamento.id, id_existente, situacao)
@@ -471,37 +619,13 @@ class Aplicacao:
             return
 
         situacao_atual = equipamento.vulnerabilidades[vuln.id]
-        afetados = self.inventario.afetados_por(vuln.id)
-        print(f"\n  Descrição ..... {vuln.descricao}")
-        print(f"  Categoria ..... {vuln.origem.rotulo}")
-        print(f"  Nota CVSS ..... {numero_br(vuln.cvss)} "
-              f"({vuln.gravidade.rotulo})")
-        print(f"  Status ........ "
-              f"{cores.situacao(situacao_atual.rotulo, situacao_atual)}"
-              f" (em {equipamento.hostname})")
-        if len(afetados) > 1:
-            print("\n  " + cores.aviso(
-                f"Descrição, categoria e nota valem para os "
-                f"{len(afetados)} equipamentos que têm esta vulnerabilidade"
-                f" ({', '.join(e.hostname for e in afetados)}). "
-                f"O status vale só para {equipamento.hostname}."))
+        tinha_vetor = vuln.vetor is not None
+        telas.mostrar_vulnerabilidade_em_edicao(
+            vuln, situacao_atual, equipamento,
+            self.inventario.afetados_por(vuln.id))
         print("\n  Deixe em branco para manter o valor atual.\n")
 
-        alteracoes = {}
-        novo = ler_campo(f"  Descrição [{vuln.descricao}]: ",
-                         obrigatorio=False)
-        if novo:
-            alteracoes["descricao"] = novo
-        nova_origem = ler_enum(
-            f"  Categoria (atual: {vuln.origem.rotulo})"
-            " - Enter para manter:",
-            OrigemVulnerabilidade, opcional=True)
-        if nova_origem is not None:
-            alteracoes["origem"] = nova_origem
-        nova_nota = self._ler_nota_cvss(
-            f"\n  Nota CVSS [{numero_br(vuln.cvss)}]: ", opcional=True)
-        if nova_nota is not None:
-            alteracoes["cvss"] = nova_nota
+        alteracoes = self._ler_alteracoes_do_catalogo(vuln)
         nova_situacao = ler_enum(
             f"  Status (atual: {situacao_atual.rotulo})"
             " - Enter para manter:",
@@ -526,9 +650,38 @@ class Aplicacao:
             return
 
         self._salvar()
+        # Nota e vetor contam como um campo só: mudam sempre juntos.
+        campos = len(alteracoes.keys() - {"vetor"}) + int(mudou_situacao)
         print("\n  " + cores.sucesso(
-            f"Vulnerabilidade atualizada "
-            f"({len(alteracoes) + int(mudou_situacao)} campo(s))."))
+            f"Vulnerabilidade atualizada ({campos} campo(s))."))
+        if tinha_vetor and vuln.vetor is None:
+            print("  " + cores.aviso(
+                "A nota agora é digitada: o vetor antigo foi retirado."))
+
+    def _ler_alteracoes_do_catalogo(self, vuln):
+        """Pergunta descrição, categoria e nota; Enter mantém cada uma.
+
+        Devolve o dicionário de alterações para Inventario.
+        atualizar_vulnerabilidade(): nota e vetor vão juntos.
+        """
+        alteracoes = {}
+        novo = ler_campo(f"  Descrição [{vuln.descricao}]: ",
+                         obrigatorio=False)
+        if novo and frase(novo) != vuln.descricao:
+            alteracoes["descricao"] = novo
+        nova_origem = ler_enum(
+            f"  Categoria (atual: {vuln.origem.rotulo})"
+            " - Enter para manter:",
+            OrigemVulnerabilidade, opcional=True)
+        if nova_origem not in (None, vuln.origem):
+            alteracoes["origem"] = nova_origem
+        resposta = self._ler_nota_cvss(
+            f"\n  Nota CVSS [{numero_br(vuln.cvss)}] - número, vetor ou "
+            f"\"{PALAVRA_CALCULAR}\": ", opcional=True)
+        # A mesma nota digitada não muda nada: o vetor dela continua.
+        if resposta not in (None, (vuln.cvss, None), (vuln.cvss, vuln.vetor)):
+            alteracoes["cvss"], alteracoes["vetor"] = resposta
+        return alteracoes
 
     def excluir_vulnerabilidade(self):
         """Opção 9: tira uma vulnerabilidade cadastrada por engano.

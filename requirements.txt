@@ -4,3 +4,8 @@
 # linalg.norm e, no autoteste, linalg.inv) existem sem mudança da versão
 # 1.26 à 2.x.
 numpy>=1.26,<3
+# cvss: a fórmula oficial da nota CVSS (versões 3.x e 4.0), da equipe de
+# segurança da Red Hat; usada em calculadora_cvss.py. Versão fixa: o
+# mesmo vetor tem de dar sempre a mesma nota. Não depende de nenhum
+# outro pacote.
+cvss==3.6

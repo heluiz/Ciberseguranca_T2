@@ -29,8 +29,8 @@ valendo, e o programa foi reescrito em orientação a objetos.
 
 ### Direto no computador
 
-Requer Python 3.11 ou superior e o NumPy (a única dependência externa, usada
-no modelo de risco). O Python 3.10 parou de receber correções de segurança em
+Requer Python 3.11 ou superior e duas bibliotecas: o NumPy, usado no modelo de
+risco, e a `cvss`, que calcula a nota CVSS a partir do vetor. O Python 3.10 parou de receber correções de segurança em
 1º de outubro de 2026, por isso não é mais indicado. Os testes passaram com
 Python 3.11, 3.12, 3.13 e 3.14, com NumPy 2.4 e 2.5; a imagem Docker usa
 Python 3.14.
@@ -154,8 +154,8 @@ docker run -dit --name inventario --restart unless-stopped \
   -v inventario-dados:/app/dados inventario:1.0
 ```
 
-Como o repositório é privado, o `git clone` pede login: no lugar da senha, use
-um token de acesso pessoal do GitHub. Para comprovar o tempo no ar,
+Se o repositório estiver privado, o `git clone` pede login: no lugar da senha,
+use um token de acesso pessoal do GitHub. Para comprovar o tempo no ar,
 `docker ps` mostra `Up 24 hours` (ou mais), `docker inspect -f
 '{{.State.StartedAt}}' inventario` mostra quando o programa ligou e
 `docker inspect -f '{{.RestartCount}}' inventario` mostra quantas vezes o
@@ -177,6 +177,44 @@ qualquer pergunta do programa:
 
 Números decimais aceitam vírgula ou ponto (`7,5` ou `7.5`).
 
+**A nota CVSS** de uma vulnerabilidade nova (opções 1 e 6) ou alterada
+(opção 8) pode ser dada de três jeitos:
+
+- **A nota**, como `7,5`.
+- **O vetor**, colado da [calculadora do FIRST](https://www.first.org/cvss/calculator/4.0)
+  ou de um boletim de segurança, nas versões 4.0, 3.1 ou 3.0, como
+  `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H`. O programa calcula a nota
+  (9,8) e guarda o vetor junto.
+- **`calcular`**: o programa faz as perguntas do CVSS, uma a uma, e explica em
+  português o que cada opção quer dizer. Responde-se com o número da opção ou
+  com a letra do vetor; `anterior` volta uma pergunta e `cancelar` desiste do
+  cálculo. No fim, o programa mostra o vetor e a nota e pergunta se pode usar
+  (Enter aceita). A versão 4.0, a atual, é a padrão; a 3.1 também está
+  disponível.
+
+Um trecho da tela do `calcular`:
+
+```
+  [1/11] Vetor de ataque (AV)
+  De onde o atacante consegue explorar a falha?
+
+    1 - Rede (N)
+        Pela rede, atravessando roteadores: da internet ou de outra sub-rede
+        da rede interna. A parte vulnerável recebe dados pela rede, seja um
+        serviço (RDP, um site) ou um programa cliente (o navegador), e a falha
+        é chamada de "explorável remotamente". Só estar na rede interna, ou
+        atrás de um firewall, não muda a resposta: continua sendo Rede.
+    2 - Rede adjacente (A)
+        Só da vizinhança, porque o próprio protocolo não passa de um roteador:
+        o mesmo segmento de rede local (ARP, descoberta de vizinhos do IPv6),
+        o mesmo meio sem fio (Bluetooth, NFC, Wi-Fi) ou uma zona
+        administrativa restrita (MPLS, VPN segura). Ex.: inundação de ARP que
+        derruba a rede local.
+  ...
+  Vetor: CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N
+  Nota:  9,3 (Crítica)
+```
+
 | Opção | Faz |
 | --- | --- |
 | 1 | Cadastra um equipamento (e, em seguida, suas vulnerabilidades iniciais) |
@@ -186,7 +224,7 @@ Números decimais aceitam vírgula ou ponto (`7,5` ou `7.5`).
 | 5 | Exclui um equipamento, com tudo que dependia dele |
 | 6 | Registra uma vulnerabilidade num equipamento: uma nova ou uma já existente no catálogo |
 | 7 | Mostra um equipamento e suas vulnerabilidades, da mais grave |
-| 8 | Atualiza uma vulnerabilidade (descrição, categoria, nota CVSS) ou o status dela naquele equipamento |
+| 8 | Atualiza uma vulnerabilidade (descrição, categoria, nota ou vetor CVSS) ou o status dela naquele equipamento |
 | 9 | Tira uma vulnerabilidade de um equipamento (cadastro errado ou duplicado) |
 | 10 | Lista as vulnerabilidades pendentes de todos os equipamentos, da mais grave |
 | 11 | Cadastra uma dependência entre dois equipamentos |
@@ -226,6 +264,7 @@ de duas branches e merges também continua valendo: veja
 | `risco.py` | Classe `ModeloRisco`: monta M, v, A e b, verifica a invertibilidade e resolve o sistema |
 | `armazenamento.py` | Classe `ArquivoInventario`: lê e grava o JSON, com gravação atômica |
 | `migracao.py` | Converte uma base do Trabalho 1 para o formato novo |
+| `calculadora_cvss.py` | As perguntas do CVSS (versões 3.1 e 4.0) com as explicações em português; monta o vetor e confere um vetor digitado |
 | `classificacoes.py` | Enums: tipo do equipamento; origem, severidade e status da vulnerabilidade |
 | `validacao.py` | Conferência de dados vindos do arquivo |
 | `entrada.py` | Leitura do teclado e comandos globais (`voltar`, `sair`...). Único módulo com `input()` |
@@ -306,6 +345,28 @@ dos dois jeitos.
   recusada em vez de arredondada: o `round()` do Python arredonda o empate para
   o número par (daria 8,2), enquanto o CVSS arredonda para cima (daria 8,3).
   Quem digitou escolhe a nota certa.
+- **A nota pode vir do vetor CVSS**, e então os dois andam juntos: a nota é a
+  que o vetor dá, como a severidade é a que a nota dá. A conta é a fórmula
+  oficial, da biblioteca `cvss`, da equipe de segurança da Red Hat (a da versão
+  4.0 usa tabelas grandes, que não faria sentido reescrever). A versão da
+  biblioteca é fixa no `requirements.txt`, para o mesmo vetor dar sempre a mesma
+  nota, e o cálculo não usa a rede.
+- **Só as métricas base do CVSS.** Elas medem a falha em si. O contexto (o tipo
+  do equipamento e as dependências) já entra pelo modelo de risco; as métricas
+  de ambiente do CVSS o contariam duas vezes. Um vetor com outra métrica
+  definida (de ameaça, temporal, de ambiente ou suplementar) é recusado, com a
+  explicação; as que vêm com o valor X, "não definida", são só ignoradas.
+- **As explicações seguem a especificação do FIRST**, inclusive nos pontos em
+  que o leigo costuma errar: "Rede" vale mesmo para um serviço acessível só de
+  dentro da rede interna; o impacto "Alto" inclui vazar uma parte só, se ela já
+  causa dano direto e grave (como a senha do administrador); clicar num link
+  enviado pelo atacante é interação "Ativa"; e uma configuração fora do padrão
+  não conta como requisito de ataque, porque a pergunta já parte do sistema
+  vulnerável.
+- **A leitura do vetor é tolerante**: aceita as métricas em qualquer ordem e
+  em minúsculas, e grava o vetor arrumado, na ordem oficial. A especificação
+  4.0 chama de inválido o vetor fora de ordem; o programa prefere arrumar a
+  recusar o que alguém copiou.
 - **Resolve-se o sistema, não se inverte a matriz.** `numpy.linalg.solve` faz a
   fatoração LU: é mais preciso e mais rápido do que calcular a inversa de
   `I − A` e multiplicar por *b*. O `python risco.py` compara os dois num
@@ -417,12 +478,18 @@ vulnerabilidades e as suas dependências dentro dele.
 
 - Os códigos de `tipo`, `origem` e `situacao` são os valores dos Enums de
   `classificacoes.py`; o rótulo com acento só existe na tela.
+- Uma vulnerabilidade cuja nota veio do vetor CVSS tem também o campo
+  `"vetor"`, por exemplo
+  `"cvss": 9.8, "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"`. O
+  campo é opcional: sem vetor, ele simplesmente não aparece (um `null` vale
+  como sem vetor), e os arquivos antigos continuam valendo. Na carga, a nota tem de ser a que o vetor dá; se
+  não for, o arquivo é recusado.
 - `dependencias` é a linha do equipamento na matriz A: pares (equipamento do
   qual se herda, fração). A matriz A, portanto, é persistida no mesmo JSON dos
   demais dados, como o enunciado pede. A matriz M não é gravada: é montada,
   na hora, a partir de `vulnerabilidades` de cada equipamento.
 - Uma mesma vulnerabilidade pode afetar vários equipamentos: ela aparece, com os
-  mesmos `id`, `descricao`, `origem` e `cvss`, no objeto de cada um deles (é
+  mesmos `id`, `descricao`, `origem`, `cvss` e `vetor`, no objeto de cada um deles (é
   daí que vem a matriz M). Ao carregar, as cópias são reunidas num só objeto do
   catálogo; se duas cópias do mesmo `id` forem diferentes, o arquivo é
   recusado. A `situacao` do tratamento é de cada equipamento: o mesmo problema
@@ -444,7 +511,8 @@ vulnerabilidades e as suas dependências dentro dele.
   (`os.replace`): se ela for interrompida, a base anterior continua inteira.
 - A carga confere o arquivo inteiro: tipos, ids repetidos, hostname repetido,
   dependência de equipamento que não existe, vulnerabilidade com dados
-  diferentes em dois equipamentos, o mesmo nome duas vezes num objeto, NaN.
+  diferentes em dois equipamentos, nota que não confere com o vetor, o mesmo
+  nome duas vezes num objeto, NaN.
   Qualquer problema para o programa com uma mensagem que diz o que está
   errado e onde, em vez de carregar pela metade e apagar dados bons na
   próxima gravação. Descrição, responsável e lotação são mantidos como estão
@@ -524,6 +592,9 @@ para converter à mão:
   cargo junto com a lotação pode apontar alguém. As medidas desta seção são as
   que o princípio da segurança (art. 6º, VII) e o art. 46 pedem: proteger os
   dados de acesso não autorizado, de perda e de alteração.
+- **Dependências conhecidas.** São só duas, ambas de projetos conhecidos: o
+  NumPy e a `cvss` (com versão fixa, sem nenhuma dependência própria). Cada
+  pacote a mais é código de terceiros rodando dentro do container.
 - **Nada sensível no repositório.** A pasta `dados/`, com a base real, fica
   fora do Git (`.gitignore`) e da imagem (`.dockerignore`); a base de exemplo
   é fictícia; não há senhas nem chaves no código.
@@ -545,7 +616,7 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 | [Versões do Python](https://devguide.python.org/versions/) | Versão em uso | Imagem e verificação automática no Python 3.14 (em manutenção completa); 3.11 ou superior fora do container. O 3.10 chegou ao fim da vida em 2026-10-01. |
 | [NumPy](https://numpy.org/doc/stable/reference/generated/numpy.linalg.solve.html) | Álgebra linear | `linalg.solve` resolve o sistema sem inverter a matriz; `linalg.cond` decide a invertibilidade; `linalg.det` só informa; `LinAlgError` é tratado. |
 | [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259) e [módulo json](https://docs.python.org/3/library/json.html) | Formato do arquivo | Array JSON na raiz, UTF-8 sem BOM, sem `NaN` nem `Infinity`, nomes únicos em cada objeto. Veja [o formato](#formato-do-arquivo-de-dados). |
-| [CVSS v3.1](https://www.first.org/cvss/v3.1/specification-document) e [v4.0](https://www.first.org/cvss/v4.0/specification-document) | Nota e severidade | Escala qualitativa oficial (igual nas duas versões) e nota com uma casa decimal. Desvio: 0,0 (*Nenhuma*) não é aceita. |
+| [CVSS v3.1](https://www.first.org/cvss/v3.1/specification-document) e [v4.0](https://www.first.org/cvss/v4.0/specification-document) | Nota e severidade | Escala qualitativa oficial (igual nas duas versões) e nota com uma casa decimal. A nota pode vir do vetor (versões 4.0, 3.1 e 3.0), pela fórmula oficial, com as perguntas das métricas base explicadas a partir da especificação. Desvios: 0,0 (*Nenhuma*) não é aceita, e o vetor é aceito fora de ordem e em minúsculas, mas gravado na forma oficial. |
 | [RFC 952](https://www.rfc-editor.org/rfc/rfc952), [1123](https://www.rfc-editor.org/rfc/rfc1123) e [1035](https://www.rfc-editor.org/rfc/rfc1035) | Hostname | Veja [Limitações conhecidas](#limitações-conhecidas). |
 | [LGPD](https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm) (Lei 13.709/2018) | Dados pessoais | Art. 6º, III (necessidade); art. 6º, VII e art. 46 (segurança). Veja [Segurança e LGPD](#segurança-e-lgpd). |
 | [Boas práticas do Docker](https://docs.docker.com/build/building/best-practices/) e [referência do Dockerfile](https://docs.docker.com/reference/dockerfile/) | Imagem | Imagem oficial `python:3.14-slim-trixie`, com a versão do Debian fixada no nome; dependências antes do código, para aproveitar o cache; usuário com UID fixo, sem ser root; `CMD` na forma exec e SIGTERM tratado; `VOLUME` para os dados; `.dockerignore`; `HEALTHCHECK` que termina com 0 ou 1. |
@@ -580,16 +651,16 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 python testes.py
 ```
 
-São 47 testes, só com a biblioteca padrão: o programa inteiro rodando por
+São 56 testes, só com a biblioteca padrão: o programa inteiro rodando por
 dentro com o teclado simulado (do cadastro ao risco, incluindo o cenário de 3
-equipamentos), a recusa de bases inválidas (inclusive JSON fora da norma) e do
-sistema singular, a conversão da base do Trabalho 1, o comportamento no
+equipamentos), a nota CVSS pelo vetor e pelas perguntas do `calcular`, a recusa
+de bases inválidas (inclusive JSON fora da norma) e do sistema singular, a conversão da base do Trabalho 1, o comportamento no
 container (inclusive `sair` e Ctrl+D) e o modelo de risco sobre os arquivos de
 exemplo. O último teste roda o autoteste de cada módulo. Nada toca em
 `dados/inventario.json`: os testes usam pastas temporárias.
 
 Cobertura, com o coverage.py (configurado em `.coveragerc`): os testes passam
-por 83% das linhas do programa, sem contar os autotestes dos módulos, que rodam
+por 85% das linhas do programa, sem contar os autotestes dos módulos, que rodam
 em outro processo.
 
 ```
@@ -624,7 +695,7 @@ histórico mesmo quando não há conflito:
 
 | Prefixo | Uso | Exemplo neste repositório |
 | --- | --- | --- |
-| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico` |
+| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss` |
 | `fix/` | Correção de defeito | `fix/normas-oficiais` |
 | `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |

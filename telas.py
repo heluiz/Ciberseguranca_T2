@@ -5,8 +5,11 @@ objetos já prontos (equipamentos, vulnerabilidades, resultados do
 modelo de risco) e cuida de alinhamento, cores e números com vírgula.
 """
 
+import textwrap
+
 import cores
 import formatacao
+from classificacoes import NivelGravidade
 from formatacao import fracao_br, numero_br
 
 LARGURA_MENU = 62
@@ -96,7 +99,8 @@ def imprimir_ocorrencias(itens, com_hostname=False):
     Cada item é (equipamento, vulnerabilidade, situação). Primeira
     linha: severidade e nota, id e descrição. Segunda: situação e
     origem. Com com_hostname (relatório de pendentes), a segunda linha
-    começa pelo hostname do equipamento.
+    começa pelo hostname do equipamento. Se a nota veio de um vetor
+    CVSS, ele aparece numa terceira linha.
     """
     # Largura do id tirada da própria lista, para alinhar [3] e [147].
     largura_id = max(len(f"[{v.id}]") for _, v, _ in itens)
@@ -111,8 +115,12 @@ def imprimir_ocorrencias(itens, com_hostname=False):
         nivel = vuln.gravidade
         severidade = cores.gravidade(
             f"{nivel.rotulo.upper():<7} {numero_br(vuln.cvss):>4}", nivel)
+        recuo = f"    {'':<12} {'':<{largura_id}}"
         print(f"    {severidade} {marcador:<{largura_id}} {vuln.descricao}")
-        print(f"    {'':<12} {'':<{largura_id}} {legenda}\n")
+        print(f"{recuo} {legenda}")
+        if vuln.vetor is not None:
+            print(f"{recuo} {cores.discreto(vuln.vetor)}")
+        print()
 
 
 def mostrar_vulnerabilidades(pares):
@@ -126,6 +134,29 @@ def mostrar_vulnerabilidades(pares):
         return
     print(f"\n  Vulnerabilidades ({len(pares)}), da mais grave:\n")
     imprimir_ocorrencias([(None, v, s) for v, s in pares])
+
+
+def mostrar_vulnerabilidade_em_edicao(vuln, situacao, equipamento,
+                                      afetados):
+    """Mostra os dados atuais de uma vulnerabilidade, antes de editar.
+
+    afetados são os equipamentos que a têm: com mais de um, avisa que
+    descrição, categoria e nota mudam para todos.
+    """
+    print(f"\n  Descrição ..... {vuln.descricao}")
+    print(f"  Categoria ..... {vuln.origem.rotulo}")
+    print(f"  Nota CVSS ..... {numero_br(vuln.cvss)} "
+          f"({vuln.gravidade.rotulo})")
+    if vuln.vetor is not None:
+        print(f"  Vetor CVSS .... {vuln.vetor}")
+    print(f"  Status ........ {cores.situacao(situacao.rotulo, situacao)}"
+          f" (em {equipamento.hostname})")
+    if len(afetados) > 1:
+        print("\n  " + cores.aviso(
+            f"Descrição, categoria e nota valem para os {len(afetados)} "
+            f"equipamentos que têm esta vulnerabilidade "
+            f"({', '.join(e.hostname for e in afetados)}). O status vale "
+            f"só para {equipamento.hostname}."))
 
 
 def mostrar_catalogo(inventario):
@@ -288,6 +319,61 @@ def mostrar_detalhe_risco(item, vulnerabilidades, parcelas):
     print(f"\n  Risco efetivo  x = b + A x = {numero_br(item.proprio, 2)} + "
           f"{numero_br(herdado, 2)} = "
           f"{cores.destaque(numero_br(item.efetivo, 2))}")
+
+
+# ----------------------------------------------------------------------
+# Calculadora CVSS: a nota respondendo às perguntas
+# ----------------------------------------------------------------------
+
+# Largura das explicações: com o recuo das opções, cabe em 80 colunas.
+LARGURA_EXPLICACAO = 70
+
+
+def _paragrafo(texto, recuo, largura=LARGURA_EXPLICACAO):
+    """Imprime o texto quebrado em linhas, todas com o mesmo recuo."""
+    for linha in textwrap.wrap(texto, largura):
+        print(f"{recuo}{linha}")
+
+
+def mostrar_inicio_calculadora_cvss():
+    """Explica a calculadora e mostra as versões do CVSS."""
+    print("\n" + cores.titulo("--- CALCULAR A NOTA CVSS ---") + "\n")
+    _paragrafo("Responda sobre a falha, e não sobre o equipamento: o CVSS "
+               "mede o quanto a vulnerabilidade é grave em si. O contexto "
+               "(o tipo do equipamento e as dependências) entra depois, "
+               "no modelo de risco. As perguntas seguem as métricas da "
+               "calculadora oficial do FIRST, explicadas em português.",
+               "  ", LARGURA_EXPLICACAO + 4)
+    print()
+    _paragrafo("Em cada pergunta, digite o número da opção (ou a letra "
+               "entre parênteses). \"anterior\" volta uma pergunta, "
+               "\"cancelar\" desiste do cálculo e \"voltar\" abandona o "
+               "cadastro desta vulnerabilidade.", "  ",
+               LARGURA_EXPLICACAO + 4)
+    print("\n  Versão do CVSS:")
+    print(f"    {cores.destaque('1')} - 4.0, a versão atual (recomendada)")
+    print(f"    {cores.destaque('2')} - 3.1, a anterior, ainda usada em "
+          f"muitas notas publicadas")
+
+
+def mostrar_pergunta_cvss(numero, total, metrica):
+    """Mostra uma pergunta do CVSS e o que cada opção quer dizer."""
+    titulo = f"[{numero}/{total}] {metrica.nome} ({metrica.codigo})"
+    print(f"\n  {cores.titulo(titulo)}")
+    _paragrafo(metrica.pergunta, "  ", LARGURA_EXPLICACAO + 4)
+    print()
+    for indice, opcao in enumerate(metrica.opcoes, start=1):
+        print(f"    {cores.destaque(str(indice))} - {opcao.nome} "
+              f"({opcao.codigo})")
+        _paragrafo(opcao.explicacao, "        ")
+
+
+def mostrar_resultado_cvss(vetor, nota):
+    """Mostra o vetor montado com as respostas e a nota que ele dá."""
+    nivel = NivelGravidade.do_cvss(nota)
+    print(f"\n  Vetor: {cores.destaque(vetor)}")
+    print("  Nota:  " + cores.gravidade(
+        f"{numero_br(nota)} ({nivel.rotulo})", nivel))
 
 
 def mostrar_matrizes(modelo):

@@ -168,25 +168,50 @@ def ler_inteiro(mensagem, opcional=False, mostrar_lista=None):
             print("  " + cores.erro("! Digite apenas números."))
 
 
+def converter_decimal(texto):
+    """Converte "7,5" ou "7.5" em 7.5; levanta ValueError se não der.
+
+    Só aceita número finito: float() aceitaria "nan" e "inf", que
+    estragariam as contas.
+    """
+    try:
+        numero = float(texto.replace(",", "."))
+    except ValueError:
+        numero = math.nan
+    if not math.isfinite(numero):
+        raise ValueError("Digite um número, como 7,5 (use vírgula ou "
+                         "ponto)")
+    return numero
+
+
 def ler_decimal(mensagem, opcional=False):
     """Lê um número decimal, com vírgula ou ponto: "7,5" e "7.5" valem.
 
-    Repete a pergunta até vir um número finito: float() aceitaria
-    "nan" e "inf", que estragariam as contas. Com opcional=True, Enter
-    vazio devolve None (manter o valor atual).
+    Repete a pergunta até vir um número finito. Com opcional=True,
+    Enter vazio devolve None (manter o valor atual).
     """
     while True:
         bruto = ler_resposta(mensagem)
         if not bruto and opcional:
             return None
         try:
-            numero = float(bruto.replace(",", "."))
-        except ValueError:
-            numero = math.nan
-        if math.isfinite(numero):
-            return numero
-        print("  " + cores.erro(
-            "! Digite um número, como 7,5 (use vírgula ou ponto)."))
+            return converter_decimal(bruto)
+        except ValueError as erro:
+            print("  " + cores.erro(f"! {erro}."))
+
+
+def ler_opcao(mensagem, quantas, padrao=None):
+    """Lê o número de uma opção de 1 a quantas, repetindo até vir um.
+
+    Com padrao, Enter vazio escolhe essa opção.
+    """
+    while True:
+        bruto = ler_resposta(mensagem)
+        if not bruto and padrao is not None:
+            return padrao
+        if bruto.isdecimal() and 1 <= int(bruto) <= quantas:
+            return int(bruto)
+        print("  " + cores.erro(f"! Digite um número de 1 a {quantas}."))
 
 
 def ler_enum(mensagem, classe_enum, opcional=False):
@@ -209,9 +234,15 @@ def ler_enum(mensagem, classe_enum, opcional=False):
                 "! Código inválido. Escolha um da lista acima."))
 
 
-def confirmar(mensagem):
-    """Devolve True se o usuário responder 's' ou 'sim'."""
-    resposta = ler_resposta(f"{mensagem} (s/N): ")
+def confirmar(mensagem, padrao=False):
+    """Devolve True se o usuário responder 's' ou 'sim'.
+
+    Enter vazio devolve padrao; com padrao=True, a pergunta mostra
+    (S/n) em vez de (s/N), como é costume no terminal.
+    """
+    resposta = ler_resposta(f"{mensagem} {'(S/n)' if padrao else '(s/N)'}: ")
+    if not resposta:
+        return padrao
     return resposta.lower() in ("s", "sim")
 
 
