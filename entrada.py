@@ -184,20 +184,34 @@ def converter_decimal(texto):
     return numero
 
 
-def ler_decimal(mensagem, opcional=False):
-    """Lê um número decimal, com vírgula ou ponto: "7,5" e "7.5" valem.
+def ler_convertido(mensagem, converter, opcional=False):
+    """Lê uma resposta e a converte, repetindo até a conversão servir.
 
-    Repete a pergunta até vir um número finito. Com opcional=True,
-    Enter vazio devolve None (manter o valor atual).
+    converter é uma função: recebe o texto digitado e devolve o valor,
+    ou levanta ValueError com o motivo, que aparece na tela. Se ela
+    devolver None, a pergunta se repete sem mensagem. Com
+    opcional=True, Enter vazio devolve None (manter o valor atual).
     """
     while True:
         bruto = ler_resposta(mensagem)
         if not bruto and opcional:
             return None
         try:
-            return converter_decimal(bruto)
+            valor = converter(bruto)
         except ValueError as erro:
             print("  " + cores.erro(f"! {erro}."))
+            continue
+        if valor is not None:
+            return valor
+
+
+def ler_decimal(mensagem, opcional=False):
+    """Lê um número decimal, com vírgula ou ponto: "7,5" e "7.5" valem.
+
+    Repete a pergunta até vir um número finito. Com opcional=True,
+    Enter vazio devolve None (manter o valor atual).
+    """
+    return ler_convertido(mensagem, converter_decimal, opcional)
 
 
 def ler_opcao(mensagem, quantas, padrao=None):

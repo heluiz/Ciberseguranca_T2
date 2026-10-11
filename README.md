@@ -30,10 +30,10 @@ valendo, e o programa foi reescrito em orientação a objetos.
 ### Direto no computador
 
 Requer Python 3.11 ou superior e duas bibliotecas: o NumPy, usado no modelo de
-risco, e a `cvss`, que calcula a nota CVSS a partir do vetor. O Python 3.10 parou de receber correções de segurança em
-1º de outubro de 2026, por isso não é mais indicado. Os testes passaram com
-Python 3.11, 3.12, 3.13 e 3.14, com NumPy 2.4 e 2.5; a imagem Docker usa
-Python 3.14.
+risco, e a `cvss`, que calcula a nota CVSS a partir do vetor. O Python 3.10
+parou de receber correções de segurança em 1º de outubro de 2026, por isso não
+é mais indicado. Os testes passaram com Python 3.11, 3.12, 3.13 e 3.14, com
+NumPy 2.4 e 2.5; a imagem Docker usa Python 3.14.
 
 ```
 pip install -r requirements.txt
@@ -231,7 +231,7 @@ Um trecho da tela do `calcular`:
 | 12 | Mostra as dependências de um equipamento e permite remover uma |
 | 13 | Mostra o risco próprio e o efetivo de **todos** os equipamentos |
 | 14 | Mostra, passo a passo, como o risco de **um** equipamento foi calculado |
-| 15 | Mostra M, v, M v, F, b e A (para poucos equipamentos) e a verificação de I − A, com o determinante e o número de condição |
+| 15 | Mostra M, v, M v, F, b e A (para poucos equipamentos), o posto de M e a dimensão do seu núcleo, e a verificação de I − A, com o determinante, o número de condição e o posto |
 
 As cores precisam de um terminal que interprete códigos ANSI. Com a variável de
 ambiente `NO_COLOR` definida, o programa imprime texto puro.
@@ -261,10 +261,11 @@ de duas branches e merges também continua valendo: veja
 | `equipamentos.py` | Classe abstrata `Equipamento`, as sete subclasses e o fator de exposição de cada tipo |
 | `vulnerabilidades.py` | Classe `Vulnerabilidade`: entrada do catálogo (descrição, origem, nota CVSS) |
 | `inventario.py` | Classe `Inventario`: o conjunto dos equipamentos e das vulnerabilidades e as regras entre eles (hostname único, cascata, dependências) |
-| `risco.py` | Classe `ModeloRisco`: monta M, v, A e b, verifica a invertibilidade e resolve o sistema |
+| `risco.py` | Classe `ModeloRisco`: monta M, v, A e b, verifica a invertibilidade (com o posto e o teorema de Rouché-Capelli), resolve o sistema e confere a solução |
 | `armazenamento.py` | Classe `ArquivoInventario`: lê e grava o JSON, com gravação atômica |
 | `migracao.py` | Converte uma base do Trabalho 1 para o formato novo |
 | `calculadora_cvss.py` | As perguntas do CVSS (versões 3.1 e 4.0) com as explicações em português; monta o vetor e confere um vetor digitado |
+| `pergunta_cvss.py` | A pergunta da nota CVSS no cadastro e na atualização da vulnerabilidade: o número, o vetor colado ou o `calcular`, uma pergunta do CVSS de cada vez |
 | `classificacoes.py` | Enums: tipo do equipamento; origem, severidade e status da vulnerabilidade |
 | `validacao.py` | Conferência de dados vindos do arquivo |
 | `entrada.py` | Leitura do teclado e comandos globais (`voltar`, `sair`...). Único módulo com `input()` |
@@ -314,6 +315,20 @@ nota por vulnerabilidade, em ℝᵐ) ao vetor *M v* (uma soma por equipamento, e
 e `F (M v) = (F M) v`. No código, F é guardada como o vetor da diagonal
 (`fatores * (M @ v)`), o que dá o mesmo resultado sem montar a matriz cheia de
 zeros. A opção 15 mostra M, v, M v, F e b.
+
+M v pode ser lido de dois jeitos. Por linhas, cada componente é a soma das
+notas das vulnerabilidades daquele equipamento. Por colunas, M v é a combinação
+das colunas de M com as notas como pesos: cada vulnerabilidade soma a sua nota
+em todos os equipamentos que afeta.
+
+O núcleo de M é o conjunto dos vetores *u*, com um valor por vulnerabilidade,
+tais que `M u = 0`: são as mudanças nas notas que não mudam a soma `M v` de
+nenhum equipamento. Pelo teorema do núcleo e da imagem, o posto de M mais a
+dimensão do núcleo dá o número de colunas (as vulnerabilidades). Na base de
+exemplo, M é 76 × 79, com posto 56, então o núcleo tem dimensão 23
+(56 + 23 = 79). Catorze colunas são nulas: vulnerabilidades corrigidas em todos
+os equipamentos em que aparecem, que continuam no catálogo mas não pesam no
+risco. A opção 15 mostra o posto e a dimensão do núcleo.
 
 O enunciado define `b = M v` e sugere que "cada tipo de equipamento pode definir
 um fator de exposição que pondera o seu risco próprio". É o que `F` faz: `M v` é
@@ -371,6 +386,19 @@ dos dois jeitos.
   fatoração LU: é mais preciso e mais rápido do que calcular a inversa de
   `I − A` e multiplicar por *b*. O `python risco.py` compara os dois num
   sistema mal condicionado e mostra o resíduo `‖(I − A) x − b‖` de cada um.
+  Depois de resolver, a solução é conferida substituindo de volta, com
+  `numpy.allclose`: `(I − A) x` tem de dar *b*, com uma tolerância que
+  acompanha o tamanho de *x* (o arredondamento do produto cresce com ele).
+- **As boas práticas da aula de álgebra linear computacional** (S3_09 a
+  S3_12): `@` para produto de matrizes (o `*` só aparece na diagonal de F, de
+  propósito, e o `python risco.py` confere que dá o mesmo que a matriz F
+  inteira com `@`); `solve` em vez de `inv`; resultados de contas (o
+  determinante, a solução, a soma das frações) comparados com tolerância, e
+  não com `==`; o número de condição antes de confiar na solução; o posto para
+  classificar o sistema; e matrizes em `float64`, sem inteiros de tamanho fixo,
+  que "dão a volta". As notas CVSS são a exceção de propósito: digitadas,
+  lidas do arquivo ou calculadas pelo vetor, elas sempre ficam com uma casa
+  decimal, e por isso podem ser comparadas exatamente.
 
 ### Verificação de invertibilidade
 
@@ -387,24 +415,37 @@ resolvido):
    `0,9999999999999999`, que passaria no teste "menor que 1" por engano.
 2. **Número de condição.** Um arquivo editado à mão pode violar a regra. Sem a
    garantia da dominância, o número de condição (`numpy.linalg.cond`) decide se
-   `I − A` é invertível: acima de 10¹², o sistema é tratado como singular.
+   `I − A` é tratada como invertível: acima de 10¹², o sistema é tratado como
+   singular.
    O determinante também é calculado, mas só para informar: em ponto
    flutuante, um determinante teoricamente nulo raramente dá zero exato, e o
-   tamanho de um determinante pequeno depende da escala da matriz.
+   tamanho de um determinante pequeno depende da escala da matriz. Quando o
+   número de condição passa do limite, o posto de `I − A`
+   (`numpy.linalg.matrix_rank`) diz o motivo. Com posto cheio, `I − A` é
+   invertível em teoria e a solução existe e é única, mas a matriz é tão mal
+   condicionada que o computador não a calcula com confiança. Com posto menor
+   que n, o programa diz quantas soluções o sistema tem, pelo teorema de
+   Rouché-Capelli: compara o posto de `I − A` com o da matriz ampliada
+   `[I − A | b]`. Se o da ampliada é maior, não há solução; se os dois são
+   iguais (e menores que n), há infinitas.
 3. **Conferência da solução.** Ser invertível não basta: com dependências em
    ciclo que repassam frações altas demais, `I − A` pode ser invertível e a
    solução dar a algum equipamento um risco efetivo *menor* que o próprio,
    até negativo. Herdar risco só pode somar, então, sem a garantia da
-   dominância, a solução é conferida (`x ≥ b`); se a conferência falhar, o
-   programa avisa e não mostra nada, como no caso singular.
+   dominância, a solução é conferida (`x ≥ b`). E, em todos os casos, depois
+   do `solve`, a solução é substituída de volta: `(I − A) x` tem de dar *b*,
+   com tolerância. Se uma conferência falhar, o programa avisa e não mostra
+   nada, como no caso singular.
 
 As opções 13, 14 e 15 mostram o resultado da verificação e, para conferência,
-`det(I − A)` e o número de condição de `I − A`.
+`det(I − A)`, o número de condição e o posto de `I − A`.
 
 Exemplos de arquivo que a verificação recusa: três equipamentos em que cada
 linha de A soma 1 (0,3 + 0,7), o que faz de (1, 1, 1) um vetor que `I − A` leva
 a zero (singular: o determinante daria 0 no papel, mas o calculado sai da ordem
-de 1e-16, e o programa avisa que é zero dentro da tolerância de 1e-12); e um
+de 1e-16, e o programa avisa que é zero dentro da tolerância de 1e-12; o
+posto de `I − A` é 2 e o de `[I − A | b]` é 3, então, pelo teorema de
+Rouché-Capelli, o sistema não tem solução); e um
 equipamento que herda 0,9 de dois outros, que herdam 0,9 dele (invertível, mas
 a solução daria riscos efetivos negativos).
 
@@ -482,8 +523,8 @@ vulnerabilidades e as suas dependências dentro dele.
   `"vetor"`, por exemplo
   `"cvss": 9.8, "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"`. O
   campo é opcional: sem vetor, ele simplesmente não aparece (um `null` vale
-  como sem vetor), e os arquivos antigos continuam valendo. Na carga, a nota tem de ser a que o vetor dá; se
-  não for, o arquivo é recusado.
+  como sem vetor), e os arquivos antigos continuam valendo. Na carga, a nota
+  tem de ser a que o vetor dá; se não for, o arquivo é recusado.
 - `dependencias` é a linha do equipamento na matriz A: pares (equipamento do
   qual se herda, fração). A matriz A, portanto, é persistida no mesmo JSON dos
   demais dados, como o enunciado pede. A matriz M não é gravada: é montada,
@@ -614,7 +655,7 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 | [PEP 257](https://peps.python.org/pep-0257/) | Docstrings | Todo módulo, classe e função pública tem docstring, com uma primeira linha curta. Desvio: a PEP pede a primeira linha como uma ordem ("Devolva..."); aqui ela está na 3ª pessoa ("Devolve..."), como é costume em português. |
 | [PEP 20](https://peps.python.org/pep-0020/) | Princípios do Python | "Errors should never pass silently": base inválida, nota com duas casas decimais e nome repetido no JSON são recusados com mensagem, nunca corrigidos em silêncio. |
 | [Versões do Python](https://devguide.python.org/versions/) | Versão em uso | Imagem e verificação automática no Python 3.14 (em manutenção completa); 3.11 ou superior fora do container. O 3.10 chegou ao fim da vida em 2026-10-01. |
-| [NumPy](https://numpy.org/doc/stable/reference/generated/numpy.linalg.solve.html) | Álgebra linear | `linalg.solve` resolve o sistema sem inverter a matriz; `linalg.cond` decide a invertibilidade; `linalg.det` só informa; `LinAlgError` é tratado. |
+| [NumPy](https://numpy.org/doc/stable/reference/generated/numpy.linalg.solve.html) | Álgebra linear | `linalg.solve` resolve o sistema sem inverter a matriz, e `allclose` confere a solução; `linalg.cond` decide a invertibilidade; `linalg.matrix_rank` dá o posto (Rouché-Capelli); `linalg.det` só informa; `LinAlgError` é tratado. |
 | [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259) e [módulo json](https://docs.python.org/3/library/json.html) | Formato do arquivo | Array JSON na raiz, UTF-8 sem BOM, sem `NaN` nem `Infinity`, nomes únicos em cada objeto. Veja [o formato](#formato-do-arquivo-de-dados). |
 | [CVSS v3.1](https://www.first.org/cvss/v3.1/specification-document) e [v4.0](https://www.first.org/cvss/v4.0/specification-document) | Nota e severidade | Escala qualitativa oficial (igual nas duas versões) e nota com uma casa decimal. A nota pode vir do vetor (versões 4.0, 3.1 e 3.0), pela fórmula oficial, com as perguntas das métricas base explicadas a partir da especificação. Desvios: 0,0 (*Nenhuma*) não é aceita, e o vetor é aceito fora de ordem e em minúsculas, mas gravado na forma oficial. |
 | [RFC 952](https://www.rfc-editor.org/rfc/rfc952), [1123](https://www.rfc-editor.org/rfc/rfc1123) e [1035](https://www.rfc-editor.org/rfc/rfc1035) | Hostname | Veja [Limitações conhecidas](#limitações-conhecidas). |
@@ -651,13 +692,22 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 python testes.py
 ```
 
-São 56 testes, só com a biblioteca padrão: o programa inteiro rodando por
+São 60 testes, só com a biblioteca padrão: o programa inteiro rodando por
 dentro com o teclado simulado (do cadastro ao risco, incluindo o cenário de 3
 equipamentos), a nota CVSS pelo vetor e pelas perguntas do `calcular`, a recusa
-de bases inválidas (inclusive JSON fora da norma) e do sistema singular, a conversão da base do Trabalho 1, o comportamento no
-container (inclusive `sair` e Ctrl+D) e o modelo de risco sobre os arquivos de
-exemplo. O último teste roda o autoteste de cada módulo. Nada toca em
-`dados/inventario.json`: os testes usam pastas temporárias.
+de bases inválidas (inclusive JSON fora da norma) e do sistema singular (com o
+posto e o teorema de Rouché-Capelli), a conversão da base do Trabalho 1, o
+comportamento no container (inclusive `sair` e Ctrl+D) e o modelo de risco
+sobre os arquivos de exemplo. O último teste roda o autoteste de cada módulo.
+Nada toca em `dados/inventario.json`: os testes usam pastas temporárias.
+
+Os mesmos testes rodam no pytest, que entende os testes escritos com o
+unittest:
+
+```
+pip install pytest
+python -m pytest testes.py
+```
 
 Cobertura, com o coverage.py (configurado em `.coveragerc`): os testes passam
 por 85% das linhas do programa, sem contar os autotestes dos módulos, que rodam
@@ -684,7 +734,42 @@ regra só reconhece verbos em inglês. O Ruff substitui o flake8 e o pydocstyle
 usados antes: o pydocstyle foi descontinuado em 2023, e o próprio projeto
 indica o Ruff no lugar.
 
-O GitHub roda o estilo e os testes sozinho a cada push: veja a seção seguinte.
+O pylint, outra ferramenta de análise estática, dá nota 9,77 de 10
+(`pip install pylint` e `pylint *.py`). Os avisos que restam foram mantidos de
+propósito:
+
+- os nomes `M` e `A`, iguais aos do enunciado;
+- limites de tamanho, como funções com mais de cinco parâmetros
+  (`registrar_vulnerabilidade` recebe um parâmetro por dado da
+  vulnerabilidade) e classes com mais de 20 métodos públicos;
+- o `except Exception` do laço do menu, que impede um erro inesperado de
+  derrubar o programa, e o `global` que desliga as cores;
+- o import circular entre `armazenamento.py` e `migracao.py`, que é só
+  aparente: `migracao.py` só importa o outro no bloco que roda quando ele é
+  executado como script;
+- trechos dos testes e dos autotestes, como as variáveis no nível do módulo
+  e a tentativa proposital de criar um `Equipamento`, que prova que a classe
+  abstrata não pode ser instanciada.
+
+O GitHub roda o estilo e os testes sozinho a cada push: veja
+[Fluxo de trabalho no Git](#fluxo-de-trabalho-no-git).
+
+### Defeitos encontrados e corrigidos
+
+Defeitos que os testes e as revisões pegaram durante o trabalho. Os que
+estavam no código ganharam um teste, para não voltarem:
+
+| Defeito | Correção | Como se confere |
+| --- | --- | --- |
+| A conferência da solução com `numpy.allclose` usava a tolerância padrão e recusava a solução certa de um sistema quase crítico (número de condição 4,5e8), com "Erro inesperado" na tela | A tolerância acompanha o tamanho de *x*, e uma solução que não confere vira aviso, sem erro | `test_sistema_quase_critico_mas_valido_e_resolvido` e `test_solucao_que_nao_confere_e_avisada_no_menu` |
+| Com posto cheio e número de condição acima do limite, a mensagem dizia que `I − A` não era invertível, contra o teorema da matriz invertível | A mensagem separa o caso: posto cheio é invertível em teoria, só mal condicionado | `test_posto_cheio_mal_condicionado_nao_contradiz_o_teorema` |
+| Na opção 8, digitar a nota que a vulnerabilidade já tinha apagava o vetor CVSS dela | A mesma nota (e a mesma categoria) não conta como mudança, e o vetor continua | `test_atualizar_com_os_mesmos_valores_nao_muda_nada` |
+| No fim do `calcular`, o Enter em "Usar esta nota?" descartava as 11 respostas | O Enter aceita a nota | `test_calcular_a_nota_respondendo_as_perguntas` |
+| `limpar` numa pergunta do `calcular` apagava a pergunta da tela | A pergunta é desenhada de novo | `test_letra_anterior_e_cancelar_nas_perguntas` |
+| Um vetor com métricas não definidas (valor `X`) era recusado | As métricas `X` são ignoradas | `test_vetor_com_metricas_nao_definidas_e_aceito` |
+| `"vetor": null` no arquivo era recusado | `null` vale como sem vetor | `test_vetor_no_arquivo_tem_de_conferir_com_a_nota` |
+| Com o usuário do container trocado para o UID 10001, o programa não gravava no volume criado pela versão anterior | Um `chown` único no volume, descrito em [Em container Docker](#em-container-docker) | Conferido à mão, no container |
+| A explicação da interação "Passiva" do CVSS dava como exemplo clicar num link, que a especificação do FIRST classifica como "Ativa" | Texto corrigido pela especificação | Revisão dos textos contra a especificação |
 
 ## Fluxo de trabalho no Git
 
@@ -695,12 +780,16 @@ histórico mesmo quando não há conflito:
 
 | Prefixo | Uso | Exemplo neste repositório |
 | --- | --- | --- |
-| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss` |
+| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli` |
 | `fix/` | Correção de defeito | `fix/normas-oficiais` |
 | `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
 
 `git log --graph --oneline --all` mostra as branches e os merges.
+
+A partir da `feature/posto-e-rouche-capelli`, a integração é feita por Pull
+Request no GitHub: a branch é enviada, o Pull Request descreve a mudança, a
+verificação automática roda nele, e o merge só é feito com tudo verde.
 
 A cada push e a cada pull request, o GitHub Actions
 (`.github/workflows/verificacao.yml`) roda o Ruff e os testes no Python 3.14,
@@ -747,5 +836,6 @@ inventario:/app/dados/inventario.json` e reinicie com
 `dados_exemplo/cenario_singular.json` tem três equipamentos cujas frações de
 dependência somam 1 em cada linha de A (0,3 + 0,7): o programa abre, mas o
 modelo de risco avisa que `I − A` não é invertível e não calcula nada. Serve
-para demonstrar a verificação, o número de condição e o determinante que dá
-quase zero, mas não zero exato.
+para demonstrar a verificação, o número de condição, o determinante que dá
+quase zero, mas não zero exato, e o teorema de Rouché-Capelli: o posto de
+`I − A` é 2 e o de `[I − A | b]` é 3, então o sistema não tem solução.

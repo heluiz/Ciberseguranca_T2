@@ -1,4 +1,4 @@
-"""Testes automáticos: python testes.py (ou python -m unittest testes).
+"""Testes automáticos: python testes.py (ou python -m pytest testes.py).
 
 Reúne o que os autotestes de cada módulo não cobrem: o programa inteiro
 rodando por dentro, com as respostas do teclado simuladas, e o arquivo
@@ -225,6 +225,9 @@ class TesteDoPrograma(unittest.TestCase):
                       "sem solução", saida)
         self.assertEqual(saida.count("Nenhum risco efetivo foi calculado"),
                          2)
+        # Rouché-Capelli: b = (4, 15, 12) não está na imagem de I - A.
+        self.assertIn("Pelo teorema de Rouché-Capelli, o sistema não tem "
+                      "solução", saida)
         self.assertNotIn("EFETIVO", saida)
         self.assertNotIn("Traceback", saida)
 
@@ -325,8 +328,9 @@ class TesteDoPrograma(unittest.TestCase):
                                               "calcular"] + respostas
                            + ["1", "n", "0"])
         self.assertIn("Cálculo cancelado.", saida)
-        self.assertGreaterEqual(saida.count("[2/11] Complexidade do ataque"),
-                                2)           # "limpar" desenhou de novo
+        # A 2ª pergunta aparece 3 vezes: a primeira, depois do
+        # "anterior" e depois do "limpar", que a desenha de novo.
+        self.assertEqual(saida.count("[2/11] Complexidade do ataque"), 3)
         vuln = self.lido()[0]["vulnerabilidades"][0]
         self.assertEqual((vuln["cvss"], vuln["vetor"]), (9.3, self.VETOR_40))
 
@@ -448,6 +452,9 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertRegex(saida, r"F .*E1=1,0  E2=1,5  E3=2,0")
         self.assertRegex(saida, r"b = F \(M v\).*E1=4,00  E2=15,00  E3=12,00")
         self.assertIn("det(I - A) = 0,875", saida)
+        # Posto: M tem 2 colunas independentes; I - A, posto cheio.
+        self.assertIn("Posto de M: 2; núcleo de M: dimensão 0", saida)
+        self.assertIn("posto de I - A = 3 (de 3)", saida)
 
     def test_matrizes_de_base_grande_mostram_so_a_verificacao(self):
         """Base grande: a opção 15 não desenha M, mas verifica I - A."""
@@ -462,6 +469,10 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("Grande demais para mostrar as matrizes", saida)
         self.assertIn("estritamente diagonal dominante", saida)
         self.assertIn("det(I - A) = 0,98", saida)
+        # Teorema do núcleo e da imagem, na base de exemplo.
+        self.assertIn("Posto de M: 56; núcleo de M: dimensão 23 (56 + 23 = "
+                      "79 colunas)", saida)
+        self.assertIn("14 colunas de M são nulas", saida)
 
     # --- consultas do T1 pelo menu ------------------------------------
 
@@ -489,6 +500,17 @@ class TesteDoPrograma(unittest.TestCase):
         saida = self.rodar(self.CENARIO + ["12", "1", "2", "s", "0"])
         self.assertIn("Dependência removida.", saida)
         self.assertEqual(self.lido()[0]["dependencias"], [])
+
+    def test_solucao_que_nao_confere_e_avisada_no_menu(self):
+        """Opção 13: se (I - A) x não der b, avisa e não mostra nada."""
+        self.rodar(self.CENARIO + ["0"])
+        with mock.patch("risco.np.linalg.solve",
+                        return_value=[0.0, 0.0, 0.0]):
+            saida = self.rodar(["13", "0"])
+        self.assertIn("A solução não confere", saida)
+        self.assertIn("Nenhum risco efetivo foi calculado", saida)
+        self.assertNotIn("Erro inesperado", saida)
+        self.assertNotIn("EFETIVO", saida)
 
     def test_verificacao_mostra_determinante_e_condicao(self):
         """A opção 13 mostra det(I - A) e o número de condição."""
@@ -676,7 +698,61 @@ class TesteDoModelo(unittest.TestCase):
         diagnostico = modelo.diagnosticar()
         self.assertFalse(diagnostico.invertivel)
         self.assertFalse(diagnostico.utilizavel)
+        # Rouché-Capelli: posto 2 em I - A, 3 na ampliada: sem solução.
+        self.assertEqual((diagnostico.ordem, diagnostico.posto), (3, 2))
+        self.assertIn("não tem solução", diagnostico.motivo)
+        self.assertIn("[I - A | b] é 3", diagnostico.motivo)
         with self.assertRaises(SistemaSingularError):
+            modelo.resolver()
+
+    def montar(self, fracoes):
+        """Três equipamentos, nota 5,0 no primeiro e as frações dadas.
+
+        fracoes: {(i, j): fração que o equipamento i herda do j}, com
+        i e j de 1 a 3. As frações vão direto no dicionário, como num
+        arquivo editado à mão: o cadastro recusaria somas maiores que 1.
+        """
+        inventario = Inventario()
+        ids = [inventario.cadastrar_equipamento(
+            TipoEquipamento.OUTRO, f"SING-0{k}", "A", "B", "C").id
+            for k in (1, 2, 3)]
+        inventario.registrar_vulnerabilidade(
+            ids[0], "x", OrigemVulnerabilidade.OUTRA, 5.0,
+            SituacaoTratamento.ABERTA)
+        for (i, j), fracao in fracoes.items():
+            inventario.buscar_por_id(ids[i - 1]).dependencias[ids[j - 1]] = \
+                fracao
+        return ModeloRisco(inventario)
+
+    def test_sistema_quase_critico_mas_valido_e_resolvido(self):
+        """Condição 4,5e8: a solução confere e é aceita."""
+        modelo = self.montar({(1, 2): 0.5, (1, 3): 0.5001,
+                              (2, 1): 0.9999, (3, 1): 0.9999})
+        self.assertTrue(modelo.diagnosticar().utilizavel)
+        x = modelo.resolver()                    # não levanta erro
+        self.assertGreater(min(x), 1e4)          # x grande...
+        self.assertLess(modelo.residuo, 1e-6)    # ...e o erro pequeno
+
+    def test_posto_cheio_mal_condicionado_nao_contradiz_o_teorema(self):
+        """Posto cheio e condição 6e12: invertível em teoria."""
+        modelo = self.montar({(1, 2): 0.9998, (1, 3): 0.0001,
+                              (2, 1): 0.9999, (2, 3): 0.0001,
+                              (3, 1): 0.5001, (3, 2): 0.9999})
+        diagnostico = modelo.diagnosticar()
+        self.assertFalse(diagnostico.utilizavel)
+        self.assertEqual(diagnostico.posto, 3)
+        self.assertIn("posto cheio", diagnostico.motivo)
+        self.assertIn("mal condicionada", diagnostico.motivo)
+        self.assertNotIn("não é invertível", diagnostico.motivo)
+        self.assertNotIn("zero dentro da tolerância", diagnostico.motivo)
+
+    def test_solucao_que_nao_confere_e_recusada(self):
+        """Se (I - A) x não der b, com tolerância, nada é mostrado."""
+        modelo = ModeloRisco(self.carregar("cenario_3_equipamentos.json"))
+        with (mock.patch("risco.np.linalg.solve",
+                         return_value=[0.0, 0.0, 0.0]),
+              self.assertRaisesRegex(SistemaSingularError,
+                                     "A solução não confere")):
             modelo.resolver()
 
     def test_base_de_exemplo_tem_solucao(self):

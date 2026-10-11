@@ -1,9 +1,9 @@
 """Programa principal: o menu e as ações do usuário.
 
-A classe Aplicacao liga as peças: pergunta ao usuário (entrada.py),
-chama as regras do Inventario, calcula o risco (risco.py), grava
-(armazenamento.py) e mostra o resultado (telas.py). É o ponto de
-partida do programa: python main.py.
+A classe Aplicacao liga as peças: pergunta ao usuário (entrada.py e,
+para a nota CVSS, pergunta_cvss.py), chama as regras do Inventario,
+calcula o risco (risco.py), grava (armazenamento.py) e mostra o
+resultado (telas.py). Para rodar: python main.py.
 
 Trabalho 2: o programa inteiro foi reescrito em orientação a objetos
 (equipamentos.py, vulnerabilidades.py, inventario.py), guarda os dados
@@ -11,14 +11,12 @@ em JSON como lista de objetos, calcula o risco de cada equipamento com
 álgebra linear e roda em container Docker.
 """
 
-import functools
 import os
 import signal
 import sys
 import time
 
 import banner
-import calculadora_cvss
 import cores
 import telas
 from armazenamento import ArquivoInventario, BaseInvalidaError
@@ -31,7 +29,6 @@ from entrada import (
     SairDoPrograma,
     VoltarAoMenu,
     confirmar,
-    converter_decimal,
     ler_campo,
     ler_decimal,
     ler_enum,
@@ -44,8 +41,8 @@ from entrada import (
 )
 from equipamentos import MENOR_FRACAO
 from formatacao import fracao_br, frase, numero_br
-from risco import ModeloRisco
-from vulnerabilidades import CVSS_MINIMO, validar_cvss
+from pergunta_cvss import EXPLICACAO_NOTA, PALAVRA_CALCULAR, ler_nota_cvss
+from risco import ModeloRisco, SistemaSingularError
 
 # Com a variável definida (o Dockerfile a define), o programa avisa como
 # sair do container sem derrubá-lo e não morre com Ctrl+C.
@@ -53,22 +50,6 @@ VARIAVEL_CONTAINER = "INVENTARIO_EM_CONTAINER"
 
 # Acima disto a matriz não cabe na tela: a opção 15 mostra só o tamanho.
 MAXIMO_PARA_MOSTRAR_MATRIZES = 12
-
-# Na pergunta da nota CVSS, esta palavra abre as perguntas do CVSS.
-PALAVRA_CALCULAR = "calcular"
-# Nas perguntas do CVSS: volta uma pergunta / desiste do cálculo.
-ANTERIOR = "anterior"
-CANCELAR = "cancelar"
-# Respostas aceitas na escolha da versão do CVSS (Enter: a 4.0).
-VERSAO_DIGITADA = {"": "4.0", "1": "4.0", "4": "4.0", "4.0": "4.0",
-                   "2": "3.1", "3": "3.1", "3.1": "3.1"}
-
-# Mostrado antes da pergunta da nota, no cadastro da vulnerabilidade.
-EXPLICACAO_NOTA = (
-    "  Nota CVSS: digite a nota (0,1 a 10,0), cole o vetor da calculadora "
-    "do\n  FIRST (CVSS:4.0/..., CVSS:3.1/... ou CVSS:3.0/...) ou digite\n"
-    f"  \"{PALAVRA_CALCULAR}\" para chegar à nota respondendo às perguntas "
-    "do CVSS,\n  com a explicação de cada uma.")
 
 # Buscas por texto da opção 3: número da opção -> (campo, pergunta).
 BUSCAS_POR_TEXTO = {
@@ -155,7 +136,7 @@ class Aplicacao:
 
     def _listar_para_id(self):
         """Mostra os equipamentos quando o usuário digita "lista"."""
-        if not len(self.inventario):
+        if not self.inventario:
             print("\n  " + cores.aviso(
                 "Nenhum equipamento cadastrado ainda.\n"))
             return
@@ -173,148 +154,6 @@ class Aplicacao:
         if equipamento is None:
             self._erro(f"Nenhum equipamento com o ID {id_equipamento}.")
         return equipamento
-
-    def _ler_nota_cvss(self, mensagem, opcional=False):
-        """Lê a nota CVSS: o número, o vetor ou "calcular".
-
-        Devolve (nota, vetor), com vetor None quando a nota foi
-        digitada, ou None quando opcional e o usuário tecla Enter.
-        Repete a pergunta até vir uma resposta válida.
-        """
-        while True:
-            bruto = ler_resposta(mensagem)
-            if not bruto and opcional:
-                return None
-            try:
-                resposta = self._interpretar_nota(bruto)
-            except ValueError as erro:
-                print("  " + cores.erro(f"! {erro}."))
-                continue
-            if resposta is not None:      # None: desistiu do cálculo
-                return resposta
-
-    def _interpretar_nota(self, bruto):
-        """Transforma a resposta em (nota, vetor); None se desistiu.
-
-        Levanta ValueError, com o motivo, se a resposta não servir.
-        """
-        if bruto.casefold() == PALAVRA_CALCULAR:
-            return self._calcular_cvss()
-        # ":" sem "CVSS:" é um vetor sem o começo: o motivo vem de lá.
-        if bruto.upper().startswith("CVSS:") or ":" in bruto:
-            vetor, nota = calculadora_cvss.analisar_vetor(bruto)
-            self._exigir_nota_com_impacto(nota)
-            print("  " + cores.sucesso(
-                f"Nota calculada pelo vetor: {numero_br(nota)}."))
-            return nota, vetor
-        try:
-            numero = converter_decimal(bruto)
-        except ValueError:
-            raise ValueError(
-                f"Digite a nota, como 7,5, cole o vetor CVSS ou digite "
-                f"\"{PALAVRA_CALCULAR}\"") from None
-        return validar_cvss(numero), None
-
-    @staticmethod
-    def _exigir_nota_com_impacto(nota):
-        """Recusa a nota 0,0, que o CVSS chama de "Nenhuma"."""
-        if nota < CVSS_MINIMO:
-            raise ValueError(
-                f"O vetor dá nota {numero_br(nota)} (\"Nenhuma\" no CVSS): "
-                f"a falha não tem impacto e não entra no inventário")
-
-    def _calcular_cvss(self):
-        """Faz as perguntas do CVSS e devolve (nota, vetor), ou None.
-
-        Cada pergunta mostra o que cada opção quer dizer. "anterior"
-        volta uma pergunta e "cancelar" desiste do cálculo (None). No
-        fim, mostra o vetor e a nota e pede confirmação.
-        """
-        telas.mostrar_inicio_calculadora_cvss()
-        versao = self._ler_versao_cvss()
-        if versao is None:
-            print("  " + cores.aviso("Cálculo cancelado."))
-            return None
-        metricas = calculadora_cvss.VERSOES[versao]
-        escolhas = {}
-        posicao = 0
-        while posicao < len(metricas):
-            metrica = metricas[posicao]
-            redesenhar = functools.partial(
-                telas.mostrar_pergunta_cvss, posicao + 1, len(metricas),
-                metrica)
-            redesenhar()
-            resposta = self._ler_opcao_cvss(metrica, redesenhar)
-            if resposta == CANCELAR:
-                print("  " + cores.aviso("Cálculo cancelado."))
-                return None
-            if resposta == ANTERIOR:
-                posicao = max(posicao - 1, 0)
-                continue
-            escolhas[metrica.codigo] = resposta
-            posicao += 1
-        return self._confirmar_nota_calculada(versao, escolhas)
-
-    @staticmethod
-    def _ler_versao_cvss():
-        """Lê a versão do CVSS: 1 (ou Enter) é a 4.0; 2, a 3.1.
-
-        Devolve None se o usuário digitar "cancelar".
-        """
-        while True:
-            bruto = ler_resposta("  Versão [1]: ").replace(",", ".")
-            if bruto.casefold() == CANCELAR:
-                return None
-            versao = VERSAO_DIGITADA.get(bruto)
-            if versao is not None:
-                return versao
-            print("  " + cores.erro(
-                f"! Digite 1 (versão 4.0) ou 2 (versão 3.1), ou "
-                f"\"{CANCELAR}\"."))
-
-    @staticmethod
-    def _ler_opcao_cvss(metrica, redesenhar):
-        """Lê a resposta de uma pergunta do CVSS.
-
-        Aceita o número da opção ou a letra do vetor (N, L...) e devolve
-        o código da opção, como "N"; "anterior" e "cancelar" voltam como
-        estão. "limpar" redesenha a pergunta.
-        """
-        codigos = [opcao.codigo for opcao in metrica.opcoes]
-        while True:
-            bruto = ler_resposta("  Opção: ", depois_de_limpar=redesenhar)
-            if bruto.casefold() in (ANTERIOR, CANCELAR):
-                return bruto.casefold()
-            if bruto.isdecimal() and 1 <= int(bruto) <= len(codigos):
-                return codigos[int(bruto) - 1]
-            if bruto.upper() in codigos:
-                return bruto.upper()
-            print("  " + cores.erro(
-                f"! Digite um número de 1 a {len(codigos)} (ou a letra "
-                f"entre parênteses), \"{ANTERIOR}\" ou \"{CANCELAR}\"."))
-
-    @staticmethod
-    def _confirmar_nota_calculada(versao, escolhas):
-        """Mostra o vetor e a nota das respostas e pede para usar.
-
-        Devolve (nota, vetor), ou None se o usuário não quiser a nota ou
-        se ela der 0,0.
-        """
-        vetor, nota = calculadora_cvss.analisar_vetor(
-            calculadora_cvss.montar_vetor(versao, escolhas))
-        if nota < CVSS_MINIMO:
-            print(f"\n  Vetor: {vetor}")
-            print("  " + cores.aviso(
-                "As respostas dão nota 0,0 (\"Nenhuma\" no CVSS): a falha "
-                "não tem impacto e não entra no inventário."))
-            return None
-        telas.mostrar_resultado_cvss(vetor, nota)
-        if confirmar("\n  Usar esta nota?", padrao=True):
-            return nota, vetor
-        print("  " + cores.aviso(
-            f"Nota descartada. Digite a nota, cole um vetor ou digite "
-            f"\"{PALAVRA_CALCULAR}\" para responder de novo."))
-        return None
 
     # ------------------------------------------------------------------
     # Equipamentos (opções 1 a 5)
@@ -350,7 +189,7 @@ class Aplicacao:
         """Opção 2: mostra todos os equipamentos em tabela."""
         print("\n" + cores.titulo("--- EQUIPAMENTOS CADASTRADOS ---"))
 
-        if not len(self.inventario):
+        if not self.inventario:
             print("\n  " + cores.aviso("Nenhum equipamento cadastrado ainda."))
             return
 
@@ -549,7 +388,7 @@ class Aplicacao:
             descricao = ler_campo("  Descrição da vulnerabilidade: ")
             origem = ler_enum("  Categoria:", OrigemVulnerabilidade)
             print("\n" + EXPLICACAO_NOTA)
-            nota, vetor = self._ler_nota_cvss("  Nota CVSS: ")
+            nota, vetor = ler_nota_cvss("  Nota CVSS: ")
         situacao = ler_enum("  Status neste equipamento:",
                             SituacaoTratamento)
 
@@ -675,7 +514,7 @@ class Aplicacao:
             OrigemVulnerabilidade, opcional=True)
         if nova_origem not in (None, vuln.origem):
             alteracoes["origem"] = nova_origem
-        resposta = self._ler_nota_cvss(
+        resposta = ler_nota_cvss(
             f"\n  Nota CVSS [{numero_br(vuln.cvss)}] - número, vetor ou "
             f"\"{PALAVRA_CALCULAR}\": ", opcional=True)
         # A mesma nota digitada não muda nada: o vetor dela continua.
@@ -823,24 +662,28 @@ class Aplicacao:
         print("\n  " + cores.sucesso("Dependência removida."))
 
     def _montar_modelo(self):
-        """Monta o modelo de risco e mostra a verificação de I - A.
+        """Monta o modelo de risco, verifica I - A e resolve o sistema.
 
-        Devolve o ModeloRisco, ou None (já explicado na tela) se não há
-        equipamentos ou se o sistema não é invertível: nesse caso nada é
-        resolvido, e o usuário é informado.
+        Devolve o ModeloRisco já resolvido, ou None (já explicado na
+        tela) se não há equipamentos, se o sistema não é invertível ou
+        se a solução não confere: nesses casos nada é mostrado.
         """
-        if not len(self.inventario):
+        if not self.inventario:
             print("\n  " + cores.aviso("Nenhum equipamento cadastrado ainda."))
             return None
         modelo = ModeloRisco(self.inventario)
         diagnostico = modelo.diagnosticar()
         telas.mostrar_diagnostico(diagnostico)
-        if not diagnostico.utilizavel:
-            print("  " + cores.erro(
-                "! Nenhum risco efetivo foi calculado. Corrija as "
-                "dependências (opção 12) e tente de novo."))
-            return None
-        return modelo
+        if diagnostico.utilizavel:
+            try:
+                modelo.resolver()
+                return modelo
+            except SistemaSingularError as erro:
+                self._erro(str(erro))
+        print("  " + cores.erro(
+            "! Nenhum risco efetivo foi calculado. Corrija as "
+            "dependências (opção 12) e tente de novo."))
+        return None
 
     def risco_de_todos(self):
         """Opção 13: risco próprio e efetivo de cada equipamento."""
@@ -852,17 +695,7 @@ class Aplicacao:
         # Do mais ao menos arriscado; no empate, a ordem de cadastro.
         itens = sorted(modelo.relatorio(),
                        key=lambda i: (-i.efetivo, i.equipamento.id))
-        telas.mostrar_relatorio_risco(itens)
-        print("\n  " + cores.discreto(
-            "SOMA CVSS = M v (só vulnerabilidades não corrigidas) · "
-            "PRÓPRIO = fator x soma"))
-        print("  " + cores.discreto(
-            "EFETIVO = próprio + risco herdado, da solução de "
-            "(I - A) x = b"))
-        print("  " + cores.discreto(
-            f"Erro numérico da solução: ||(I - A) x - b|| = "
-            f"{modelo.residuo:.1e}".replace(".", ",")))
-        print("  Para ver como um deles foi calculado, use a opção 14.")
+        telas.mostrar_relatorio_risco(itens, modelo.residuo)
 
     def risco_de_um(self):
         """Opção 14: o risco de um equipamento, passo a passo."""
@@ -881,14 +714,12 @@ class Aplicacao:
     def ver_matrizes(self):
         """Opção 15: mostra as matrizes e a verificação de I - A."""
         print("\n" + cores.titulo("--- MATRIZES DO MODELO DE RISCO ---"))
-        if not len(self.inventario):
+        if not self.inventario:
             print("\n  " + cores.aviso("Nenhum equipamento cadastrado ainda."))
             return
         modelo = ModeloRisco(self.inventario)
-        n, m = modelo.M.shape
-        print(f"\n  {n} equipamento(s) e {m} vulnerabilidade(s): M é "
-              f"{n} x {m}, v tem {m} valor(es) e A é {n} x {n}.")
-        if max(n, m) > MAXIMO_PARA_MOSTRAR_MATRIZES:
+        telas.mostrar_dimensoes(modelo)
+        if max(modelo.M.shape) > MAXIMO_PARA_MOSTRAR_MATRIZES:
             # As matrizes não cabem; a verificação de I - A, sim.
             print("  " + cores.aviso(
                 f"Grande demais para mostrar as matrizes (mostro até "
@@ -1080,7 +911,7 @@ class Aplicacao:
         if not diagnostico.utilizavel:
             print("  " + cores.erro(
                 "! As dependências gravadas deixam o modelo de risco sem "
-                "solução (opção 13 explica)."))
+                "solução confiável (opção 13 explica)."))
 
     @staticmethod
     def _confirmar_saida():

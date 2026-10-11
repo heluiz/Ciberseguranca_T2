@@ -1,6 +1,6 @@
 # Fora da imagem: controle de versão, lixo do Python, dados locais
 # (os dados do container ficam no volume), arquivos só do Docker e os
-# das ferramentas de verificação (GitHub, cobertura, Ruff).
+# das ferramentas de verificação (GitHub, cobertura, pytest, Ruff).
 .git
 .gitignore
 **/__pycache__/
@@ -15,4 +15,5 @@ README.md
 .github/
 .coveragerc
 .coverage
+.pytest_cache/
 ruff.toml

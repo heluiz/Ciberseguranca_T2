@@ -1,8 +1,8 @@
 # Dependências de execução do programa. O Dockerfile as instala.
-# NumPy: álgebra linear do modelo de risco (risco.py). As funções usadas
-# (zeros, ones, eye, array, linalg.solve, linalg.det, linalg.cond,
-# linalg.norm e, no autoteste, linalg.inv) existem sem mudança da versão
-# 1.26 à 2.x.
+# NumPy: álgebra linear do modelo de risco (risco.py). As funções usadas,
+# como linalg.solve, linalg.cond, linalg.matrix_rank, linalg.det,
+# linalg.norm, allclose e as básicas (zeros, eye, array, abs), existem
+# sem mudança da versão 1.26 à 2.x.
 numpy>=1.26,<3
 # cvss: a fórmula oficial da nota CVSS (versões 3.x e 4.0), da equipe de
 # segurança da Red Hat; usada em calculadora_cvss.py. Versão fixa: o

@@ -29,11 +29,16 @@ que 1, I - A é estritamente diagonal dominante e, por isso, invertível;
 o cadastro de dependências impõe essa regra (Equipamento.
 definir_dependencia). Um arquivo editado à mão pode violá-la, então a
 verificação é feita aqui também, e o usuário é informado quando o
-sistema não tem solução confiável.
+sistema não tem solução confiável. Nesse caso, o posto diz o motivo:
+com posto cheio, a solução existe e é única, mas a matriz é mal
+condicionada e o computador não a calcula com confiança; com posto
+menor, o teorema de Rouché-Capelli (o posto de I - A comparado com o
+da matriz ampliada [I - A | b]) diz se não há solução ou se há
+infinitas.
 
-Sem a regra da soma, o número de condição decide se I - A é
-invertível. Se for, a solução ainda é conferida: herdar risco só pode
-somar, então nenhum risco efetivo pode ficar menor que o próprio
+Sem a regra da soma, o número de condição decide se I - A é tratada
+como invertível. Se for, a solução ainda é conferida: herdar risco só
+pode somar, então nenhum risco efetivo pode ficar menor que o próprio
 (x >= b). Se ficar (dependências em ciclo com frações altas demais), a
 solução não tem sentido: o usuário é avisado e nada é mostrado.
 
@@ -67,6 +72,11 @@ TOLERANCIA_DETERMINANTE = 1e-12
 # Folga da conferência x >= b: diferenças menores são arredondamento.
 FOLGA_SOLUCAO = 1e-9
 
+# Folga da conferência (I - A) x = b, depois do solve. O erro de
+# arredondamento do produto (I - A) x cresce com o tamanho de x, então
+# a tolerância é esta fração do maior |x| (e pelo menos ela mesma).
+FOLGA_CONFERENCIA = 1e-10
+
 # Folga na regra "soma da linha < 1": uma soma de 0,9999999999999999
 # vem de arredondamento (é o que 0,7 + 0,2 + 0,1 dá em ponto flutuante)
 # e não é de verdade menor que 1.
@@ -78,12 +88,17 @@ FOLGA_DOMINANCIA = 1e-9
 RiscoEquipamento = namedtuple(
     "RiscoEquipamento", "equipamento soma_cvss fator proprio efetivo")
 
-# O que a verificação de I - A concluiu. invertivel: I - A tem inversa;
+# O que a verificação de I - A concluiu. invertivel: I - A é tratada
+# como invertível (dominância, ou número de condição abaixo do limite),
+# e o computador calcula a solução com confiança; com posto cheio e
+# condição alta, ela tem inversa em teoria, mas o campo fica False.
 # utilizavel: além disso, a solução tem sentido de risco (x >= b).
+# ordem e posto: o n de I - A (n x n) e o seu posto; o posto é n
+# exatamente quando I - A tem inversa (teorema da matriz invertível).
 Diagnostico = namedtuple(
     "Diagnostico",
     "invertivel utilizavel dominante maior_soma determinante condicao "
-    "motivo")
+    "motivo ordem posto", defaults=(0, 0))
 
 
 class SistemaSingularError(Exception):
@@ -165,11 +180,17 @@ class ModeloRisco:
              é invertível e que nenhum risco efetivo fica menor que o
              próprio.
           2. Sem essa garantia, o número de condição (np.linalg.cond,
-             limite LIMITE_CONDICAO) decide se I - A é invertível.
-          3. Se for invertível, a solução é conferida: risco herdado só
+             limite LIMITE_CONDICAO) decide se I - A é tratada como
+             invertível. Se não for, o posto diz o motivo: com posto
+             cheio, a matriz é só mal condicionada; com posto menor, o
+             teorema de Rouché-Capelli diz se não há solução ou se há
+             infinitas (_quantas_solucoes).
+          3. Se for tratada como invertível, a solução é conferida:
+             risco herdado só
              soma, então o efetivo não pode ficar menor que o próprio
              (x >= b). Se ficar, a solução não tem sentido.
-        O determinante é calculado só para informar: não decide.
+        O determinante e o posto de I - A são calculados para informar:
+        não decidem.
         """
         n = len(self.b)
         if n == 0:
@@ -183,6 +204,7 @@ class ModeloRisco:
         dominante = maior < 1.0 - FOLGA_DOMINANCIA
         determinante = float(np.linalg.det(i_menos_a))
         condicao = float(np.linalg.cond(i_menos_a))
+        posto = int(np.linalg.matrix_rank(i_menos_a))
 
         maior_br = formatacao.fracao_br(maior)
         if dominante:
@@ -190,41 +212,45 @@ class ModeloRisco:
                       f"soma de linha de A é {maior_br}, menor que 1. "
                       f"Invertível.")
             return Diagnostico(True, True, True, maior, determinante,
-                               condicao, motivo)
+                               condicao, motivo, n, posto)
 
         condicao_br = formatacao.numero_compacto(condicao)
         limite_br = formatacao.numero_compacto(LIMITE_CONDICAO)
         invertivel = bool(np.isfinite(condicao) and condicao < LIMITE_CONDICAO)
         if not invertivel:
-            motivo = (f"I - A não é invertível: a maior soma de linha de A "
-                      f"é {maior_br} (precisa ser menor que 1) e o número "
-                      f"de condição é {condicao_br} (limite {limite_br}).")
-            if determinante == 0.0:
-                motivo += " O determinante calculado é 0."
-            elif abs(determinante) < TOLERANCIA_DETERMINANTE:
-                tolerancia_br = formatacao.numero_compacto(
-                    TOLERANCIA_DETERMINANTE)
-                motivo += (f" O determinante calculado, "
-                           f"{formatacao.numero_compacto(determinante)}, não "
-                           f"é zero exato, mas é zero dentro da tolerância "
-                           f"de {tolerancia_br}: em ponto flutuante, um "
-                           f"determinante que daria zero no papel raramente "
-                           f"dá zero exato.")
+            if posto == n:
+                # Posto cheio: invertível em teoria (teorema da matriz
+                # invertível), mas mal condicionada demais para confiar.
+                motivo = (f"I - A tem posto cheio ({n} de {n}), então é "
+                          f"invertível em teoria e a solução existe e é "
+                          f"única, mas é mal condicionada: o número de "
+                          f"condição é {condicao_br} (limite {limite_br}) e "
+                          f"a maior soma de linha de A é {maior_br}. No "
+                          f"computador, a solução perderia quase todos os "
+                          f"dígitos e não seria confiável.")
+            else:
+                motivo = (f"I - A não é invertível: a maior soma de linha "
+                          f"de A é {maior_br} (precisa ser menor que 1) e o "
+                          f"número de condição é {condicao_br} (limite "
+                          f"{limite_br}).")
+                motivo += self._sobre_o_determinante(determinante)
+                motivo += self._quantas_solucoes(i_menos_a, posto)
             motivo += (" Reduza as frações de dependência de algum "
                        "equipamento até a soma ficar abaixo de 1.")
             return Diagnostico(False, False, False, maior, determinante,
-                               condicao, motivo)
+                               condicao, motivo, n, posto)
 
         # Invertível, sem a garantia da dominância: confere a solução.
         x = np.linalg.solve(i_menos_a, self.b)
         if np.all(x >= self.b - FOLGA_SOLUCAO):
             motivo = (f"A maior soma de linha de A é {maior_br} (não é "
                       f"menor que 1), mas o número de condição "
-                      f"({condicao_br}) é pequeno: I - A é invertível. A "
+                      f"({condicao_br}) está abaixo do limite "
+                      f"({limite_br}): I - A é invertível. A "
                       f"solução foi conferida: nenhum risco efetivo ficou "
                       f"menor que o próprio.")
             return Diagnostico(True, True, False, maior, determinante,
-                               condicao, motivo)
+                               condicao, motivo, n, posto)
 
         motivo = (f"I - A é invertível (número de condição {condicao_br}), "
                   f"mas a solução daria a algum equipamento um risco "
@@ -234,7 +260,46 @@ class ModeloRisco:
                   f"reduza-as até a soma de cada linha de A ficar abaixo "
                   f"de 1.")
         return Diagnostico(True, False, False, maior, determinante,
-                           condicao, motivo)
+                           condicao, motivo, n, posto)
+
+    @staticmethod
+    def _sobre_o_determinante(determinante):
+        """Explica o determinante "quase zero" de uma I - A singular.
+
+        Com tolerância, nunca com ==: um determinante que daria zero no
+        papel quase nunca dá zero exato no computador.
+        """
+        if abs(determinante) >= TOLERANCIA_DETERMINANTE:
+            return ""
+        tolerancia_br = formatacao.numero_compacto(TOLERANCIA_DETERMINANTE)
+        return (f" O determinante calculado "
+                f"({formatacao.numero_compacto(determinante)}) é zero "
+                f"dentro da tolerância de {tolerancia_br}. A comparação usa "
+                f"tolerância porque, em ponto flutuante, um determinante "
+                f"que daria zero no papel costuma sair só perto de zero.")
+
+    def _quantas_solucoes(self, i_menos_a, posto):
+        """Diz quantas soluções tem o sistema, se o posto não é cheio.
+
+        Teorema de Rouché-Capelli: compara o posto de I - A com o da
+        matriz ampliada [I - A | b]. Se o da ampliada é maior, b não é
+        combinação das colunas de I - A e não há solução; se são iguais
+        (e menores que n), há infinitas.
+        """
+        n = len(self.b)
+        # b vai reduzido à escala de I - A (o maior valor vira 1): o
+        # posto não muda, e as duas contas usam a mesma régua para
+        # decidir o que é zero.
+        escala = max(1.0, float(np.abs(self.b).max()))
+        ampliada = int(np.linalg.matrix_rank(
+            np.column_stack([i_menos_a, self.b / escala])))
+        if ampliada > posto:
+            conclusao = "não tem solução"
+        else:
+            conclusao = "tem infinitas soluções"
+        return (f" Pelo teorema de Rouché-Capelli, o sistema {conclusao}: "
+                f"o posto de I - A é {posto} (de {n}) e o da matriz "
+                f"ampliada [I - A | b] é {ampliada}.")
 
     # ------------------------------------------------------------------
     # Solução
@@ -244,9 +309,10 @@ class ModeloRisco:
         """Resolve (I - A) x = b e devolve o vetor x do risco efetivo.
 
         Levanta SistemaSingularError, com a explicação, se I - A não for
-        invertível ou se a solução não fizer sentido (diagnosticar). A
-        solução fica em self.x, e o tamanho do erro ||(I - A) x - b||,
-        em self.residuo.
+        invertível ou se a solução não fizer sentido (diagnosticar), e
+        também se a solução não conferir: substituída de volta,
+        (I - A) x tem de dar b, com tolerância. A solução fica em
+        self.x, e o tamanho do erro ||(I - A) x - b||, em self.residuo.
         """
         diagnostico = self.diagnosticar()
         if not diagnostico.utilizavel:
@@ -269,10 +335,33 @@ class ModeloRisco:
                 from erro
         if not np.all(np.isfinite(x)):
             raise SistemaSingularError("A solução do sistema não é finita.")
+        # Confere substituindo de volta, com tolerância (allclose, e não
+        # ==): (I - A) x tem de dar b. A tolerância acompanha o tamanho
+        # de x, porque o arredondamento do produto cresce com ele.
+        produto = i_menos_a @ x
+        tolerancia = FOLGA_CONFERENCIA * max(1.0, float(np.abs(x).max()))
+        if not np.allclose(produto, self.b, atol=tolerancia):
+            raise SistemaSingularError(
+                "A solução não confere: (I - A) x não dá b, então ela não "
+                "é confiável.")
 
         self.x = x
-        self.residuo = float(np.linalg.norm(i_menos_a @ x - self.b))
+        self.residuo = float(np.linalg.norm(produto - self.b))
         return x
+
+    def posto_e_colunas_nulas(self):
+        """Devolve o posto de M e quantas colunas de M são nulas.
+
+        Teorema do núcleo e da imagem: posto + dimensão do núcleo = m,
+        o número de colunas (vulnerabilidades). Uma coluna nula é uma
+        vulnerabilidade corrigida em todos os equipamentos em que
+        aparece: mudar a nota dela não muda o risco próprio de ninguém.
+        """
+        if self.M.size == 0:
+            return 0, self.M.shape[1]
+        posto = int(np.linalg.matrix_rank(self.M))
+        nulas = int(np.count_nonzero(~self.M.any(axis=0)))
+        return posto, nulas
 
     def relatorio(self):
         """Devolve uma lista de RiscoEquipamento, em ordem de id.
@@ -392,6 +481,16 @@ if __name__ == "__main__":
     print("b = F * (M v) =", modelo.b)
     assert np.array_equal(modelo.M, [[1, 0], [1, 1], [0, 1]])
     assert np.allclose(modelo.b, [4, 15, 12]), "risco próprio errado"
+    # O código guarda F como o vetor da diagonal e multiplica com *,
+    # elemento a elemento. Com a matriz F inteira e @, tem de dar o
+    # mesmo: trocar um pelo outro sem querer não dá erro, dá resultado
+    # errado. E F (M v) = (F M) v, porque o produto é associativo.
+    matriz_f = np.diag(modelo.fatores)
+    assert np.allclose(matriz_f @ (modelo.M @ modelo.v), modelo.b)
+    assert np.allclose((matriz_f @ modelo.M) @ modelo.v, modelo.b)
+    print("F (M v) = (F M) v = fatores * (M v): o * com a diagonal dá o "
+          "mesmo que o @ com a matriz F.")
+    assert modelo.posto_e_colunas_nulas() == (2, 0)   # 2 independentes
 
     diag = modelo.diagnosticar()
     print(f"\n{diag.motivo}")
@@ -399,6 +498,7 @@ if __name__ == "__main__":
           f"cond(I - A) = {diag.condicao:.4f}")
     assert diag.invertivel and diag.utilizavel and diag.dominante
     assert abs(diag.determinante - 0.875) < 1e-12   # 1 - 0,5*0,25 - ...
+    assert diag.ordem == 3 and diag.posto == 3       # posto cheio
 
     x = modelo.resolver()
     print("x =", x, f"(resíduo {modelo.residuo:.1e})")
@@ -428,6 +528,19 @@ if __name__ == "__main__":
         "aceita como risco deve continuar contando"
     print("\nCorrigida sai da matriz M; aceita como risco continua nela.")
 
+    # Núcleo de M: V1 corrigida nos dois equipamentos vira uma coluna
+    # nula. O posto cai para 1, e o núcleo (2 colunas - posto 1) tem
+    # dimensão 1: mudar a nota de V1 não muda o risco de ninguém.
+    inv.alterar_situacao(e1.id, v1.id, SituacaoTratamento.CORRIGIDA)
+    inv.alterar_situacao(e2.id, v1.id, SituacaoTratamento.CORRIGIDA)
+    corrigida = ModeloRisco(inv)
+    assert corrigida.posto_e_colunas_nulas() == (1, 1)
+    assert np.allclose(corrigida.M @ [1, 0], 0)   # (1, 0) no núcleo
+    inv.alterar_situacao(e1.id, v1.id, ABERTA)
+    inv.alterar_situacao(e2.id, v1.id, ABERTA)
+    print("Coluna nula em M (V1 corrigida em todos): posto 1, núcleo de "
+          "dimensão 1.")
+
     # --- 3. Sistema singular, de um arquivo editado à mão -------------
     # Três equipamentos que se herdam 0,5 entre si: cada linha de A soma
     # 1 e I - A tem o autovetor (1, 1, 1) com autovalor 0.
@@ -450,6 +563,28 @@ if __name__ == "__main__":
         raise AssertionError("resolveu um sistema singular")
     except SistemaSingularError as erro:
         assert "não é invertível" in str(erro)
+    # Rouché-Capelli. Sem vulnerabilidades, b = 0: o posto de I - A e o
+    # de [I - A | b] são 2, e há infinitas soluções (x = t (1, 1, 1)).
+    assert diag.ordem == 3 and diag.posto == 2
+    assert "tem infinitas soluções" in diag.motivo, diag.motivo
+    # Com uma vulnerabilidade em S0, b sai da imagem de I - A: o posto
+    # da ampliada sobe para 3, e não há solução.
+    singular.registrar_vulnerabilidade(ids[0], "x", ORIGEM, 5.0, ABERTA)
+    d_b = ModeloRisco(singular).diagnosticar()
+    assert d_b.posto == 2 and "não tem solução" in d_b.motivo, d_b.motivo
+    print(f"Com b = (5, 0, 0): {d_b.motivo}")
+    # Quase singular: no computador o posto é cheio, mas o número de
+    # condição passa do limite. Em teoria a solução é única; na
+    # prática, não se confia nela.
+    par = Inventario()
+    p1, p2 = [par.cadastrar_equipamento(
+        TipoEquipamento.OUTRO, f"P{k}", "A", "B", "C") for k in range(2)]
+    p1.dependencias[p2.id] = 1 - 1e-13
+    p2.dependencias[p1.id] = 1 - 1e-13
+    d_par = ModeloRisco(par).diagnosticar()
+    assert not d_par.invertivel and d_par.posto == 2, d_par
+    assert "mal condicionada" in d_par.motivo, d_par.motivo
+    assert "não é invertível" not in d_par.motivo   # posto cheio
     # Soma de linha maior que 1 não é, sozinha, sinal de singularidade:
     # E1 herda 0,9 de E2 e 0,9 de E3 (soma 1,8), e os outros não herdam
     # nada. I - A é triangular com 1 na diagonal: det = 1, invertível.
@@ -518,10 +653,11 @@ if __name__ == "__main__":
     sem_dep = Inventario()
     s1 = sem_dep.cadastrar_equipamento(TipoEquipamento.ROTEADOR, "R1", "A",
                                        "B", "C")
-    assert ModeloRisco(sem_dep).relatorio()[0].efetivo == 0.0  # sem vulns
+    assert np.isclose(ModeloRisco(sem_dep).relatorio()[0].efetivo, 0.0)
     sem_dep.registrar_vulnerabilidade(s1.id, "y", ORIGEM, 5.0, ABERTA)
     unico = ModeloRisco(sem_dep).relatorio()[0]
-    assert abs(unico.proprio - 6.0) < 1e-12 and unico.efetivo == unico.proprio
+    assert np.isclose(unico.proprio, 6.0)
+    assert np.isclose(unico.efetivo, unico.proprio)
     print("Casos de borda: sem equipamentos, sem vulnerabilidades, sem "
           "dependências.")
 
