@@ -230,8 +230,8 @@ def mostrar_dependencias(inventario, equipamento):
 def mostrar_diagnostico(diagnostico):
     """Mostra o resultado da verificação de I - A.
 
-    O determinante e o número de condição aparecem sempre, para
-    conferência. Quem decide é a regra explicada no motivo: o
+    O determinante, o número de condição e o posto aparecem sempre,
+    para conferência. Quem decide é a regra explicada no motivo: o
     determinante sozinho não serve (veja risco.py).
     """
     if diagnostico.utilizavel:
@@ -244,6 +244,41 @@ def mostrar_diagnostico(diagnostico):
         f"det(I - A) = {formatacao.numero_compacto(diagnostico.determinante)}"
         f" · número de condição de I - A = "
         f"{formatacao.numero_compacto(diagnostico.condicao)}"))
+    if diagnostico.ordem:
+        if diagnostico.posto == diagnostico.ordem:
+            sobre = "posto cheio"
+        else:
+            sobre = (f"menor que {diagnostico.ordem}, então I - A não tem "
+                     f"inversa")
+        print("  " + cores.discreto(
+            f"posto de I - A = {diagnostico.posto} (de "
+            f"{diagnostico.ordem}): {sobre}"))
+
+
+def mostrar_dimensoes(modelo):
+    """Mostra o tamanho das matrizes e o posto de M (opção 15).
+
+    Teorema do núcleo e da imagem: o posto de M mais a dimensão do
+    núcleo dá o número de colunas (vulnerabilidades).
+    """
+    n, m = modelo.M.shape
+    print(f"\n  {n} equipamento(s) e {m} vulnerabilidade(s): M é "
+          f"{n} x {m}, v tem {m} valor(es) e A é {n} x {n}.")
+    if not m:
+        return
+    posto, nulas = modelo.posto_e_colunas_nulas()
+    colunas = "coluna" if m == 1 else "colunas"
+    print(f"  Posto de M: {posto}; núcleo de M: dimensão {m - posto} "
+          f"({posto} + {m - posto} = {m} {colunas}).")
+    if nulas == 1:
+        _paragrafo("1 coluna de M é nula: uma vulnerabilidade corrigida "
+                   "em todos os equipamentos em que aparece, que por isso "
+                   "não muda o risco.", "  ", LARGURA_EXPLICACAO + 4)
+    elif nulas:
+        _paragrafo(f"{nulas} colunas de M são nulas: vulnerabilidades "
+                   f"corrigidas em todos os equipamentos em que aparecem, "
+                   f"que por isso não mudam o risco.", "  ",
+                   LARGURA_EXPLICACAO + 4)
 
 
 def barra(valor, maximo, largura=20):
@@ -254,11 +289,12 @@ def barra(valor, maximo, largura=20):
                      round(largura * valor / maximo))
 
 
-def mostrar_relatorio_risco(itens):
+def mostrar_relatorio_risco(itens, residuo):
     """Mostra o risco próprio e o efetivo de todos os equipamentos.
 
     itens são RiscoEquipamento, já na ordem a mostrar. A barra mostra o
-    risco efetivo em proporção ao maior.
+    risco efetivo em proporção ao maior. Embaixo vêm a legenda das
+    colunas e o resíduo ||(I - A) x - b|| da solução.
     """
     maximo = max((i.efetivo for i in itens), default=0.0)
     linhas = []
@@ -273,6 +309,16 @@ def mostrar_relatorio_risco(itens):
          "EFETIVO", ""),
         (5, 22, 20, 9, 5, 9, 9, 20),
         (True, False, False, True, True, True, True, False), linhas)
+    print("\n  " + cores.discreto(
+        "SOMA CVSS = M v (só vulnerabilidades não corrigidas) · "
+        "PRÓPRIO = fator x soma"))
+    print("  " + cores.discreto(
+        "EFETIVO = próprio + risco herdado, da solução de "
+        "(I - A) x = b"))
+    print("  " + cores.discreto(
+        f"Erro numérico da solução: ||(I - A) x - b|| = "
+        f"{residuo:.1e}".replace(".", ",")))
+    print("  Para ver como um deles foi calculado, use a opção 14.")
 
 
 def mostrar_detalhe_risco(item, vulnerabilidades, parcelas):
