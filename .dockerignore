@@ -1,10 +1,12 @@
-# Fora da imagem: controle de versão, lixo do Python, dados locais
+# Fora da imagem: controle de versão, lixo do Python, o ambiente
+# virtual (.venv: a imagem instala as bibliotecas sozinha), dados locais
 # (os dados do container ficam no volume), arquivos só do Docker e os
 # das ferramentas de verificação (GitHub, cobertura, pytest, Ruff).
 .git
 .gitignore
 **/__pycache__/
 **/*.pyc
+.venv/
 .ruff_cache/
 *.tmp
 dados/
