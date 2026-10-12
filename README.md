@@ -27,24 +27,125 @@ valendo, e o programa foi reescrito em orientação a objetos.
 
 ## Como executar
 
+Há três jeitos de rodar o programa: direto no computador, com o Python; num
+container Docker no seu computador, como na apresentação; e num container no
+servidor do docente, onde ele precisa ficar 24 horas no ar (requisito 3).
+
+### O que instalar
+
+| Ferramenta | Direto no computador | Docker no computador | Servidor do docente | Para conferir |
+| --- | --- | --- | --- | --- |
+| Git | Sim (ou o ZIP do GitHub) | Sim (ou o ZIP do GitHub) | Sim, no servidor | `git --version` |
+| Python 3.11 ou mais novo | Sim | Não: vem na imagem | Não: vem na imagem | `python --version` |
+| WSL 2 (só no Windows) | Não | Sim | Não | `wsl --version` |
+| Docker | Não | Sim: Docker Desktop | Sim, no servidor | `docker version` |
+| Cliente SSH | Não | Não | Sim, no seu computador | `ssh -V` |
+
+**Git.** No Windows, baixe o instalador em
+[git-scm.com](https://git-scm.com/downloads/win) e aceite as opções padrão, ou
+rode no PowerShell `winget install --id Git.Git -e --source winget`. No Debian
+e no Ubuntu: `sudo apt install git`. Sem o Git, o botão **Code → Download
+ZIP** do GitHub baixa o código, mas aí não dá para atualizá-lo com `git pull`.
+
+**Python**, só para rodar direto no computador. Use o 3.14, o mesmo da imagem
+Docker; os testes passaram do 3.11 ao 3.15. No Windows, o python.org recomenda
+hoje o *Python install manager*, da Microsoft Store ou de
+[python.org/downloads](https://www.python.org/downloads/): depois de
+instalá-lo, `py install 3.14` instala o Python 3.14. O instalador tradicional
+ainda existe para o 3.14 (deixa de existir no 3.16); nele, marque **Add
+python.exe to PATH**. Abra um terminal novo e confira com `python --version`.
+No Debian e no Ubuntu: `sudo apt install python3 python3-venv`; lá o comando
+é `python3`.
+
+**WSL 2 e Docker Desktop**, no Windows, para o Docker no computador:
+
+1. A virtualização do processador precisa estar ligada: no Gerenciador de
+   Tarefas, em Desempenho → CPU, tem de aparecer "Virtualização: Habilitado".
+   Se estiver desabilitada, ligue-a na BIOS (UEFI) do computador.
+2. No PowerShell aberto **como administrador**, rode `wsl --install` (ou
+   `wsl --update`, se o WSL já estiver instalado) e reinicie o computador. O
+   `wsl --version` tem de mostrar a versão 2.1.5 ou mais nova.
+3. Instale o
+   [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
+   com a opção **Use WSL 2 instead of Hyper-V** marcada. Ele pede o Windows 10
+   22H2 ou o 11 23H2 (ou mais novos) e 8 GB de memória, e é gratuito para uso
+   pessoal e educacional.
+4. **Abra o Docker Desktop**, que não abre sozinho depois de instalado, e
+   espere aparecer "Engine running". Em Settings → General, a opção *Start
+   Docker Desktop when you sign in to your computer* faz ele abrir junto com
+   o Windows.
+5. Confira: `docker version` mostra as partes *Client* e *Server*, e
+   `docker run --rm hello-world` baixa e roda uma imagem de teste.
+
+No Linux, instale o [Docker Engine](https://docs.docker.com/engine/install/).
+Quem não está no grupo `docker` precisa de `sudo` antes de cada comando
+`docker`; `sudo usermod -aG docker $USER` inclui o seu usuário no grupo, a
+partir do próximo login. No macOS, use o Docker Desktop.
+
+**Cliente SSH**, para entrar no servidor do docente. Já vem no Windows 10 e no
+11, no Linux e no macOS. Se o `ssh -V` não funcionar no Windows, adicione o
+recurso opcional *Cliente OpenSSH* nas Configurações.
+
+### Baixar o código
+
+```
+git clone https://github.com/heluiz/Ciberseguranca_T2.git
+cd Ciberseguranca_T2
+```
+
+Os comandos das próximas seções rodam dentro dessa pasta. Para receber as
+atualizações do repositório depois, `git pull`.
+
 ### Direto no computador
 
 Requer Python 3.11 ou superior e duas bibliotecas: o NumPy, usado no modelo de
 risco, e a `cvss`, que calcula a nota CVSS a partir do vetor. O Python 3.10
 parou de receber correções de segurança em 1º de outubro de 2026, por isso não
-é mais indicado. Os testes passaram com Python 3.11, 3.12, 3.13 e 3.14, com
-NumPy 2.4 e 2.5; a imagem Docker usa Python 3.14.
+é mais indicado. Os testes passaram do Python 3.11 ao 3.15, com NumPy 2.4 e
+2.5; a imagem Docker usa o Python 3.14.
+
+As bibliotecas ficam num ambiente virtual (*venv*): a pasta `.venv`, dentro do
+projeto, com uma cópia própria delas, sem mexer no Python do sistema. No Linux
+ele é obrigatório, porque lá o Python do sistema recusa o `pip install` com o
+erro `externally-managed-environment`. A pasta `.venv` fica fora do Git e da
+imagem Docker.
+
+No Windows, no PowerShell:
 
 ```
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python main.py
 ```
 
+No Linux e no macOS:
+
+```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+Com o ambiente ativado (a segunda linha), o `(.venv)` aparece no começo da
+linha de comando, e `python` e `pip` passam a ser os do ambiente. Num terminal
+novo, basta ativar de novo e rodar `python main.py`: a instalação não se
+repete. Se o PowerShell disser que a execução de scripts foi desabilitada,
+rode uma vez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` e ative de
+novo.
+
 O programa começa com a base vazia (`dados/inventario.json`, criado ao gravar
 a primeira alteração). Para testá-lo com dados fictícios, veja
-[Dados de exemplo](#dados-de-exemplo).
+[Dados de exemplo](#dados-de-exemplo). Para sair, use a opção 0 ou digite
+`sair`. Os testes estão em [Testes](#testes).
 
 ### Em container Docker
+
+Requer o Docker ligado (veja [O que instalar](#o-que-instalar)): no Windows,
+abra o Docker Desktop antes. Os comandos rodam na pasta do projeto, e a
+primeira construção precisa de internet, para baixar a imagem do Python e as
+bibliotecas.
 
 ```
 docker build -t inventario:1.0 .
@@ -58,18 +159,24 @@ docker attach inventario
 ```
 
 (No PowerShell, a barra invertida no fim da linha não continua o comando:
-escreva o `docker run` numa linha só, sem as barras.)
+escreva o `docker run` numa linha só, sem as barras.) Para começar com a base
+de exemplo, copie-a para o volume antes do primeiro `docker run`, como em
+[Dados de exemplo](#dados-de-exemplo).
 
 No `docker attach` a tela costuma aparecer vazia, porque o Docker não repete
 o que já foi impresso: **tecle Enter e a tela de abertura (logotipo e menu) é
 desenhada de novo** (se o programa estiver esperando a opção do menu; numa
 pergunta, o Enter vale como resposta). Para sair sem parar o programa, tecle
-**Ctrl+P e depois Ctrl+Q.** O container continua rodando e dá para voltar com outro
-`docker attach`.
+**Ctrl+P e depois Ctrl+Q.** O container continua rodando e dá para voltar com
+outro `docker attach`. No terminal do VS Code, o Ctrl+P abre a busca de
+arquivos do editor e não chega ao Docker: faça o `docker attach` no PowerShell
+ou no Windows Terminal.
 
 O `compose.yaml` é uma alternativa que faz a construção, o volume e a execução
 de uma vez, com as mesmas opções: `docker compose up -d --build`, seguido de
-`docker attach inventario`.
+`docker attach inventario`. Use um jeito ou o outro: os dois dão ao container
+o nome `inventario`, e o segundo daria conflito. Para trocar, apague antes o
+container com `docker rm -f inventario`; os dados continuam no volume.
 
 | Opção | Por quê |
 | --- | --- |
@@ -119,10 +226,11 @@ intervalo que dobra a cada tentativa (até 1 minuto). Para consertar:
 exemplo, `docker run --rm -it -v inventario-dados:/d alpine vi /d/inventario.json`)
 ou mova-o para outro nome, e `docker start inventario`.
 
-Para atualizar o programa, mantendo os dados (o `docker run` é o mesmo de
-antes):
+Para atualizar o programa, mantendo os dados: o `git pull` traz o código novo,
+e o `docker run` é o mesmo de antes.
 
 ```
+git pull
 docker build -t inventario:1.0 .
 docker rm -f inventario
 docker run -dit --name inventario --restart unless-stopped \
@@ -142,24 +250,119 @@ docker run --rm --user root -v inventario-dados:/app/dados inventario:1.0 chown 
 ### No servidor do docente
 
 O requisito 3 pede o container funcionando por no mínimo 24 horas num servidor
-disponibilizado pelo docente. Lá, os passos são os mesmos:
+disponibilizado pelo docente. O caminho mais comum é entrar no servidor por
+SSH e rodar lá os mesmos comandos do Docker. O servidor precisa ter o Docker,
+o Git e acesso à internet, para construir a imagem, e o seu usuário precisa
+ter permissão para usar o Docker. O endereço e o usuário vêm do docente.
+
+**1. Entrar no servidor e conferir o Docker.**
+
+```
+ssh usuario@endereco-do-servidor
+docker version
+```
+
+Se o `docker version` responder `permission denied`, o seu usuário não está
+no grupo `docker`: use `sudo` antes de cada comando `docker` ou peça ao
+docente para incluí-lo.
+
+**2. Baixar o código e construir a imagem.**
 
 ```
 git clone https://github.com/heluiz/Ciberseguranca_T2.git
 cd Ciberseguranca_T2
 docker build -t inventario:1.0 .
 docker volume create inventario-dados
+```
+
+Se o repositório estiver privado, o `git clone` pede login: no lugar da senha,
+use um token de acesso pessoal do GitHub.
+
+**3. Pôr a base de exemplo, se quiser, antes de ligar o container.**
+
+```
+docker create --name semente -v inventario-dados:/app/dados inventario:1.0
+docker cp dados_exemplo/inventario_exemplo.json semente:/app/dados/inventario.json
+docker rm semente
+```
+
+**4. Ligar o container.**
+
+```
 docker run -dit --name inventario --restart unless-stopped \
   --read-only --security-opt no-new-privileges \
   -v inventario-dados:/app/dados inventario:1.0
 ```
 
-Se o repositório estiver privado, o `git clone` pede login: no lugar da senha,
-use um token de acesso pessoal do GitHub. Para comprovar o tempo no ar,
-`docker ps` mostra `Up 24 hours` (ou mais), `docker inspect -f
-'{{.State.StartedAt}}' inventario` mostra quando o programa ligou e
-`docker inspect -f '{{.RestartCount}}' inventario` mostra quantas vezes o
-Docker precisou religá-lo.
+**5. Conferir e sair.** O `docker ps` mostra `Up` e, depois de um minuto,
+`(healthy)`. Para usar o menu, `docker attach inventario` e Enter; para sair
+dele sem parar o programa, Ctrl+P e depois Ctrl+Q. Depois, `exit` fecha a
+conexão SSH, e o container continua rodando no servidor.
+
+Durante as 24 horas:
+
+- **Não mexa no container.** `docker restart`, `docker stop` e `docker start`,
+  a troca da imagem e um `sair` confirmado no menu fazem a contagem recomeçar.
+  Por isso a base de exemplo entra antes do `docker run` (passo 3), e a versão
+  do programa fica congelada: atualizá-la exige recriar o container. Um
+  reinício do próprio servidor também zera a contagem, embora o Docker religue
+  o container sozinho.
+- **Servidor compartilhado.** Se outros alunos usam o mesmo servidor, troque
+  os nomes da imagem, do container e do volume por nomes seus em todos os
+  comandos, por exemplo `inventario-heluiz:1.0`, `inventario-heluiz` e
+  `inventario-heluiz-dados`. Com os mesmos nomes, o `docker run` de um aluno
+  dá conflito com o do outro, o `docker build` de um troca a imagem do outro,
+  e dois containers com o mesmo volume misturam os dados. O `compose.yaml` usa
+  nomes fixos; nesse caso, use o `docker run`.
+- **Para comprovar o tempo no ar**, o `docker ps` mostra `Up 24 hours` (ou
+  mais), `docker inspect -f '{{.State.StartedAt}}' inventario` mostra quando o
+  programa ligou e `docker inspect -f '{{.RestartCount}}' inventario` mostra
+  quantas vezes o Docker precisou religá-lo.
+
+Dois outros caminhos:
+
+**Servidor sem acesso à internet.** Construa a imagem no seu computador e
+leve-a pronta, num arquivo, junto com a base de exemplo:
+
+```
+docker save -o inventario.tar inventario:1.0
+scp inventario.tar dados_exemplo/inventario_exemplo.json usuario@endereco-do-servidor:
+```
+
+No servidor, `docker load -i inventario.tar` carrega a imagem; depois, siga os
+passos 3 e 4, com `inventario_exemplo.json` no lugar de
+`dados_exemplo/inventario_exemplo.json`. O processador do servidor precisa ser
+do mesmo tipo do seu (em geral, x86-64).
+
+**Comandar o servidor do seu computador.** O Docker do seu computador pode
+mandar os comandos para o Docker do servidor, por SSH, com um *contexto*:
+
+```
+docker context create servidor --docker "host=ssh://usuario@endereco-do-servidor"
+docker --context servidor build -t inventario:1.0 .
+docker --context servidor ps
+```
+
+O `build` envia a pasta do projeto para o servidor, e os outros comandos desta
+seção (`volume`, `create`, `cp`, `run`, `attach`) funcionam do mesmo jeito,
+com `--context servidor`. Esse caminho exige login por chave SSH, porque o
+Docker não aceita senha: `ssh-keygen` cria a chave, e o conteúdo do arquivo
+`.pub` que ele gera vai para o `~/.ssh/authorized_keys` do seu usuário no
+servidor.
+
+### Problemas comuns
+
+| O que aparece | Por quê | O que fazer |
+| --- | --- | --- |
+| `python` responde que o Python não foi encontrado, ou abre a Microsoft Store | O Python não está instalado, ou não está no PATH | Instale-o (veja [O que instalar](#o-que-instalar)) e abra um terminal novo; no instalador tradicional, marque **Add python.exe to PATH** |
+| `error: externally-managed-environment`, no `pip install` | No Linux, o Python do sistema não aceita bibliotecas instaladas pelo `pip` | Use o ambiente virtual, como em [Direto no computador](#direto-no-computador) |
+| O PowerShell diz que a execução de scripts foi desabilitada, ao ativar o `.venv` | A política de execução do PowerShell bloqueia scripts | Rode uma vez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| `ModuleNotFoundError: No module named 'numpy'` | O ambiente virtual não está ativado, ou as bibliotecas não foram instaladas nele | Ative o `.venv` (aparece `(.venv)` na linha de comando) e rode `pip install -r requirements.txt` |
+| `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine` | O Docker Desktop está fechado | Abra o Docker Desktop e espere aparecer "Engine running" |
+| `permission denied while trying to connect to the docker API at unix:///var/run/docker.sock` | No Linux, o seu usuário não tem permissão para usar o Docker | Use `sudo` antes do comando ou entre no grupo `docker` |
+| `Conflict. The container name "/inventario" is already in use` | Já existe um container com esse nome | `docker start inventario` liga o que já existe; `docker rm -f inventario` o apaga, para criar de novo (os dados ficam no volume) |
+| `Este programa é interativo e precisa de um terminal`, no `docker logs inventario` | O `docker run` foi feito sem `-it` | `docker rm -f inventario` e o `docker run` de novo, com `-dit` |
+| Ctrl+P, Ctrl+Q não sai do `docker attach` | No terminal do VS Code, o Ctrl+P abre a busca de arquivos | Faça o `docker attach` no PowerShell ou no Windows Terminal |
 
 ## Como usar
 
@@ -242,7 +445,7 @@ ambiente `NO_COLOR` definida, o programa imprime texto puro.
 | --- | --- | --- | --- |
 | 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. A classe "equipamentos" do enunciado é a `Equipamento`, no módulo `equipamentos.py`: o nome segue a convenção da PEP 8 para classes (CapWords) e está no singular, porque cada objeto é *um* equipamento. |
 | 2 | Armazenamento em JSON formado por um array de objetos | 20% | `armazenamento.py` grava o que `Inventario.para_dict()` monta: um array JSON na raiz, um objeto por equipamento. Veja [o formato](#formato-do-arquivo-de-dados). |
-| 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker). |
+| 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker) e [No servidor do docente](#no-servidor-do-docente). |
 | 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu. A matriz A fica no mesmo JSON (campo `dependencias`), e o NumPy está declarado em `requirements.txt`, que o `Dockerfile` instala. Veja [o modelo de risco](#o-modelo-de-risco). |
 
 Os requisitos do Trabalho 1 (cadastro, busca por ID e por hostname,
@@ -484,8 +687,17 @@ Para conferir no programa:
 INVENTARIO_DADOS=dados_exemplo/cenario_3_equipamentos.json python main.py
 ```
 
-(no PowerShell: `$env:INVENTARIO_DADOS="dados_exemplo/cenario_3_equipamentos.json"`)
-e use as opções 15 (matrizes), 13 (risco de todos) e 14 (passo a passo). Se
+No PowerShell, a variável é definida numa linha à parte e vale até a janela ser
+fechada. A última linha abaixo, depois de sair do programa, apaga a variável,
+para o próximo `python main.py` voltar a abrir a sua base:
+
+```
+$env:INVENTARIO_DADOS = "dados_exemplo/cenario_3_equipamentos.json"
+python main.py
+Remove-Item Env:INVENTARIO_DADOS
+```
+
+Use as opções 15 (matrizes), 13 (risco de todos) e 14 (passo a passo). Se
 alterar algo, o programa grava nesse arquivo: trabalhe numa cópia. O
 `python risco.py` repete essa conta e mais outras: compara a solução do NumPy
 com a série de Neumann (`x = b + A b + A² b + ...`, que converge quando cada

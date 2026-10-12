@@ -2,6 +2,10 @@
 __pycache__/
 *.pyc
 
+# Ambiente virtual do Python (python -m venv .venv): cada maquina cria o
+# seu a partir do requirements.txt
+.venv/
+
 # Base de dados gerada pelo proprio programa (pasta dados/) e a copia de
 # seguranca feita ao converter uma base do Trabalho 1.
 # Repositorio guarda codigo, nao dado gerado: cada maquina cria a sua base
