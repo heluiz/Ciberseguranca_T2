@@ -2,8 +2,10 @@
 
 A classe Aplicacao liga as peças: pergunta ao usuário (entrada.py e,
 para a nota CVSS, pergunta_cvss.py), chama as regras do Inventario,
-calcula o risco (risco.py), grava (armazenamento.py) e mostra o
-resultado (telas.py). Para rodar: python main.py.
+calcula o risco (risco.py), consulta a base de CVEs exploradas
+(base_cve.py) e a atualiza (atualizacao_cve.py), grava
+(armazenamento.py) e mostra o resultado (telas.py). Para rodar:
+python main.py.
 
 Trabalho 2: o programa inteiro foi reescrito em orientação a objetos
 (equipamentos.py, vulnerabilidades.py, inventario.py), guarda os dados
@@ -15,11 +17,15 @@ import os
 import signal
 import sys
 import time
+from collections import namedtuple
 
+import atualizacao_cve
 import banner
 import cores
 import telas
 from armazenamento import ArquivoInventario, BaseInvalidaError
+from base_cve import BaseCVE, BaseCVEInvalidaError
+from base_cve import caminho_padrao as caminho_da_base_cve
 from classificacoes import (
     OrigemVulnerabilidade,
     SituacaoTratamento,
@@ -56,6 +62,15 @@ VARIAVEL_CONTAINER = "INVENTARIO_EM_CONTAINER"
 # Acima disto a matriz não cabe na tela: a opção 15 mostra só o tamanho.
 MAXIMO_PARA_MOSTRAR_MATRIZES = 12
 
+# Quantos itens cada página mostra nas listas da opção 16.
+CVES_POR_PAGINA = 10
+NOMES_POR_PAGINA = 20
+
+# Os dados de uma vulnerabilidade nova, antes de ela entrar no
+# inventário: digitados ou tirados da base de CVEs.
+DadosVulnerabilidade = namedtuple(
+    "DadosVulnerabilidade", "descricao origem nota vetor cve cwe")
+
 # Buscas por texto da opção 3: número da opção -> (campo, pergunta).
 BUSCAS_POR_TEXTO = {
     2: ("hostname", "  Hostname (ou parte dele): "),
@@ -87,6 +102,9 @@ OPCOES_MENU = (
         (14, "Risco de um equipamento (passo a passo)"),
         (15, "Matrizes do modelo (M, v, F, A) e verificação de I - A"),
     )),
+    ("Base de CVEs exploradas", (
+        (16, "Buscar falhas exploradas, sugestões e atualização"),
+    )),
     ("", ((0, "Sair"),)),
 )
 
@@ -99,10 +117,18 @@ def em_container():
 class Aplicacao:
     """O programa: carrega a base e repete o menu até o usuário sair."""
 
-    def __init__(self, arquivo):
-        """Recebe o ArquivoInventario onde a base é lida e gravada."""
+    def __init__(self, arquivo, base_cve=None, abrir=None):
+        """Recebe o ArquivoInventario onde a base é lida e gravada.
+
+        base_cve é a base de CVEs exploradas; sem ela, a do disco é lida
+        na primeira vez que for usada. abrir(url) baixa a atualização
+        dessa base (o padrão é atualizacao_cve.abrir_url); os testes
+        passam uma que não usa a internet.
+        """
         self.arquivo = arquivo
         self.inventario = None
+        self._base_cve = base_cve
+        self._abrir = abrir
         # Fins de entrada seguidos (Ctrl+D), para não girar sem parar.
         self._eofs_seguidos = 0
         # Número da opção -> método que a executa. Substitui uma cadeia
@@ -124,6 +150,7 @@ class Aplicacao:
             13: self.risco_de_todos,
             14: self.risco_de_um,
             15: self.ver_matrizes,
+            16: self.base_de_cves,
         }
 
     # ------------------------------------------------------------------
@@ -462,7 +489,8 @@ class Aplicacao:
         Usada no cadastro do equipamento (requisito 3 do T1) e na opção
         6 (requisito 7), para as duas telas se comportarem igual. A
         vulnerabilidade pode ser nova ou uma que já existe no catálogo e
-        afeta outros equipamentos.
+        afeta outros equipamentos. Uma CVE nova que está na base de CVEs
+        exploradas pode trazer de lá a descrição, o CWE e a nota.
         """
         disponiveis = [v for v in self.inventario.vulnerabilidades()
                        if v.id not in equipamento.vulnerabilidades]
@@ -476,26 +504,44 @@ class Aplicacao:
                 id_existente = self._ler_vulnerabilidade_do_catalogo(
                     equipamento)
 
-        cve = None
+        dados = None
         if id_existente is None:
             cve, id_existente = self._ler_cve_nova(equipamento)
         if id_existente is None:
-            descricao = ler_campo("  Descrição da vulnerabilidade: ")
-            origem = ler_enum("  Categoria:", OrigemVulnerabilidade)
-            cwe = ler_convertido(
-                "  CWE, o tipo de fraqueza (opcional, como CWE-416; Enter "
-                "pula): ", validar_cwe, opcional=True)
-            print("\n" + EXPLICACAO_NOTA)
-            nota, vetor = ler_nota_cvss("  Nota CVSS: ")
+            registro = self._oferecer_dados_da_base(cve)
+            dados = (self._ler_dados_novos(cve) if registro is None
+                     else self._dados_da_base(registro))
         situacao = ler_enum("  Status neste equipamento:",
                             SituacaoTratamento)
+        self._gravar_vulnerabilidade(equipamento, id_existente, dados,
+                                     situacao)
 
+    @staticmethod
+    def _ler_dados_novos(cve):
+        """Pergunta descrição, categoria, CWE e nota de uma nova."""
+        descricao = ler_campo("  Descrição da vulnerabilidade: ")
+        origem = ler_enum("  Categoria:", OrigemVulnerabilidade)
+        cwe = ler_convertido(
+            "  CWE, o tipo de fraqueza (opcional, como CWE-416; Enter "
+            "pula): ", validar_cwe, opcional=True)
+        print("\n" + EXPLICACAO_NOTA)
+        nota, vetor = ler_nota_cvss("  Nota CVSS: ")
+        return DadosVulnerabilidade(descricao, origem, nota, vetor, cve, cwe)
+
+    def _gravar_vulnerabilidade(self, equipamento, id_existente, dados,
+                                situacao):
+        """Registra a vulnerabilidade no equipamento e grava a base.
+
+        Com id_existente, registra a que já está no catálogo; senão,
+        cria uma com os dados (DadosVulnerabilidade).
+        """
         # Tudo foi perguntado: só agora o inventário muda.
         try:
             if id_existente is None:
                 vuln = self.inventario.registrar_vulnerabilidade(
-                    equipamento.id, descricao, origem, nota, situacao,
-                    vetor, cve=cve, cwe=cwe)
+                    equipamento.id, dados.descricao, dados.origem,
+                    dados.nota, situacao, dados.vetor, cve=dados.cve,
+                    cwe=dados.cwe)
             else:
                 self.inventario.registrar_vulnerabilidade_existente(
                     equipamento.id, id_existente, situacao)
@@ -876,6 +922,276 @@ class Aplicacao:
         else:
             telas.mostrar_matrizes(modelo)
         telas.mostrar_diagnostico(modelo.diagnosticar())
+
+    # ------------------------------------------------------------------
+    # Base de CVEs exploradas (opção 16 e cadastro de vulnerabilidade)
+    # ------------------------------------------------------------------
+
+    def _base_de_cves(self):
+        """A base de CVEs, lida do disco na primeira vez que é usada.
+
+        Devolve None, e avisa, se nem a base que vem com o programa
+        puder ser lida: o resto do programa funciona sem ela.
+        """
+        if self._base_cve is None:
+            try:
+                self._base_cve, aviso = BaseCVE.carregar()
+            except BaseCVEInvalidaError as erro:
+                self._erro(f"A base de CVEs não pôde ser lida: {erro}")
+                return None
+            if aviso:
+                print("\n  " + cores.aviso(aviso))
+        return self._base_cve
+
+    def _oferecer_dados_da_base(self, cve):
+        """Mostra a CVE, se ela estiver na base, e pergunta se a usa.
+
+        Devolve o RegistroCVE, ou None: sem CVE, CVE fora da base ou o
+        usuário preferiu digitar.
+        """
+        base = self._base_de_cves() if cve is not None else None
+        registro = base.buscar_cve(cve) if base is not None else None
+        if registro is None:
+            return None
+        print("\n  " + cores.aviso(f"A {cve} está na base de CVEs "
+                                    f"exploradas:"))
+        telas.mostrar_registro_cve(registro)
+        if confirmar("\n  Usar a descrição, o CWE e a nota da base?",
+                     padrao=True):
+            return registro
+        return None
+
+    @staticmethod
+    def _dados_da_base(registro):
+        """Os dados de uma vulnerabilidade nova, tirados da base.
+
+        Só a categoria é perguntada, com falta de atualização no Enter
+        (a correção de uma CVE do catálogo é, quase sempre, aplicar a
+        atualização do fabricante), e a nota, se a CVE não tiver.
+        """
+        origem = ler_enum("  Categoria:", OrigemVulnerabilidade,
+                          padrao=OrigemVulnerabilidade.FALTA_ATUALIZACAO)
+        if registro.cvss is None:
+            print("\n" + EXPLICACAO_NOTA)
+            nota, vetor = ler_nota_cvss("  Nota CVSS: ")
+        else:
+            nota, vetor = registro.cvss, registro.vetor
+        cwe = registro.cwes[0] if registro.cwes else None
+        return DadosVulnerabilidade(registro.nome, origem, nota, vetor,
+                                    registro.cve, cwe)
+
+    def base_de_cves(self):
+        """Opção 16: busca, navegação, sugestões e atualização."""
+        print("\n" + cores.titulo("--- BASE DE CVEs EXPLORADAS ---") + "\n")
+        base = self._base_de_cves()
+        if base is None:
+            return
+        print("  " + telas.resumo_da_base_cve(base) + "\n")
+        print(f"    {cores.destaque('1')} - Buscar por palavras (fabricante, "
+              f"produto, nome ou a CVE)")
+        print(f"    {cores.destaque('2')} - Navegar por fabricante e produto")
+        print(f"    {cores.destaque('3')} - Sugestões para um equipamento "
+              f"(pela ficha técnica)")
+        print(f"    {cores.destaque('4')} - Atualizar a base (precisa de "
+              f"internet)")
+        acoes = {1: self._buscar_na_base, 2: self._navegar_na_base,
+                 3: self._sugerir_pela_ficha, 4: self._atualizar_base}
+        acoes[ler_opcao("  Opção: ", len(acoes))](base)
+
+    def _buscar_na_base(self, base):
+        """Opção 16, item 1: busca por palavras ou pela CVE."""
+        texto = ler_texto("  Palavras (como fortinet vpn ou remote "
+                          "desktop) ou a CVE: ")
+        achados = base.buscar(texto)
+        if not achados:
+            self._erro("Nenhuma CVE da base tem todas essas palavras. Os "
+                       "nomes e as descrições estão em inglês, como no "
+                       "catálogo oficial: tente remote desktop, e não "
+                       "área de trabalho remota.")
+            return
+        self._escolher_cve(achados, f"{len(achados)} CVE(s) com "
+                                    f"\"{texto}\", da mais relevante:")
+
+    def _navegar_na_base(self, base):
+        """Opção 16, item 2: escolhe o fabricante, o produto e a CVE."""
+        filtro = ler_texto("  Parte do nome do fabricante (Enter mostra "
+                           "todos): ", obrigatorio=False)
+        fabricantes = base.fabricantes(filtro)
+        if not fabricantes:
+            self._erro(f"Nenhum fabricante da base tem \"{filtro}\" no "
+                       f"nome.")
+            return
+        print(f"\n  {len(fabricantes)} fabricante(s), do que tem mais CVEs:")
+        fabricante = self._escolher_nome(fabricantes, "Número do fabricante")
+        if fabricante is None:
+            return
+        produtos = base.produtos(fabricante)
+        produto = produtos[0][0]
+        if len(produtos) > 1:
+            print(f"\n  Produtos de {fabricante}:")
+            produto = self._escolher_nome(produtos, "Número do produto")
+            if produto is None:
+                return
+        registros = base.do_produto(fabricante, produto)
+        self._escolher_cve(registros, f"{fabricante} {produto}: "
+                                      f"{len(registros)} CVE(s), da maior "
+                                      f"nota:")
+
+    def _sugerir_pela_ficha(self, base):
+        """Opção 16, item 3: as CVEs que combinam com a ficha."""
+        equipamento = self._ler_equipamento()
+        if equipamento is None:
+            return
+        if equipamento.ficha.vazia:
+            self._erro(f"{equipamento.hostname} não tem ficha técnica: "
+                       f"preencha o fabricante, o modelo ou o sistema na "
+                       f"opção 4.")
+            return
+        sugeridas = base.sugestoes(equipamento.ficha)
+        if not sugeridas:
+            self._erro(f"Nenhuma CVE da base combina com o fabricante, o "
+                       f"modelo ou o sistema de {equipamento.hostname}.")
+            return
+        combinou = sorted({p for _, ps in sugeridas for p in ps})
+        print("\n  " + cores.aviso(
+            "A combinação é pelo nome do fabricante e do produto, e não "
+            "pela versão:\n  confira se a versão do equipamento é "
+            "afetada."))
+        self._escolher_cve(
+            [registro for registro, _ in sugeridas],
+            f"{len(sugeridas)} CVE(s) combinam com a ficha de "
+            f"{equipamento.hostname} ({', '.join(combinou)}):", equipamento)
+
+    def _atualizar_base(self, base):
+        """Opção 16, item 4: baixa o catálogo novo e grava a base."""
+        print("\n  A atualização baixa o catálogo KEV mais novo (uns 2 MB) e "
+              "a nota\n  das CVEs que entraram nele. Sem internet, nada "
+              "muda.")
+        if not confirmar("  Atualizar agora?", padrao=True):
+            return
+        print("  Baixando o catálogo...")
+        try:
+            nova, resumo = atualizacao_cve.atualizar(
+                base, self._abrir, ao_buscar=self._mostrar_andamento)
+            nova.salvar(caminho_da_base_cve())
+        except atualizacao_cve.AtualizacaoError as erro:
+            self._erro(f"A base não foi atualizada ({erro}). O programa "
+                       f"continua com a base que já tem.")
+            return
+        except OSError as erro:
+            self._erro(f"A base nova não pôde ser gravada ({erro}); "
+                       f"continua a de antes.")
+            return
+        self._base_cve = nova
+        texto = (f"Base atualizada: catálogo {nova.catalogo}, {resumo.total} "
+                 f"CVEs ({resumo.novas} nova(s), {resumo.sairam} saíram); "
+                 f"{resumo.notas_buscadas} nota(s) buscada(s).")
+        print("\n  " + cores.sucesso(texto))
+        if resumo.sem_nota:
+            print("  " + cores.aviso(
+                f"{resumo.sem_nota} CVE(s) ficaram sem nota: a próxima "
+                f"atualização tenta de novo."))
+
+    @staticmethod
+    def _mostrar_andamento(feitos, total):
+        """Mostra o andamento da busca das notas na atualização."""
+        if feitos == 1:
+            print(f"  Buscando a nota de {total} CVE(s)...")
+        elif feitos % 50 == 0 or feitos == total:
+            print(f"  ... {feitos} de {total}")
+
+    def _escolher_da_pagina(self, total, por_pagina, mostrar, pergunta):
+        """Mostra os itens de página em página e lê o número de um.
+
+        mostrar(inicio, fim) imprime os itens de inicio a fim - 1. Enter
+        mostra a próxima página; depois da última, Enter sai. Devolve o
+        índice (a partir de 0) do item escolhido, ou None.
+        """
+        inicio = 0
+        while True:
+            fim = min(inicio + por_pagina, total)
+            mostrar(inicio, fim)
+            dica = (f"Enter mostra mais, {fim} de {total}" if fim < total
+                    else "Enter sai")
+            while True:
+                numero = ler_inteiro(f"  {pergunta} ({dica}): ",
+                                     opcional=True)
+                if numero is None:
+                    break
+                if 1 <= numero <= fim:
+                    return numero - 1
+                self._erro(f"Digite um número de 1 a {fim}.")
+            if fim >= total:
+                return None
+            inicio = fim
+
+    def _escolher_nome(self, itens, pergunta):
+        """Lista [(nome, quantas CVEs)] e devolve o nome escolhido."""
+        def mostrar(inicio, fim):
+            """Imprime os nomes de inicio a fim - 1."""
+            telas.mostrar_nomes_numerados(itens[inicio:fim], inicio)
+
+        indice = self._escolher_da_pagina(len(itens), NOMES_POR_PAGINA,
+                                          mostrar, pergunta)
+        return None if indice is None else itens[indice][0]
+
+    def _escolher_cve(self, registros, titulo, equipamento=None):
+        """Lista as CVEs, mostra a escolhida e oferece registrá-la.
+
+        Com equipamento (nas sugestões), as que ele já tem aparecem com
+        um *, e o registro vai direto para ele.
+        """
+        marcadas = set()
+        if equipamento is not None:
+            marcadas = {self.inventario.buscar_vulnerabilidade(i).cve
+                        for i in equipamento.vulnerabilidades}
+
+        def mostrar(inicio, fim):
+            """Imprime as CVEs de inicio a fim - 1."""
+            telas.mostrar_registros_cve(registros[inicio:fim], inicio,
+                                        marcadas)
+
+        print(f"\n  {titulo}")
+        indice = self._escolher_da_pagina(len(registros), CVES_POR_PAGINA,
+                                          mostrar, "Número da CVE")
+        if indice is None:
+            return
+        registro = registros[indice]
+        telas.mostrar_registro_cve(registro)
+        destino = (f"em {equipamento.hostname}" if equipamento is not None
+                   else "num equipamento")
+        if confirmar(f"\n  Registrar esta CVE {destino}?"):
+            self._registrar_da_base(registro, equipamento)
+
+    def _registrar_da_base(self, registro, equipamento=None):
+        """Registra uma CVE da base num equipamento, com os dados dela.
+
+        Se a CVE já está no catálogo do inventário, em outro
+        equipamento, é essa vulnerabilidade que entra: uma CVE, uma
+        vulnerabilidade.
+        """
+        if equipamento is None:
+            equipamento = self._ler_equipamento()
+            if equipamento is None:
+                return
+        existente = self.inventario.vulnerabilidade_com_cve(registro.cve)
+        dados = None
+        if existente is None:
+            dados = self._dados_da_base(registro)
+        elif existente.id in equipamento.vulnerabilidades:
+            self._erro(f"{equipamento.hostname} já tem a {registro.cve} "
+                       f"(vulnerabilidade {existente.id}).")
+            return
+        else:
+            print("  " + cores.aviso(
+                f"A {registro.cve} já está no catálogo: [{existente.id}] "
+                f"{existente.descricao}. Ela entra também em "
+                f"{equipamento.hostname}."))
+        situacao = ler_enum("  Status neste equipamento:",
+                            SituacaoTratamento)
+        self._gravar_vulnerabilidade(
+            equipamento, None if existente is None else existente.id, dados,
+            situacao)
 
     # ------------------------------------------------------------------
     # O laço do programa

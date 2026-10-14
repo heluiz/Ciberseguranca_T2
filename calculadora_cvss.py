@@ -341,6 +341,24 @@ def _conferir_trecho(trecho, versao, perguntas, respostas):
     respostas[codigo] = valor
 
 
+def so_metricas_base(texto):
+    """Tira do vetor as métricas que não são base, com qualquer valor.
+
+    Os registros oficiais das CVEs às vezes trazem métricas temporais
+    ou de ameaça (como E:U) junto com as base. analisar_vetor() as
+    recusa, porque o programa guarda só a nota base, e a nota base não
+    depende delas: sem elas, ela continua a mesma. Levanta ValueError
+    se o vetor não começar com uma versão conhecida.
+    """
+    vetor = "".join(str(texto).split()).upper()
+    versao = _versao_do_vetor(vetor)
+    prefixo, _, resto = vetor.partition("/")
+    trechos = [trecho for trecho in resto.split("/")
+               if trecho and trecho.partition(":")[0]
+               not in _NAO_BASE[versao]]
+    return "/".join([prefixo, *trechos])
+
+
 def analisar_vetor(texto):
     """Confere um vetor CVSS e devolve (vetor arrumado, nota base).
 
@@ -409,6 +427,14 @@ if __name__ == "__main__":
                     "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:X/RL:X"):
         assert analisar_vetor(folgado) == (EXEMPLOS[0][0], 9.8), folgado
     print("Vetor fora de ordem, em minúsculas e com métricas X: aceito.")
+
+    # Métricas temporais e de ameaça, como vêm em registros oficiais,
+    # saem do vetor, e a nota base continua a mesma.
+    assert so_metricas_base(EXEMPLOS[0][0] + "/E:U/RL:O/RC:C") == (
+        EXEMPLOS[0][0])
+    assert analisar_vetor(so_metricas_base(EXEMPLOS[4][0] + "/E:A")) == (
+        EXEMPLOS[4][0], 9.3)
+    print("Métricas temporais e de ameaça tiradas: a nota base fica.")
 
     for ruim in ("AV:N/AC:L/Au:N/C:P/I:P/A:P",               # CVSS 2
                  "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H",  # falta A
