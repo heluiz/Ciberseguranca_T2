@@ -1,8 +1,9 @@
 """A classe Inventario: o conjunto de equipamentos e vulnerabilidades.
 
-Coordena as regras que envolvem mais de um objeto: hostname único,
-exclusão em cascata, vulnerabilidades compartilhadas entre
-equipamentos e dependências que apontam para equipamentos que existem.
+Coordena as regras que envolvem mais de um objeto: hostname e
+patrimônio únicos, CVE única no catálogo, exclusão em cascata,
+vulnerabilidades compartilhadas entre equipamentos e dependências que
+apontam para equipamentos que existem.
 Os equipamentos ficam num dicionário (id -> objeto), o que torna a
 busca por id direta; o formato do arquivo, uma lista de objetos JSON,
 só aparece em para_dict() e de_dict().
@@ -15,12 +16,17 @@ from collections import namedtuple
 import formatacao
 from classificacoes import SituacaoTratamento, TipoEquipamento
 from equipamentos import Equipamento, criar_equipamento
+from ficha_tecnica import FichaTecnica
 from validacao import (
     exigir_campo,
     exigir_lista,
     exigir_objeto,
 )
-from vulnerabilidades import Vulnerabilidade
+from vulnerabilidades import (
+    Vulnerabilidade,
+    validar_cve,
+    validar_referencia,
+)
 
 # Campos que aceitam busca por texto. O tipo fica de fora: é escolhido
 # numa lista (buscar_por_tipo).
@@ -96,6 +102,33 @@ class Inventario:
         """Devolve os equipamentos do tipo, em ordem de id."""
         return [e for e in self.todos() if e.tipo is tipo]
 
+    def buscar_na_ficha(self, termo):
+        """Devolve os equipamentos com o termo em algum campo da ficha.
+
+        Procura em fabricante, modelo, série, patrimônio, sistema e
+        versão, como buscar_por_texto: parcial, sem acento e sem caixa.
+        """
+        alvo = formatacao.para_busca(termo)
+        return [e for e in self.todos()
+                if any(alvo in formatacao.para_busca(valor)
+                       for _, valor in e.ficha.preenchidos())]
+
+    def problema_no_patrimonio(self, patrimonio, ignorar_id=None):
+        """Devolve None se o patrimônio está livre, ou o motivo.
+
+        O número de patrimônio identifica o bem no órgão: dois
+        equipamentos não podem ter o mesmo. A comparação ignora caixa e
+        espaços. ignorar_id tira o próprio equipamento da checagem.
+        """
+        alvo = formatacao.para_busca(patrimonio)
+        for equipamento in self._equipamentos.values():
+            atual = equipamento.ficha.patrimonio
+            if (equipamento.id != ignorar_id and atual is not None
+                    and formatacao.para_busca(atual) == alvo):
+                return (f"o patrimônio {atual} já é do equipamento "
+                        f"{equipamento.id} ({equipamento.hostname})")
+        return None
+
     def problema_no_hostname(self, hostname, ignorar_id=None):
         """Devolve None se o hostname serve, ou o motivo da recusa.
 
@@ -118,38 +151,66 @@ class Inventario:
     # ------------------------------------------------------------------
 
     def cadastrar_equipamento(self, tipo, hostname, custodiante, lotacao,
-                              descricao):
+                              descricao, *, ficha=None):
         """Cadastra um equipamento e o devolve (requisito 3 do T1).
 
-        Levanta ValueError se o hostname for inválido ou já estiver em
-        uso: duas máquinas com o mesmo nome são um conflito real na
-        rede. O objeto criado é da subclasse do tipo.
+        ficha, opcional, é {campo: texto} da ficha técnica. Levanta
+        ValueError se o hostname for inválido ou já estiver em uso (duas
+        máquinas com o mesmo nome são um conflito real na rede), se a
+        ficha for inválida ou se o patrimônio já for de outro. O objeto
+        criado é da subclasse do tipo.
         """
         problema = self.problema_no_hostname(hostname)
         if problema:
             raise ValueError(f"Hostname inválido: {problema}")
+        nova_ficha = self._validar_ficha(FichaTecnica(), ficha or {})
         equipamento = criar_equipamento(
             tipo, self._novo_id(self._equipamentos, "equipamentos"),
             hostname, custodiante, lotacao, descricao)
+        equipamento.ficha = nova_ficha
         self._equipamentos[equipamento.id] = equipamento
         return equipamento
+
+    def _validar_ficha(self, atual, alteracoes, id_equipamento=None):
+        """Devolve a ficha com as alterações, sem mudar a atual.
+
+        Levanta ValueError se algum campo for inválido ou se o
+        patrimônio já for de outro equipamento.
+        """
+        nova = atual.copia()
+        nova.atualizar(alteracoes)
+        if nova.patrimonio is not None:
+            problema = self.problema_no_patrimonio(nova.patrimonio,
+                                                   id_equipamento)
+            if problema:
+                raise ValueError(f"Patrimônio inválido: {problema}")
+        return nova
 
     def atualizar_equipamento(self, id_equipamento, alteracoes):
         """Aplica as alterações {campo: valor} ao equipamento.
 
         Além dos campos de Equipamento.CAMPOS_EDITAVEIS, aceita "tipo"
         (um TipoEquipamento): o objeto é então substituído por outro, da
-        subclasse do novo tipo, com os mesmos dados e relações.
+        subclasse do novo tipo, com os mesmos dados e relações. Aceita
+        também "ficha", um {campo: texto} com as mudanças da ficha
+        técnica (None apaga o campo).
 
         Devolve True se atualizou e False se o id não existe. Levanta
-        ValueError em campo protegido, hostname inválido ou repetido, ou
-        tipo inválido; nesse caso nada muda.
+        ValueError em campo protegido, hostname inválido ou repetido,
+        tipo inválido, ficha inválida ou patrimônio de outro
+        equipamento; nesse caso nada muda.
         """
         equipamento = self._equipamentos.get(id_equipamento)
         if equipamento is None:
             return False
 
-        dados = {c: v for c, v in alteracoes.items() if c != "tipo"}
+        dados = {c: v for c, v in alteracoes.items()
+                 if c not in ("tipo", "ficha")}
+        nova_ficha = None
+        if "ficha" in alteracoes:
+            nova_ficha = self._validar_ficha(equipamento.ficha,
+                                             alteracoes["ficha"],
+                                             id_equipamento)
         novo_tipo = alteracoes.get("tipo")
         if "tipo" in alteracoes and not isinstance(novo_tipo,
                                                    TipoEquipamento):
@@ -161,8 +222,11 @@ class Inventario:
                 raise ValueError(f"Hostname inválido: {problema}")
 
         # Equipamento.atualizar() confere tudo antes de gravar; se
-        # levantar erro, nada mudou e a troca de tipo nem começa.
+        # levantar erro, nada mudou e a troca de tipo nem começa. A
+        # ficha já foi conferida acima, numa cópia.
         equipamento.atualizar(dados)
+        if nova_ficha is not None:
+            equipamento.ficha = nova_ficha
         if novo_tipo is not None and novo_tipo is not equipamento.tipo:
             self._equipamentos[id_equipamento] = (
                 equipamento.converter_para(novo_tipo))
@@ -229,13 +293,59 @@ class Inventario:
         pares.sort(key=lambda par: (-par[0].cvss, par[0].id))
         return pares
 
+    def vulnerabilidade_com_cve(self, cve, ignorar_id=None):
+        """Devolve a vulnerabilidade do catálogo com essa CVE, ou None.
+
+        Uma CVE identifica uma falha só, então aparece em uma
+        vulnerabilidade do catálogo no máximo. ignorar_id tira a própria
+        vulnerabilidade da busca numa atualização. Levanta ValueError se
+        a CVE estiver fora do formato.
+        """
+        cve = validar_cve(cve)
+        for vulnerabilidade in self._vulnerabilidades.values():
+            if vulnerabilidade.cve == cve and vulnerabilidade.id != ignorar_id:
+                return vulnerabilidade
+        return None
+
+    def _exigir_cve_livre(self, cve, ignorar_id=None):
+        """Levanta ValueError se outra vulnerabilidade já tem a CVE."""
+        if cve is None:
+            return
+        outra = self.vulnerabilidade_com_cve(cve, ignorar_id)
+        if outra is not None:
+            raise ValueError(
+                f"A {outra.cve} já está no catálogo, na vulnerabilidade "
+                f"{outra.id}: registre essa no equipamento, em vez de "
+                f"cadastrar outra")
+
+    def ocorrencias_da_referencia(self, referencia):
+        """Devolve onde aparece uma CVE ou um CWE.
+
+        referencia é uma CVE (CVE-2019-0708) ou um CWE (CWE-416), com ou
+        sem o prefixo. Cada item é (equipamento, vulnerabilidade,
+        situação), como em pendentes(), da mais grave. Levanta
+        ValueError se a referência não for nenhum dos dois.
+        """
+        alvo = validar_referencia(referencia)
+        campo = "cve" if alvo.startswith("CVE-") else "cwe"
+        itens = []
+        for equipamento in self.todos():
+            for id_vuln, situacao in equipamento.vulnerabilidades.items():
+                vulnerabilidade = self._vulnerabilidades[id_vuln]
+                if getattr(vulnerabilidade, campo) == alvo:
+                    itens.append((equipamento, vulnerabilidade, situacao))
+        itens.sort(key=lambda item: (-item[1].cvss, item[0].id, item[1].id))
+        return itens
+
     def registrar_vulnerabilidade(self, id_equipamento, descricao, origem,
-                                  cvss, situacao, vetor=None):
+                                  cvss, situacao, vetor=None, *, cve=None,
+                                  cwe=None):
         """Cria uma vulnerabilidade nova e a registra no equipamento.
 
         Devolve a Vulnerabilidade criada (requisito 7 do T1). O vetor
-        CVSS é opcional; com ele, a nota tem de ser a que ele dá. Tudo
-        é conferido antes de gravar, então um dado inválido não deixa
+        CVSS, a CVE e o CWE são opcionais; com vetor, a nota tem de ser
+        a que ele dá, e a CVE não pode já estar no catálogo. Tudo é
+        conferido antes de gravar, então um dado inválido não deixa
         vulnerabilidade solta no catálogo.
         """
         equipamento = self._exigir_equipamento(id_equipamento)
@@ -244,7 +354,9 @@ class Inventario:
         # Cria o objeto primeiro, com id provisório: se algum dado for
         # inválido, o erro sai aqui, antes de o id ser gasto e de
         # qualquer mudança.
-        vulnerabilidade = Vulnerabilidade(0, descricao, origem, cvss, vetor)
+        vulnerabilidade = Vulnerabilidade(0, descricao, origem, cvss, vetor,
+                                          cve=cve, cwe=cwe)
+        self._exigir_cve_livre(vulnerabilidade.cve)
         vulnerabilidade.id = self._novo_id(self._vulnerabilidades,
                                            "vulnerabilidades")
         equipamento.vincular_vulnerabilidade(vulnerabilidade.id, situacao)
@@ -266,15 +378,18 @@ class Inventario:
         equipamento.vincular_vulnerabilidade(id_vulnerabilidade, situacao)
 
     def atualizar_vulnerabilidade(self, id_vulnerabilidade, alteracoes):
-        """Altera descrição, origem, nota ou vetor CVSS no catálogo.
+        """Altera os dados de uma vulnerabilidade do catálogo.
 
-        Vale para todos os equipamentos afetados. Devolve False se o id
-        não existe; levanta ValueError em campo protegido ou valor
-        inválido (nada muda).
+        Descrição, CVE, CWE, origem, nota ou vetor: vale para todos os
+        equipamentos afetados. Devolve False se o id não existe; levanta
+        ValueError em campo protegido, valor inválido ou CVE que outra
+        vulnerabilidade já tem (nada muda).
         """
         vulnerabilidade = self._vulnerabilidades.get(id_vulnerabilidade)
         if vulnerabilidade is None:
             return False
+        if alteracoes.get("cve") is not None:
+            self._exigir_cve_livre(alteracoes["cve"], id_vulnerabilidade)
         vulnerabilidade.atualizar(alteracoes)
         return True
 
@@ -389,6 +504,53 @@ class Inventario:
             lista.append(objeto)
         return lista
 
+    def _conferir_o_conjunto(self):
+        """Confere, depois da leitura, o que só se vê no conjunto.
+
+        Hostname e patrimônio únicos entre os equipamentos (na ordem do
+        arquivo), CVE única no catálogo e dependências que apontam para
+        equipamentos que existem. Levanta ValueError no primeiro
+        problema.
+        """
+        hostnames, patrimonios = {}, {}
+        for equipamento in self._equipamentos.values():
+            chave = equipamento.hostname.lower()
+            if chave in hostnames:
+                raise ValueError(
+                    f"equipamento {equipamento.id}: o hostname "
+                    f"{equipamento.hostname} já é usado pelo equipamento "
+                    f"{hostnames[chave]}")
+            hostnames[chave] = equipamento.id
+            patrimonio = equipamento.ficha.patrimonio
+            if patrimonio is None:
+                continue
+            chave = formatacao.para_busca(patrimonio)
+            if chave in patrimonios:
+                raise ValueError(
+                    f"equipamento {equipamento.id}: o patrimônio "
+                    f"{patrimonio} já é do equipamento {patrimonios[chave]}")
+            patrimonios[chave] = equipamento.id
+
+        # Uma CVE identifica uma falha só: duas vulnerabilidades do
+        # catálogo com a mesma CVE seriam uma, cadastrada duas vezes.
+        donos = {}
+        for vulnerabilidade in self.vulnerabilidades():
+            if vulnerabilidade.cve is None:
+                continue
+            if vulnerabilidade.cve in donos:
+                raise ValueError(
+                    f"a {vulnerabilidade.cve} aparece nas vulnerabilidades "
+                    f"{donos[vulnerabilidade.cve]} e {vulnerabilidade.id}")
+            donos[vulnerabilidade.cve] = vulnerabilidade.id
+
+        # Integridade referencial: a dependência precisa ter para onde.
+        for equipamento in self.todos():
+            for destino in equipamento.dependencias:
+                if destino not in self._equipamentos:
+                    raise ValueError(
+                        f"equipamento {equipamento.id}: depende do "
+                        f"equipamento {destino}, que não existe")
+
     @classmethod
     def de_dict(cls, dados):
         """Reconstrói o inventário a partir do conteúdo do arquivo.
@@ -397,12 +559,12 @@ class Inventario:
         conteúdo estiver fora do formato. Além de cada objeto, confere
         o que só se vê no conjunto: ids repetidos, hostname repetido,
         a mesma vulnerabilidade com dados diferentes em dois
-        equipamentos e dependência de equipamento inexistente. Carregar
-        pela metade faria a próxima gravação apagar os dados bons.
+        equipamentos, a mesma CVE em duas vulnerabilidades e dependência
+        de equipamento inexistente. Carregar pela metade faria a próxima
+        gravação apagar os dados bons.
         """
         itens = exigir_lista(dados, "arquivo")
         inventario = cls()
-        hostnames = {}
         for item in itens:
             exigir_objeto(item, "equipamento")
             id_item = item.get("id", "?")
@@ -421,8 +583,9 @@ class Inventario:
                 if conhecida != vulnerabilidade:
                     raise ValueError(
                         f"{nome}: a vulnerabilidade {vulnerabilidade.id} "
-                        f"aparece em outro equipamento com descrição, "
-                        f"origem, nota ou vetor diferente")
+                        f"aparece em outro equipamento com dados "
+                        f"diferentes (descrição, CVE, CWE, origem, nota "
+                        f"ou vetor)")
                 reduzido["vulnerabilidades"].append(
                     {c: vuln[c] for c in ("id", "situacao") if c in vuln})
 
@@ -430,23 +593,9 @@ class Inventario:
             if equipamento.id in inventario._equipamentos:
                 raise ValueError(f"equipamento {equipamento.id}: "
                                  f"id repetido")
-            chave = equipamento.hostname.lower()
-            if chave in hostnames:
-                raise ValueError(
-                    f"equipamento {equipamento.id}: o hostname "
-                    f"{equipamento.hostname} já é usado pelo equipamento "
-                    f"{hostnames[chave]}")
-            hostnames[chave] = equipamento.id
             inventario._equipamentos[equipamento.id] = equipamento
 
-        # Integridade referencial: a dependência precisa ter para onde.
-        for equipamento in inventario.todos():
-            for destino in equipamento.dependencias:
-                if destino not in inventario._equipamentos:
-                    raise ValueError(
-                        f"equipamento {equipamento.id}: depende do "
-                        f"equipamento {destino}, que não existe")
-
+        inventario._conferir_o_conjunto()
         inventario._marca["equipamentos"] = max(inventario._equipamentos,
                                                 default=0)
         inventario._marca["vulnerabilidades"] = max(
@@ -528,6 +677,63 @@ if __name__ == "__main__":
     assert inv.vulnerabilidades_do(2)[1][0].cvss == 5.0, \
         "a nota deveria valer para todos os equipamentos"
 
+    # --- Ficha técnica: patrimônio único e busca ----------------------
+    inv.atualizar_equipamento(1, {"ficha": {"fabricante": "Dell",
+                                            "modelo": "OptiPlex 7010",
+                                            "patrimonio": "PC-123"}})
+    assert inv.buscar_na_ficha("optiplex") == [pc]
+    assert inv.buscar_na_ficha("pc-123") == [pc]
+    assert inv.problema_no_patrimonio("pc-123", ignorar_id=1) is None
+    try:
+        inv.atualizar_equipamento(2, {"lotacao": "outra",
+                                      "ficha": {"patrimonio": "pc-123"}})
+        raise AssertionError("aceitou patrimônio de outro equipamento")
+    except ValueError as erro:
+        print(f"Patrimônio repetido recusado: {erro}")
+    assert srv.lotacao == "Sala Técnica", "mudou pela metade"
+    try:
+        inv.cadastrar_equipamento(ESTACAO, "PC-02", "X", "Y", "Z",
+                                  ficha={"patrimonio": "PC-123"})
+        raise AssertionError("aceitou patrimônio repetido no cadastro")
+    except ValueError:
+        assert inv.buscar_por_texto("hostname", "PC-02") == []
+    inv.atualizar_equipamento(1, {"ficha": {"modelo": None}})
+    assert pc.ficha.modelo is None and pc.ficha.fabricante == "Dell"
+
+    # --- CVE única no catálogo e busca por CVE ou CWE -----------------
+    bluekeep = inv.registrar_vulnerabilidade(
+        2, "bluekeep", FALTA_ATUALIZACAO, 9.8, ABERTA,
+        cve="CVE-2019-0708", cwe="CWE-416")
+    assert inv.vulnerabilidade_com_cve("cve-2019-0708") is bluekeep
+    assert inv.vulnerabilidade_com_cve("CVE-2019-0708", bluekeep.id) is None
+    try:
+        inv.registrar_vulnerabilidade(1, "outra", FALTA_ATUALIZACAO, 9.0,
+                                      ABERTA, cve="2019-0708")
+        raise AssertionError("aceitou CVE repetida no catálogo")
+    except ValueError as erro:
+        print(f"CVE repetida recusada: {erro}")
+    assert len(inv.vulnerabilidades()) == 3, "sobrou vulnerabilidade solta"
+    inv.registrar_vulnerabilidade_existente(1, bluekeep.id, ABERTA)
+    assert [(e.id, v.id) for e, v, _ in
+            inv.ocorrencias_da_referencia("CVE-2019-0708")] == [
+                (1, bluekeep.id), (2, bluekeep.id)]
+    assert len(inv.ocorrencias_da_referencia("416")) == 2
+    assert not inv.ocorrencias_da_referencia("CWE-798")
+    try:
+        inv.ocorrencias_da_referencia("bluekeep")
+        raise AssertionError("aceitou busca que não é CVE nem CWE")
+    except ValueError:
+        pass
+    try:
+        inv.atualizar_vulnerabilidade(v1.id, {"cve": "CVE-2019-0708"})
+        raise AssertionError("aceitou CVE de outra vulnerabilidade")
+    except ValueError:
+        assert v1.cve is None
+    inv.atualizar_vulnerabilidade(bluekeep.id, {"cve": "CVE-2019-0708"})
+    inv.remover_vulnerabilidade(1, bluekeep.id)
+    inv.remover_vulnerabilidade(2, bluekeep.id)
+    assert inv.buscar_vulnerabilidade(bluekeep.id) is None
+
     # --- Atualização, inclusive troca de tipo -------------------------
     inv.atualizar_equipamento(1, {"custodiante": "outro escrivão"})
     assert inv.buscar_por_id(1).custodiante == "Outro Escrivão"
@@ -581,7 +787,8 @@ if __name__ == "__main__":
     assert inv.remover_vulnerabilidade(1, v1.id) == (False, False)
     v3 = inv.registrar_vulnerabilidade(
         1, "nova", FALTA_ATUALIZACAO, 3.0, ABERTA)
-    assert v3.id == 3, f"id de vulnerabilidade reaproveitado: {v3.id}"
+    # O 3 foi da bluekeep, já excluída: não volta a ser usado.
+    assert v3.id == bluekeep.id + 1, f"id reaproveitado: {v3.id}"
     print("Ids de equipamento e de vulnerabilidade não são reaproveitados.")
 
     # --- Arquivos adulterados -----------------------------------------
@@ -617,10 +824,19 @@ if __name__ == "__main__":
         "vulnerabilidades que não é lista": com(0, vulnerabilidades={}),
         "id de equipamento repetido": [bom[0], bom[0]],
         "hostname repetido": [bom[0], dict(bom[1], hostname="pc-a")],
+        "patrimônio repetido": [dict(bom[0], ficha={"patrimonio": "77"}),
+                                dict(bom[1], ficha={"patrimonio": "77"})],
         "vulnerabilidade sem situação": com(0, vulnerabilidades=[
             {k: v for k, v in bom[0]["vulnerabilidades"][0].items()
              if k != "situacao"}]),
         "vulnerabilidade com dados diferentes": outra_nota,
+        "CVE repetida em duas vulnerabilidades": [
+            dict(bom[0], vulnerabilidades=[
+                dict(bom[0]["vulnerabilidades"][0], cve="CVE-2024-3094")]),
+            dict(bom[1], vulnerabilidades=[
+                dict(bom[0]["vulnerabilidades"][0], cve="CVE-2024-3094"),
+                dict(bom[0]["vulnerabilidades"][0], id=50,
+                     cve="CVE-2024-3094")])],
         "dependência de equipamento inexistente": com(0, dependencias=[
             {"equipamento_id": 99, "fracao": 0.2}]),
     }

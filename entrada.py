@@ -205,6 +205,31 @@ def ler_convertido(mensagem, converter, opcional=False):
             return valor
 
 
+# Na atualização de um campo opcional (CVE, CWE, ficha técnica): Enter
+# mantém o valor, e este sinal apaga.
+APAGAR = "-"
+
+
+def ler_alteracao_opcional(mensagem, converter):
+    """Lê a alteração de um campo opcional, numa atualização.
+
+    Devolve (alterou, valor). Enter vazio mantém o valor atual:
+    (False, None). "-" apaga o campo: (True, None). Outro texto passa
+    por converter, que devolve o valor novo ou levanta ValueError com o
+    motivo; nesse caso a pergunta se repete.
+    """
+    while True:
+        bruto = ler_resposta(mensagem)
+        if not bruto:
+            return False, None
+        if bruto == APAGAR:
+            return True, None
+        try:
+            return True, converter(bruto)
+        except ValueError as erro:
+            print("  " + cores.erro(f"! {erro}."))
+
+
 def ler_decimal(mensagem, opcional=False):
     """Lê um número decimal, com vírgula ou ponto: "7,5" e "7.5" valem.
 

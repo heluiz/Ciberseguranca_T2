@@ -29,7 +29,9 @@ from entrada import (
     SairDoPrograma,
     VoltarAoMenu,
     confirmar,
+    ler_alteracao_opcional,
     ler_campo,
+    ler_convertido,
     ler_decimal,
     ler_enum,
     ler_hostname,
@@ -40,9 +42,12 @@ from entrada import (
     limpar_tela,
 )
 from equipamentos import MENOR_FRACAO
+from ficha_tecnica import ROTULOS as ROTULOS_DA_FICHA
+from ficha_tecnica import validar_valor
 from formatacao import fracao_br, frase, numero_br
 from pergunta_cvss import EXPLICACAO_NOTA, PALAVRA_CALCULAR, ler_nota_cvss
 from risco import ModeloRisco, SistemaSingularError
+from vulnerabilidades import validar_cve, validar_cwe, validar_referencia
 
 # Com a variável definida (o Dockerfile a define), o programa avisa como
 # sair do container sem derrubá-lo e não morre com Ctrl+C.
@@ -168,10 +173,14 @@ class Aplicacao:
         lotacao = ler_campo("  Lotação (setor): ")
         descricao = ler_campo("  Descrição: ")
         tipo = ler_enum("  Tipo de equipamento:", TipoEquipamento)
+        ficha = {}
+        if confirmar("\n  Preencher a ficha técnica (fabricante, modelo, "
+                     "patrimônio...)?"):
+            ficha = self._ler_ficha_nova()
 
         try:
             equipamento = self.inventario.cadastrar_equipamento(
-                tipo, hostname, custodiante, lotacao, descricao)
+                tipo, hostname, custodiante, lotacao, descricao, ficha=ficha)
         except ValueError as erro:
             self._erro(str(erro))
             return
@@ -200,9 +209,10 @@ class Aplicacao:
     def buscar_equipamento(self):
         """Opção 3: acha equipamentos por id, hostname ou outros campos.
 
-        O requisito 4 do T1 pede id e hostname; responsável, lotação e
-        tipo vão além. Um resultado mostra a ficha completa; vários, a
-        tabela.
+        O requisito 4 do T1 pede id e hostname; responsável, lotação,
+        tipo, ficha técnica, CVE e CWE vão além. Um resultado mostra a
+        ficha completa; vários, a tabela. A busca por CVE ou CWE mostra
+        as ocorrências, com a situação em cada equipamento.
         """
         print("\n" + cores.titulo("--- BUSCAR EQUIPAMENTO ---") + "\n")
         print(f"    {cores.destaque('1')} - Por ID")
@@ -210,8 +220,15 @@ class Aplicacao:
         print(f"    {cores.destaque('3')} - Por responsável")
         print(f"    {cores.destaque('4')} - Por lotação")
         print(f"    {cores.destaque('5')} - Por tipo")
+        print(f"    {cores.destaque('6')} - Por fabricante, modelo, série, "
+              f"patrimônio ou sistema")
+        print(f"    {cores.destaque('7')} - Por CVE ou CWE (onde a "
+              f"vulnerabilidade aparece)")
         opcao = ler_inteiro("  Opção: ")
 
+        if opcao == 7:
+            self._buscar_referencia()
+            return
         if opcao == 1:
             id_equipamento = self._ler_id_equipamento("  ID: ")
             achado = self.inventario.buscar_por_id(id_equipamento)
@@ -223,6 +240,10 @@ class Aplicacao:
         elif opcao == 5:
             tipo = ler_enum("  Tipo de equipamento:", TipoEquipamento)
             encontrados = self.inventario.buscar_por_tipo(tipo)
+        elif opcao == 6:
+            termo = ler_texto("  Fabricante, modelo, série, patrimônio ou "
+                              "sistema (ou parte): ")
+            encontrados = self.inventario.buscar_na_ficha(termo)
         else:
             self._erro("Opção inválida.")
             return
@@ -236,6 +257,21 @@ class Aplicacao:
             telas.mostrar_tabela(encontrados)
             print("\n  Para ver a ficha e as vulnerabilidades de um deles, "
                   "use a opção 7.")
+
+    def _buscar_referencia(self):
+        """Opção 3, item 7: os equipamentos com uma CVE ou um CWE.
+
+        Responde a pergunta de quando sai uma falha nova: quais
+        equipamentos a têm, e em que situação está cada um.
+        """
+        referencia = ler_convertido("  CVE ou CWE: ", validar_referencia)
+        itens = self.inventario.ocorrencias_da_referencia(referencia)
+        if not itens:
+            self._erro(f"Nenhum equipamento tem a {referencia}.")
+            return
+        print(f"\n  {referencia} em {len(itens)} equipamento(s), da mais "
+              f"grave:\n")
+        telas.imprimir_ocorrencias(itens, com_hostname=True)
 
     def _mostrar_ficha_completa(self, equipamento):
         """Ficha do equipamento e as suas vulnerabilidades."""
@@ -289,6 +325,11 @@ class Aplicacao:
         if novo_tipo is not None and novo_tipo is not equipamento.tipo:
             alteracoes["tipo"] = novo_tipo
 
+        if confirmar("\n  Alterar a ficha técnica?"):
+            mudancas = self._ler_alteracoes_da_ficha(equipamento)
+            if mudancas:
+                alteracoes["ficha"] = mudancas
+
         if not alteracoes:
             print("\n  " + cores.aviso("Nada foi alterado."))
             return
@@ -300,8 +341,59 @@ class Aplicacao:
             return
 
         self._salvar()
+        # Cada campo da ficha conta como um campo.
+        campos = (len(alteracoes) - ("ficha" in alteracoes)
+                  + len(alteracoes.get("ficha", {})))
         print("\n  " + cores.sucesso(
-            f"Equipamento atualizado ({len(alteracoes)} campo(s))."))
+            f"Equipamento atualizado ({campos} campo(s))."))
+
+    def _conversor_da_ficha(self, campo, id_equipamento=None):
+        """Devolve a função que confere o texto de um campo da ficha.
+
+        A função devolve o texto arrumado ou levanta ValueError com o
+        motivo. No patrimônio, confere também que nenhum outro
+        equipamento o tem.
+        """
+        rotulo = ROTULOS_DA_FICHA[campo]
+
+        def converter(texto):
+            valor = validar_valor(rotulo, texto)
+            if campo == "patrimonio":
+                problema = self.inventario.problema_no_patrimonio(
+                    valor, id_equipamento)
+                if problema:
+                    raise ValueError(f"Patrimônio: {problema}")
+            return valor
+
+        return converter
+
+    def _ler_ficha_nova(self):
+        """Pergunta os campos da ficha técnica; Enter pula cada um."""
+        print("\n  Ficha técnica: Enter pula o campo.")
+        ficha = {}
+        for campo, rotulo in ROTULOS_DA_FICHA.items():
+            valor = ler_convertido(f"  {rotulo}: ",
+                                   self._conversor_da_ficha(campo),
+                                   opcional=True)
+            if valor is not None:
+                ficha[campo] = valor
+        return ficha
+
+    def _ler_alteracoes_da_ficha(self, equipamento):
+        """Pergunta cada campo da ficha; Enter mantém, "-" apaga.
+
+        Devolve {campo: valor novo} só com o que mudou (None apaga).
+        """
+        print("\n  Ficha técnica: Enter mantém o campo, \"-\" apaga.")
+        mudancas = {}
+        for campo, rotulo in ROTULOS_DA_FICHA.items():
+            atual = getattr(equipamento.ficha, campo)
+            alterou, valor = ler_alteracao_opcional(
+                f"  {rotulo} [{atual or 'vazio'}]: ",
+                self._conversor_da_ficha(campo, equipamento.id))
+            if alterou and valor != atual:
+                mudancas[campo] = valor
+        return mudancas
 
     def excluir_equipamento(self):
         """Opção 5: exclui o equipamento e o que dependia dele.
@@ -384,9 +476,15 @@ class Aplicacao:
                 id_existente = self._ler_vulnerabilidade_do_catalogo(
                     equipamento)
 
+        cve = None
+        if id_existente is None:
+            cve, id_existente = self._ler_cve_nova(equipamento)
         if id_existente is None:
             descricao = ler_campo("  Descrição da vulnerabilidade: ")
             origem = ler_enum("  Categoria:", OrigemVulnerabilidade)
+            cwe = ler_convertido(
+                "  CWE, o tipo de fraqueza (opcional, como CWE-416; Enter "
+                "pula): ", validar_cwe, opcional=True)
             print("\n" + EXPLICACAO_NOTA)
             nota, vetor = ler_nota_cvss("  Nota CVSS: ")
         situacao = ler_enum("  Status neste equipamento:",
@@ -397,7 +495,7 @@ class Aplicacao:
             if id_existente is None:
                 vuln = self.inventario.registrar_vulnerabilidade(
                     equipamento.id, descricao, origem, nota, situacao,
-                    vetor)
+                    vetor, cve=cve, cwe=cwe)
             else:
                 self.inventario.registrar_vulnerabilidade_existente(
                     equipamento.id, id_existente, situacao)
@@ -411,6 +509,33 @@ class Aplicacao:
             f"Vulnerabilidade {vuln.id} registrada em {equipamento.hostname}"
             f" (severidade {vuln.gravidade.rotulo}, nota "
             f"{numero_br(vuln.cvss)})."))
+
+    def _ler_cve_nova(self, equipamento):
+        """Pergunta a CVE de uma vulnerabilidade nova (opcional).
+
+        Devolve (cve, id_existente). Uma CVE já do catálogo não pode ser
+        cadastrada de novo: o programa oferece registrar a que existe
+        neste equipamento (e devolve o id dela) ou pergunta outra.
+        """
+        while True:
+            cve = ler_convertido(
+                "  CVE (opcional, como CVE-2019-0708; Enter pula): ",
+                validar_cve, opcional=True)
+            if cve is None:
+                return None, None
+            existente = self.inventario.vulnerabilidade_com_cve(cve)
+            if existente is None:
+                return cve, None
+            if existente.id in equipamento.vulnerabilidades:
+                self._erro(f"{equipamento.hostname} já tem a {cve} "
+                           f"(vulnerabilidade {existente.id}).")
+                continue
+            print("  " + cores.aviso(
+                f"A {cve} já está no catálogo: [{existente.id}] "
+                f"{existente.descricao}."))
+            if confirmar("  Registrar essa vulnerabilidade neste "
+                         "equipamento?", padrao=True):
+                return None, existente.id
 
     def cadastrar_vulnerabilidade(self):
         """Opção 6: cadastra uma vulnerabilidade num equipamento."""
@@ -446,8 +571,9 @@ class Aplicacao:
         """Opção 8: corrige uma vulnerabilidade ou muda o tratamento.
 
         Mesma mecânica da opção 4: Enter mantém o valor atual.
-        Descrição, categoria e nota são da vulnerabilidade e valem para
-        todos os equipamentos que a têm; o status é de cada equipamento.
+        Descrição, CVE, CWE, categoria e nota são da vulnerabilidade e
+        valem para todos os equipamentos que a têm; o status é de cada
+        equipamento.
         """
         print("\n" + cores.titulo("--- ATUALIZAR VULNERABILIDADE ---") + "\n")
         equipamento = self._ler_equipamento()
@@ -498,9 +624,10 @@ class Aplicacao:
                 "A nota agora é digitada: o vetor antigo foi retirado."))
 
     def _ler_alteracoes_do_catalogo(self, vuln):
-        """Pergunta descrição, categoria e nota; Enter mantém cada uma.
+        """Pergunta descrição, CVE, CWE, categoria e nota.
 
-        Devolve o dicionário de alterações para Inventario.
+        Enter mantém cada uma; na CVE e no CWE, "-" apaga. Devolve o
+        dicionário de alterações para Inventario.
         atualizar_vulnerabilidade(): nota e vetor vão juntos.
         """
         alteracoes = {}
@@ -508,6 +635,25 @@ class Aplicacao:
                          obrigatorio=False)
         if novo and frase(novo) != vuln.descricao:
             alteracoes["descricao"] = novo
+
+        def cve_livre(texto):
+            """A CVE digitada, se nenhuma outra vulnerabilidade tem."""
+            cve = validar_cve(texto)
+            outra = self.inventario.vulnerabilidade_com_cve(cve, vuln.id)
+            if outra is not None:
+                raise ValueError(f"A {cve} já está na vulnerabilidade "
+                                 f"{outra.id}")
+            return cve
+
+        for campo, rotulo, converter in (("cve", "CVE", cve_livre),
+                                         ("cwe", "CWE", validar_cwe)):
+            atual = getattr(vuln, campo)
+            alterou, valor = ler_alteracao_opcional(
+                f"  {rotulo} [{atual or 'nenhum'}] - Enter mantém, \"-\" "
+                f"apaga: ", converter)
+            if alterou and valor != atual:
+                alteracoes[campo] = valor
+
         nova_origem = ler_enum(
             f"  Categoria (atual: {vuln.origem.rotulo})"
             " - Enter para manter:",

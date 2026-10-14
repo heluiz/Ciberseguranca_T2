@@ -9,6 +9,8 @@ trabalho: o modelo chama equipamento.fator_exposicao sem saber de qual
 tipo é o objeto.
 
 Relações (composição, sem herança):
+  - ficha: a FichaTecnica (fabricante, modelo, série, patrimônio,
+    sistema e versão), toda opcional.
   - vulnerabilidades: {id da vulnerabilidade: SituacaoTratamento}.
     Diz quais vulnerabilidades do catálogo afetam este equipamento e em
     que situação está o tratamento aqui.
@@ -24,6 +26,7 @@ from abc import ABC, abstractmethod
 
 import formatacao
 from classificacoes import SituacaoTratamento, TipoEquipamento
+from ficha_tecnica import FichaTecnica
 from validacao import (
     exigir_campo,
     exigir_enum,
@@ -102,6 +105,7 @@ class Equipamento(ABC):
         self.custodiante = formatacao.titulo(custodiante)
         self.lotacao = formatacao.titulo(lotacao)
         self.descricao = formatacao.frase(descricao)
+        self.ficha = FichaTecnica()
         self.vulnerabilidades = {}
         self.dependencias = {}
 
@@ -198,6 +202,7 @@ class Equipamento(ABC):
         novo = criar_equipamento(tipo, self.id, self.hostname,
                                  self.custodiante, self.lotacao,
                                  self.descricao)
+        novo.ficha = self.ficha.copia()
         novo.vulnerabilidades = dict(self.vulnerabilidades)
         novo.dependencias = dict(self.dependencias)
         return novo
@@ -285,24 +290,27 @@ class Equipamento(ABC):
         """Devolve o objeto JSON do equipamento (só tipos do JSON).
 
         As relações viram listas de objetos, em ordem de id, para o
-        arquivo sair sempre igual para os mesmos dados.
+        arquivo sair sempre igual para os mesmos dados. A ficha técnica
+        só aparece quando tem algum campo: um arquivo sem fichas fica
+        igual ao de antes de ela existir.
         """
-        return {
+        objeto = {
             "id": self.id,
             "tipo": self.TIPO.value,
             "hostname": self.hostname,
             "custodiante": self.custodiante,
             "lotacao": self.lotacao,
             "descricao": self.descricao,
-            "vulnerabilidades": [
-                {"id": id_vuln, "situacao": situacao.value}
-                for id_vuln, situacao in sorted(self.vulnerabilidades.items())
-            ],
-            "dependencias": [
-                {"equipamento_id": destino, "fracao": fracao}
-                for destino, fracao in sorted(self.dependencias.items())
-            ],
         }
+        if not self.ficha.vazia:
+            objeto["ficha"] = self.ficha.para_dict()
+        objeto["vulnerabilidades"] = [
+            {"id": id_vuln, "situacao": situacao.value}
+            for id_vuln, situacao in sorted(self.vulnerabilidades.items())]
+        objeto["dependencias"] = [
+            {"equipamento_id": destino, "fracao": fracao}
+            for destino, fracao in sorted(self.dependencias.items())]
+        return objeto
 
     @staticmethod
     def de_dict(dados):
@@ -339,6 +347,10 @@ class Equipamento(ABC):
         # espaços repetidos.
         for campo in ("custodiante", "lotacao", "descricao"):
             setattr(equipamento, campo, " ".join(textos[campo].split()))
+        # Campo opcional: ausente ou null quer dizer ficha vazia.
+        if dados.get("ficha") is not None:
+            equipamento.ficha = FichaTecnica.de_dict(
+                dados["ficha"], f"{nome}: campo 'ficha'")
 
         lista = exigir_lista(
             exigir_campo(dados, "vulnerabilidades", nome),
@@ -605,6 +617,7 @@ if __name__ == "__main__":
 
     # --- Mudança de tipo: outro objeto, mesmos dados ------------------
     srv.vincular_vulnerabilidade(8, SituacaoTratamento.ABERTA)
+    srv.ficha.atualizar({"fabricante": "Dell", "patrimonio": "123456"})
     banco = srv.converter_para(TipoEquipamento.BANCO_DADOS)
     print(f"\n{srv!r} virou {banco!r}; fator {srv.fator_exposicao} -> "
           f"{banco.fator_exposicao}")
@@ -612,6 +625,7 @@ if __name__ == "__main__":
     assert banco.vulnerabilidades == srv.vulnerabilidades
     assert banco.dependencias == srv.dependencias
     assert banco.dependencias is not srv.dependencias, "dict compartilhado"
+    assert banco.ficha == srv.ficha and banco.ficha is not srv.ficha
 
     # --- Ida e volta pelo formato do arquivo --------------------------
     for tipo in TipoEquipamento:
@@ -619,10 +633,16 @@ if __name__ == "__main__":
                                      "Descrição")
         original.vulnerabilidades = {4: SituacaoTratamento.EM_TRATAMENTO}
         original.dependencias = {1: 0.25, 2: 0.5}
+        original.ficha.atualizar({"modelo": "Modelo X"})
         copia = Equipamento.de_dict(original.para_dict())
         assert type(copia) is type(original), "voltou com outra classe"
         assert copia == original, "a cópia lida difere da original"
     print("Ida e volta pelo JSON: as 7 subclasses voltam como eram.")
+    sem_ficha = criar_equipamento(TipoEquipamento.OUTRO, 4, "EQ-02", "A",
+                                  "B", "C")
+    assert "ficha" not in sem_ficha.para_dict(), "ficha vazia gravada"
+    assert Equipamento.de_dict(dict(sem_ficha.para_dict(),
+                                    ficha=None)).ficha.vazia
     print(f"Exemplo: {srv.para_dict()}")
 
     # --- Objetos adulterados ------------------------------------------
@@ -646,6 +666,8 @@ if __name__ == "__main__":
         "dependência repetida": dict(base, dependencias=[
             {"equipamento_id": 1, "fracao": 0.2},
             {"equipamento_id": 1, "fracao": 0.3}]),
+        "ficha com campo desconhecido": dict(base, ficha={"cor": "preta"}),
+        "ficha que não é objeto": dict(base, ficha="Dell"),
         "id 0": dict(base, id=0),
         "id decimal": dict(base, id=2.0),
     }

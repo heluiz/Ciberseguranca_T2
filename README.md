@@ -377,8 +377,26 @@ qualquer pergunta do programa:
 | `limpar` | Limpa a tela; no menu, desenha o menu de novo |
 | `ajuda` ou `?` | Mostra a lista de comandos |
 | `lista` | Nas perguntas de ID de equipamento (e na escolha de uma vulnerabilidade do catálogo, na opção 6), mostra os registros e repete a pergunta |
+| `-` | Na atualização de um campo opcional (CVE, CWE e ficha técnica, nas opções 4 e 8), apaga o campo; Enter mantém o valor atual |
 
 Números decimais aceitam vírgula ou ponto (`7,5` ou `7.5`).
+
+**A CVE e o CWE** de uma vulnerabilidade nova são opcionais. A primeira
+pergunta é a CVE, como `CVE-2019-0708` (o prefixo pode faltar: `2019-0708`
+também vale). Uma CVE aparece uma vez só no catálogo: se ela já está lá, o
+programa mostra qual é a vulnerabilidade e oferece registrar a mesma neste
+equipamento. Depois da categoria vem o CWE, o tipo de fraqueza, como
+`CWE-416`. O formato dos dois é conferido.
+
+**A ficha técnica** do equipamento, no cadastro (opção 1) ou na atualização
+(opção 4), também é opcional: fabricante, modelo, número de série, número de
+patrimônio, sistema (operacional ou firmware) e versão. O patrimônio identifica
+o bem no órgão e não pode se repetir entre equipamentos.
+
+A opção 3 busca também pela ficha técnica (por parte do fabricante, do modelo,
+da série, do patrimônio ou do sistema) e por CVE ou CWE. A busca por CVE
+responde à pergunta de quando sai uma falha nova: quais equipamentos a têm, e
+em que situação está cada um.
 
 **A nota CVSS** de uma vulnerabilidade nova (opções 1 e 6) ou alterada
 (opção 8) pode ser dada de três jeitos:
@@ -420,14 +438,14 @@ Um trecho da tela do `calcular`:
 
 | Opção | Faz |
 | --- | --- |
-| 1 | Cadastra um equipamento (e, em seguida, suas vulnerabilidades iniciais) |
+| 1 | Cadastra um equipamento, com a ficha técnica se quiser (e, em seguida, suas vulnerabilidades iniciais) |
 | 2 | Lista todos os equipamentos |
-| 3 | Busca por ID, hostname, responsável, lotação ou tipo |
-| 4 | Atualiza um equipamento (Enter mantém o valor atual); inclui mudar o tipo |
+| 3 | Busca por ID, hostname, responsável, lotação, tipo, ficha técnica, CVE ou CWE |
+| 4 | Atualiza um equipamento e a ficha técnica dele (Enter mantém o valor atual); inclui mudar o tipo |
 | 5 | Exclui um equipamento, com tudo que dependia dele |
-| 6 | Registra uma vulnerabilidade num equipamento: uma nova ou uma já existente no catálogo |
+| 6 | Registra uma vulnerabilidade num equipamento: uma nova (com CVE e CWE, se houver) ou uma já existente no catálogo |
 | 7 | Mostra um equipamento e suas vulnerabilidades, da mais grave |
-| 8 | Atualiza uma vulnerabilidade (descrição, categoria, nota ou vetor CVSS) ou o status dela naquele equipamento |
+| 8 | Atualiza uma vulnerabilidade (descrição, CVE, CWE, categoria, nota ou vetor CVSS) ou o status dela naquele equipamento |
 | 9 | Tira uma vulnerabilidade de um equipamento (cadastro errado ou duplicado) |
 | 10 | Lista as vulnerabilidades pendentes de todos os equipamentos, da mais grave |
 | 11 | Cadastra uma dependência entre dois equipamentos |
@@ -443,7 +461,7 @@ ambiente `NO_COLOR` definida, o programa imprime texto puro.
 
 | # | Requisito | Peso | Onde está |
 | --- | --- | --- | --- |
-| 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. A classe "equipamentos" do enunciado é a `Equipamento`, no módulo `equipamentos.py`: o nome segue a convenção da PEP 8 para classes (CapWords) e está no singular, porque cada objeto é *um* equipamento. |
+| 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. A classe "equipamentos" do enunciado é a `Equipamento`, no módulo `equipamentos.py`: o nome segue a convenção da PEP 8 para classes (CapWords) e está no singular, porque cada objeto é *um* equipamento. Cada equipamento tem uma `FichaTecnica` (`ficha_tecnica.py`), com fabricante, modelo, série, patrimônio, sistema e versão: composição. |
 | 2 | Armazenamento em JSON formado por um array de objetos | 20% | `armazenamento.py` grava o que `Inventario.para_dict()` monta: um array JSON na raiz, um objeto por equipamento. Veja [o formato](#formato-do-arquivo-de-dados). |
 | 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker) e [No servidor do docente](#no-servidor-do-docente). |
 | 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu. A matriz A fica no mesmo JSON (campo `dependencias`), e o NumPy está declarado em `requirements.txt`, que o `Dockerfile` instala. Veja [o modelo de risco](#o-modelo-de-risco). |
@@ -462,8 +480,9 @@ de duas branches e merges também continua valendo: veja
 | --- | --- |
 | `main.py` | Classe `Aplicacao`: o menu e as ações. Liga as demais peças. É o ponto de partida |
 | `equipamentos.py` | Classe abstrata `Equipamento`, as sete subclasses e o fator de exposição de cada tipo |
-| `vulnerabilidades.py` | Classe `Vulnerabilidade`: entrada do catálogo (descrição, origem, nota CVSS) |
-| `inventario.py` | Classe `Inventario`: o conjunto dos equipamentos e das vulnerabilidades e as regras entre eles (hostname único, cascata, dependências) |
+| `ficha_tecnica.py` | Classe `FichaTecnica`: fabricante, modelo, número de série, patrimônio, sistema e versão de um equipamento, todos opcionais |
+| `vulnerabilidades.py` | Classe `Vulnerabilidade`: entrada do catálogo (descrição, CVE e CWE opcionais, origem, nota CVSS) |
+| `inventario.py` | Classe `Inventario`: o conjunto dos equipamentos e das vulnerabilidades e as regras entre eles (hostname e patrimônio únicos, CVE única no catálogo, cascata, dependências, buscas) |
 | `risco.py` | Classe `ModeloRisco`: monta M, v, A e b, verifica a invertibilidade (com o posto e o teorema de Rouché-Capelli), resolve o sistema e confere a solução |
 | `armazenamento.py` | Classe `ArquivoInventario`: lê e grava o JSON, com gravação atômica |
 | `migracao.py` | Converte uma base do Trabalho 1 para o formato novo |
@@ -482,9 +501,10 @@ de duas branches e merges também continua valendo: veja
 
 Só `entrada.py` chama `input()` e só `armazenamento.py` lê e grava a base (a
 conversão manual de `migracao.py`, executada como script, também grava o arquivo
-de destino). As classes do domínio (`Equipamento`, `Vulnerabilidade`,
-`Inventario`, `ModeloRisco`) não sabem de teclado, tela nem arquivo, por isso
-cada módulo tem um bloco de teste que roda sozinho (`python equipamentos.py`).
+de destino). As classes do domínio (`Equipamento`, `FichaTecnica`,
+`Vulnerabilidade`, `Inventario`, `ModeloRisco`) não sabem de teclado, tela nem
+arquivo, por isso cada módulo tem um bloco de teste que roda sozinho
+(`python equipamentos.py`).
 
 ## O modelo de risco
 
@@ -542,6 +562,26 @@ fatores passam a valer 1. A
 [validação à mão](#validação-à-mão-cenário-de-3-equipamentos) mostra a conta
 dos dois jeitos.
 
+Três siglas aparecem no programa. O **CVE** identifica uma falha específica
+num produto: o CVE-2019-0708, por exemplo, é o BlueKeep, da Área de Trabalho
+Remota do Windows. O **CWE** dá o tipo de fraqueza que causou a falha (no
+BlueKeep, o CWE-416, uso de memória já liberada), e o **CVSS** dá a
+severidade, de 0 a 10 (9,8, no BlueKeep). O modelo usa só a nota CVSS, que
+vira o vetor *v*. A CVE e o CWE ficam na vulnerabilidade, os dois opcionais, e
+identificam a falha, sem entrar na conta; a categoria (erro de configuração,
+falta de atualização...) é a do requisito 7 do Trabalho 1.
+
+Por que duas matrizes, e não só a nota de cada falha? O cenário da
+[validação à mão](#validação-à-mão-cenário-de-3-equipamentos) mostra as duas
+razões. A primeira é a **soma**: pela falha mais grave, o servidor (E2)
+empataria com o banco de dados (E3), os dois com 6,0; `M v` soma as notas, e o
+servidor, que tem uma falha a mais, fica com 10, contra 6 do banco. A segunda
+é a **propagação**: quem invade um equipamento usa esse acesso para chegar aos
+outros (é o movimento lateral, a tática TA0008 do MITRE ATT&CK), e `A` repassa
+parte do risco pelas dependências. A estação (E1) tem uma falha só, de 4,0,
+mas termina com risco efetivo 16, quatro vezes o próprio, porque herda metade
+do risco do servidor, que por sua vez herda do banco.
+
 ### Decisões do modelo
 
 - **Fator de exposição polimórfico.** Cada subclasse de `Equipamento` define
@@ -592,16 +632,33 @@ dos dois jeitos.
   Depois de resolver, a solução é conferida substituindo de volta, com
   `numpy.allclose`: `(I − A) x` tem de dar *b*, com uma tolerância que
   acompanha o tamanho de *x* (o arredondamento do produto cresce com ele).
-- **As boas práticas da aula de álgebra linear computacional** (S3_09 a
-  S3_12): `@` para produto de matrizes (o `*` só aparece na diagonal de F, de
-  propósito, e o `python risco.py` confere que dá o mesmo que a matriz F
-  inteira com `@`); `solve` em vez de `inv`; resultados de contas (o
-  determinante, a solução, a soma das frações) comparados com tolerância, e
-  não com `==`; o número de condição antes de confiar na solução; o posto para
-  classificar o sistema; e matrizes em `float64`, sem inteiros de tamanho fixo,
-  que "dão a volta". As notas CVSS são a exceção de propósito: digitadas,
-  lidas do arquivo ou calculadas pelo vetor, elas sempre ficam com uma casa
-  decimal, e por isso podem ser comparadas exatamente.
+- **O número de condição tem dois limites.** Ele mede quanto um erro
+  relativo nos dados pode crescer na solução: um número de condição de 10ᵏ
+  custa cerca de *k* dos 16 dígitos do `float64`. Acima de 1/ε (ε é o épsilon
+  da máquina, cerca de 2,2 × 10⁻¹⁶, então o limite é cerca de 4,5 × 10¹⁵; na
+  tela, o programa escreve "1/épsilon", por extenso), a matriz é singular ou
+  quase singular para o computador, e o sistema é recusado. Acima de 10⁸, uma
+  convenção que garante uns 8 dos 16 dígitos, a solução sai, com o aviso de
+  que pode ter poucos dígitos confiáveis. Esse teste é mais confiável do que
+  comparar o determinante com uma tolerância, porque o tamanho do
+  determinante depende da escala da matriz. O posto completa a regra: o
+  `matrix_rank` conta como zero os valores singulares menores que n × ε vezes
+  o maior, porque o erro de arredondamento cresce com o tamanho da matriz.
+  Com dezenas de equipamentos, o arredondamento pode deixar o número de
+  condição de uma matriz singular logo abaixo de 1/ε (num teste com 6.000
+  matrizes singulares montadas a partir da base de exemplo, isso aconteceu
+  uma vez, e o `solve` falhou nessa matriz); com o posto menor que n, o
+  programa recusa essas matrizes também.
+- **Boas práticas de álgebra linear computacional**: `@` para produto de
+  matrizes (o `*` só aparece na diagonal de F, de propósito, e o
+  `python risco.py` confere que dá o mesmo que a matriz F inteira com `@`);
+  `solve` em vez de `inv`; resultados de contas (o determinante, a solução, a
+  soma das frações) comparados com tolerância, e não com `==`; o número de
+  condição antes de confiar na solução; o posto para classificar o sistema; e
+  matrizes em `float64`, sem inteiros de tamanho fixo, que "dão a volta". As
+  notas CVSS são a exceção de propósito: digitadas, lidas do arquivo ou
+  calculadas pelo vetor, elas sempre ficam com uma casa decimal, e por isso
+  podem ser comparadas exatamente.
 
 ### Verificação de invertibilidade
 
@@ -616,21 +673,27 @@ resolvido):
    1 é recusada, com a mensagem de quanto ainda sobra. A soma é arredondada
    antes da comparação, porque em ponto flutuante `0,7 + 0,2 + 0,1` dá
    `0,9999999999999999`, que passaria no teste "menor que 1" por engano.
-2. **Número de condição.** Um arquivo editado à mão pode violar a regra. Sem a
-   garantia da dominância, o número de condição (`numpy.linalg.cond`) decide se
-   `I − A` é tratada como invertível: acima de 10¹², o sistema é tratado como
-   singular.
+2. **Número de condição e posto.** Um arquivo editado à mão pode violar a
+   regra. A dominância é um critério suficiente, mas não necessário: sem ela,
+   `I − A` ainda pode ser invertível. Então, sem a garantia da dominância, o
+   número de condição (`numpy.linalg.cond`) decide se `I − A` é tratada como
+   invertível: acima de 1/ε (cerca de 4,5 × 10¹⁵), o sistema é recusado.
+   O posto de `I − A` (`numpy.linalg.matrix_rank`) completa a regra: com
+   posto menor que n, o sistema também é recusado, mesmo com o número de
+   condição abaixo de 1/ε (veja [Decisões do modelo](#decisões-do-modelo)).
+   Entre 10⁸ e 1/ε, com posto cheio, o sistema é resolvido, com o aviso de
+   que a solução pode ter poucos dígitos confiáveis; esse aviso aparece
+   também quando há dominância.
    O determinante também é calculado, mas só para informar: em ponto
    flutuante, um determinante teoricamente nulo raramente dá zero exato, e o
    tamanho de um determinante pequeno depende da escala da matriz. Quando o
-   número de condição passa do limite, o posto de `I − A`
-   (`numpy.linalg.matrix_rank`) diz o motivo. Com posto cheio, `I − A` é
-   invertível em teoria e a solução existe e é única, mas a matriz é tão mal
-   condicionada que o computador não a calcula com confiança. Com posto menor
-   que n, o programa diz quantas soluções o sistema tem, pelo teorema de
-   Rouché-Capelli: compara o posto de `I − A` com o da matriz ampliada
-   `[I − A | b]`. Se o da ampliada é maior, não há solução; se os dois são
-   iguais (e menores que n), há infinitas.
+   sistema é recusado, o posto diz o motivo: com posto menor que n, o
+   programa classifica o sistema pelo teorema de Rouché-Capelli, comparando o
+   posto de `I − A` com o da matriz ampliada `[I − A | b]`. Se o da ampliada é
+   maior, o sistema é impossível (não tem solução); se os dois são iguais (e
+   menores que n), é possível e indeterminado (tem infinitas soluções). Com
+   posto cheio (n de n), o sistema é possível e determinado: a solução existe
+   e é única, e a linha do posto, nas opções 13 a 15, diz isso.
 3. **Conferência da solução.** Ser invertível não basta: com dependências em
    ciclo que repassam frações altas demais, `I − A` pode ser invertível e a
    solução dar a algum equipamento um risco efetivo *menor* que o próprio,
@@ -718,9 +781,14 @@ vulnerabilidades e as suas dependências dentro dele.
     "custodiante": "Suporte de Informática",
     "lotacao": "Sala Técnica",
     "descricao": "Servidor",
+    "ficha": {"fabricante": "Dell", "modelo": "PowerEdge R740",
+              "patrimonio": "445566"},
     "vulnerabilidades": [
       {"id": 1, "descricao": "Vulnerabilidade V1", "origem": 6,
-       "cvss": 4.0, "situacao": 1}
+       "cvss": 4.0, "situacao": 1},
+      {"id": 2, "descricao": "BlueKeep na Área de Trabalho Remota",
+       "cve": "CVE-2019-0708", "cwe": "CWE-416", "origem": 2,
+       "cvss": 9.8, "situacao": 1}
     ],
     "dependencias": [{"equipamento_id": 3, "fracao": 0.5}]
   }
@@ -737,17 +805,26 @@ vulnerabilidades e as suas dependências dentro dele.
   campo é opcional: sem vetor, ele simplesmente não aparece (um `null` vale
   como sem vetor), e os arquivos antigos continuam valendo. Na carga, a nota
   tem de ser a que o vetor dá; se não for, o arquivo é recusado.
+- `"cve"` e `"cwe"` seguem a mesma regra: opcionais, só aparecem quando
+  existem, e o formato é conferido na carga (`CVE-2019-0708`, `CWE-416`).
+  Duas vulnerabilidades diferentes com a mesma CVE fazem o arquivo ser
+  recusado: seriam a mesma falha, cadastrada duas vezes.
+- `"ficha"` é a ficha técnica do equipamento, um objeto com até seis textos:
+  `fabricante`, `modelo`, `numero_serie`, `patrimonio`, `sistema` e `versao`.
+  Também é opcional, e só aparece se algum campo foi preenchido; um campo com
+  outro nome faz o arquivo ser recusado, porque sumiria na próxima gravação.
+  Dois equipamentos com o mesmo patrimônio também são recusados.
 - `dependencias` é a linha do equipamento na matriz A: pares (equipamento do
   qual se herda, fração). A matriz A, portanto, é persistida no mesmo JSON dos
   demais dados, como o enunciado pede. A matriz M não é gravada: é montada,
   na hora, a partir de `vulnerabilidades` de cada equipamento.
-- Uma mesma vulnerabilidade pode afetar vários equipamentos: ela aparece, com os
-  mesmos `id`, `descricao`, `origem`, `cvss` e `vetor`, no objeto de cada um deles (é
-  daí que vem a matriz M). Ao carregar, as cópias são reunidas num só objeto do
-  catálogo; se duas cópias do mesmo `id` forem diferentes, o arquivo é
-  recusado. A `situacao` do tratamento é de cada equipamento: o mesmo problema
-  pode estar corrigido num e aberto em outro. Uma vulnerabilidade que nenhum
-  equipamento tem não é gravada.
+- Uma mesma vulnerabilidade pode afetar vários equipamentos: ela aparece, com
+  os mesmos dados (`id`, `descricao`, `cve`, `cwe`, `origem`, `cvss` e
+  `vetor`), no objeto de cada um deles (é daí que vem a matriz M). Ao carregar,
+  as cópias são reunidas num só objeto do catálogo; se duas cópias do mesmo
+  `id` forem diferentes, o arquivo é recusado. A `situacao` do tratamento é de
+  cada equipamento: o mesmo problema pode estar corrigido num e aberto em
+  outro. Uma vulnerabilidade que nenhum equipamento tem não é gravada.
 - Como o arquivo é só a lista, ele não guarda contador de ids: enquanto o
   programa roda, um id excluído nunca é entregue de novo, mas depois de
   reiniciar o próximo id é o maior existente mais 1.
@@ -762,10 +839,11 @@ vulnerabilidades e as suas dependências dentro dele.
   sem avisar.
 - A gravação vai para um arquivo temporário que depois substitui o definitivo
   (`os.replace`): se ela for interrompida, a base anterior continua inteira.
-- A carga confere o arquivo inteiro: tipos, ids repetidos, hostname repetido,
-  dependência de equipamento que não existe, vulnerabilidade com dados
-  diferentes em dois equipamentos, nota que não confere com o vetor, o mesmo
-  nome duas vezes num objeto, NaN.
+- A carga confere o arquivo inteiro: tipos, ids repetidos, hostname ou
+  patrimônio repetido, CVE repetida, CVE ou CWE fora do formato, dependência
+  de equipamento que não existe, vulnerabilidade com dados diferentes em dois
+  equipamentos, nota que não confere com o vetor, o mesmo nome duas vezes num
+  objeto, NaN.
   Qualquer problema para o programa com uma mensagem que diz o que está
   errado e onde, em vez de carregar pela metade e apagar dados bons na
   próxima gravação. Descrição, responsável e lotação são mantidos como estão
@@ -790,15 +868,28 @@ para converter à mão:
   equipamento "genérico" (a classe não pode ser instanciada), e esquecer o
   fator numa subclasse nova é um erro na hora. A tabela `CLASSE_DO_TIPO` liga
   cada `TipoEquipamento` à sua classe; um tipo novo é uma subclasse e uma linha.
-- **Composição para as relações.** O equipamento *tem* um dicionário de
-  vulnerabilidades (id → situação) e um de dependências (id → fração); não
-  herda de nada além da base. Referenciar por id, e não por objeto, mantém o
-  JSON simples e evita referências circulares entre equipamentos que dependem
-  um do outro.
+- **Composição para as relações.** O equipamento *tem* uma ficha técnica (um
+  objeto `FichaTecnica`), um dicionário de vulnerabilidades (id → situação) e
+  um de dependências (id → fração); não herda de nada além da base.
+  Referenciar por id, e não por objeto, mantém o JSON simples e evita
+  referências circulares entre equipamentos que dependem um do outro. A ficha
+  é uma classe à parte porque os seis campos andam juntos (a mudança de tipo
+  leva a ficha inteira) e são todos opcionais.
 - **Quem sabe cuida.** A regra "soma das frações < 1" fica em `Equipamento`
-  porque só depende dele; "hostname único" e "o destino da dependência existe"
-  ficam em `Inventario`, que conhece os outros equipamentos; a conta de risco
-  fica em `ModeloRisco`, que não altera nenhum dado.
+  porque só depende dele, e o formato da CVE e do CWE, em `Vulnerabilidade`;
+  "hostname único", "patrimônio único", "CVE única no catálogo" e "o destino
+  da dependência existe" ficam em `Inventario`, que conhece os outros
+  equipamentos e vulnerabilidades; a conta de risco fica em `ModeloRisco`, que
+  não altera nenhum dado.
+- **Uma CVE, uma vulnerabilidade.** Uma CVE identifica uma falha só, então
+  aparece uma vez no catálogo, e os equipamentos afetados apontam para ela. Por
+  isso, no cadastro de uma vulnerabilidade nova, a CVE é a primeira pergunta:
+  se ela já existe, o programa oferece registrar a mesma, em vez de criar uma
+  cópia que dividiria o histórico em dois.
+- **Campos novos são opcionais.** CVE, CWE e ficha técnica só aparecem no
+  arquivo quando existem. Uma base antiga abre como sempre, e a base de
+  exemplo, regravada pelo programa, sai igual, letra por letra (um teste
+  confere).
 - **Tipo do equipamento é mudável**, mas um objeto não muda de classe:
   `Equipamento.converter_para()` cria outro objeto da subclasse certa, com o
   mesmo id e as mesmas relações, e o `Inventario` o coloca no lugar.
@@ -850,7 +941,10 @@ para converter à mão:
   pacote a mais é código de terceiros rodando dentro do container.
 - **Nada sensível no repositório.** A pasta `dados/`, com a base real, fica
   fora do Git (`.gitignore`) e da imagem (`.dockerignore`); a base de exemplo
-  é fictícia; não há senhas nem chaves no código.
+  é fictícia; não há senhas nem chaves no código. A base real merece ainda
+  mais cuidado com a ficha técnica e as CVEs: fabricante, modelo e versão de
+  cada equipamento, junto com as falhas abertas, mostram a um atacante o que
+  explorar e onde.
 - **Sem login, por enquanto.** O programa não tem autenticação nem perfis de
   acesso: quem consegue dar `docker attach` (ou seja, quem acessa o servidor)
   pode alterar tudo. Autenticação e autorização ficam para o backend web do
@@ -889,8 +983,22 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
   equipamentos entre si, não são uma nota de 0 a 10.
 - **Os fatores de exposição e as frações de dependência são estimativas** de
   quem usa o programa: o modelo não as deduz da rede real.
-- **Limite do número de condição.** O valor 10¹² é uma escolha prática (deixa
-  uns 4 dígitos confiáveis em ponto flutuante de 64 bits), não um teorema.
+- **A nota CVSS mede a gravidade, e não a chance de ataque**: ela não diz se
+  alguém vai explorar a falha. O modelo também é linear de propósito: as notas
+  de um equipamento se somam, e o risco herdado é proporcional à fração da
+  dependência. Serve para decidir o que corrigir primeiro, e não substitui uma
+  análise de riscos completa, como a da
+  [ISO/IEC 27005](https://www.iso.org/standard/80585.html).
+- **Limites do número de condição.** O aviso acima de 10⁸ é uma convenção
+  (garante uns 8 dos 16 dígitos do `float64`), e não um teorema. A
+  recusa acima de 1/ε é o ponto em que o computador já não distingue a matriz
+  de uma singular. O posto, com a tolerância do NumPy, é mais rigoroso: com
+  muitos equipamentos, ele pode recusar uma matriz invertível em teoria, mas
+  tão mal condicionada que a solução quase não teria dígito confiável.
+- **A CVE é digitada, e não buscada.** O programa confere o formato da CVE e
+  do CWE, mas não consulta nenhuma base pública (como a NVD) para trazer a
+  descrição e a nota, nem descobre sozinho quais CVEs afetam o fabricante, o
+  modelo e a versão da ficha técnica: quem cadastra informa.
 - **O hostname é um nome simples, sem domínio** (sem pontos): de 1 a 63
   caracteres, só letras sem acento, números e hífen, sem hífen nas pontas,
   pelas RFC 952, 1123 e 1035, como no Trabalho 1. Duas escolhas do projeto: um
@@ -904,14 +1012,19 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 python testes.py
 ```
 
-São 60 testes, só com a biblioteca padrão: o programa inteiro rodando por
+São 71 testes, só com a biblioteca padrão: o programa inteiro rodando por
 dentro com o teclado simulado (do cadastro ao risco, incluindo o cenário de 3
-equipamentos), a nota CVSS pelo vetor e pelas perguntas do `calcular`, a recusa
-de bases inválidas (inclusive JSON fora da norma) e do sistema singular (com o
-posto e o teorema de Rouché-Capelli), a conversão da base do Trabalho 1, o
-comportamento no container (inclusive `sair` e Ctrl+D) e o modelo de risco
-sobre os arquivos de exemplo. O último teste roda o autoteste de cada módulo.
-Nada toca em `dados/inventario.json`: os testes usam pastas temporárias.
+equipamentos), a nota CVSS pelo vetor e pelas perguntas do `calcular`, a CVE e
+o CWE (formato, CVE única no catálogo, busca, atualização), a ficha técnica
+(cadastro, patrimônio único, busca, atualização), a recusa de bases inválidas
+(inclusive JSON fora da norma) e do sistema singular (com o posto e o teorema
+de Rouché-Capelli), os dois limites do número de condição e o posto que
+completa a regra, a conversão da base do Trabalho 1, o comportamento no
+container (inclusive `sair` e Ctrl+D) e o modelo de risco sobre os arquivos de
+exemplo. O último teste roda o autoteste de cada módulo, com a saída em cp1252,
+a codificação que o Windows usa quando a saída vai para um arquivo ou para
+outro programa. Nada toca em `dados/inventario.json`: os testes usam pastas
+temporárias.
 
 Os mesmos testes rodam no pytest, que entende os testes escritos com o
 unittest:
@@ -922,7 +1035,7 @@ python -m pytest testes.py
 ```
 
 Cobertura, com o coverage.py (configurado em `.coveragerc`): os testes passam
-por 85% das linhas do programa, sem contar os autotestes dos módulos, que rodam
+por 87% das linhas do programa, sem contar os autotestes dos módulos, que rodam
 em outro processo.
 
 ```
@@ -946,14 +1059,16 @@ regra só reconhece verbos em inglês. O Ruff substitui o flake8 e o pydocstyle
 usados antes: o pydocstyle foi descontinuado em 2023, e o próprio projeto
 indica o Ruff no lugar.
 
-O pylint, outra ferramenta de análise estática, dá nota 9,77 de 10
+O pylint, outra ferramenta de análise estática, dá nota 9,78 de 10
 (`pip install pylint` e `pylint *.py`). Os avisos que restam foram mantidos de
 propósito:
 
 - os nomes `M` e `A`, iguais aos do enunciado;
 - limites de tamanho, como funções com mais de cinco parâmetros
   (`registrar_vulnerabilidade` recebe um parâmetro por dado da
-  vulnerabilidade) e classes com mais de 20 métodos públicos;
+  vulnerabilidade), classes com mais de 20 métodos públicos e os dois
+  arquivos com mais de 1.000 linhas (`main.py`, com uma ação por opção do
+  menu, e `testes.py`, com um teste por comportamento);
 - o `except Exception` do laço do menu, que impede um erro inesperado de
   derrubar o programa, e o `global` que desliga as cores;
 - o import circular entre `armazenamento.py` e `migracao.py`, que é só
@@ -975,6 +1090,8 @@ estavam no código ganharam um teste, para não voltarem:
 | --- | --- | --- |
 | A conferência da solução com `numpy.allclose` usava a tolerância padrão e recusava a solução certa de um sistema quase crítico (número de condição 4,5e8), com "Erro inesperado" na tela | A tolerância acompanha o tamanho de *x*, e uma solução que não confere vira aviso, sem erro | `test_sistema_quase_critico_mas_valido_e_resolvido` e `test_solucao_que_nao_confere_e_avisada_no_menu` |
 | Com posto cheio e número de condição acima do limite, a mensagem dizia que `I − A` não era invertível, contra o teorema da matriz invertível | A mensagem separa o caso: posto cheio é invertível em teoria, só mal condicionado | `test_posto_cheio_mal_condicionado_nao_contradiz_o_teorema` |
+| Uma matriz singular cujo número de condição o arredondamento deixava logo abaixo de 1/ε passava pela verificação, e o `solve` terminava a opção com "Erro inesperado" (achado num teste com 6.000 matrizes singulares) | O posto completa a regra do número de condição, e um pivô zero no `solve` vira recusa, com explicação | `test_posto_menor_que_n_recusa_abaixo_de_1_sobre_eps` e `test_pivo_zero_no_solve_e_recusado` |
+| No Windows, o autoteste do `risco.py` terminava com `UnicodeEncodeError` quando a saída ia para outro programa, como no `python testes.py`: a mensagem do limite do número de condição tinha a letra grega ε, que não existe na codificação cp1252 | As mensagens escrevem "épsilon" por extenso, e os autotestes rodam com a saída em cp1252 em qualquer sistema, para o defeito aparecer também no Linux do GitHub | `test_autotestes_dos_modulos` |
 | Na opção 8, digitar a nota que a vulnerabilidade já tinha apagava o vetor CVSS dela | A mesma nota (e a mesma categoria) não conta como mudança, e o vetor continua | `test_atualizar_com_os_mesmos_valores_nao_muda_nada` |
 | No fim do `calcular`, o Enter em "Usar esta nota?" descartava as 11 respostas | O Enter aceita a nota | `test_calcular_a_nota_respondendo_as_perguntas` |
 | `limpar` numa pergunta do `calcular` apagava a pergunta da tela | A pergunta é desenhada de novo | `test_letra_anterior_e_cancelar_nas_perguntas` |
@@ -992,7 +1109,7 @@ histórico mesmo quando não há conflito:
 
 | Prefixo | Uso | Exemplo neste repositório |
 | --- | --- | --- |
-| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli` |
+| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica` |
 | `fix/` | Correção de defeito | `fix/normas-oficiais` |
 | `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
