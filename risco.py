@@ -42,9 +42,19 @@ pode somar, então nenhum risco efetivo pode ficar menor que o próprio
 (x >= b). Se ficar (dependências em ciclo com frações altas demais), a
 solução não tem sentido: o usuário é avisado e nada é mostrado.
 
+O número de condição tem dois limites: acima de 1/ε (cerca de 4,5e15)
+o sistema é recusado, e acima de 1e8 a solução sai com o aviso de que
+pode ter poucos dígitos confiáveis. O posto completa a regra: com posto
+menor que n, o sistema também é recusado, mesmo com o número de
+condição abaixo de 1/ε (com muitos equipamentos, o arredondamento pode
+deixar o número de condição de uma matriz singular logo abaixo do
+limite).
+
 O módulo não lê do teclado nem grava em disco.
 """
 
+import math
+import sys
 from collections import namedtuple
 
 import numpy as np
@@ -56,13 +66,21 @@ import formatacao
 # b = M v, a definição literal do enunciado.
 USAR_FATOR_DE_EXPOSICAO = True
 
-# Acima deste número de condição, o sistema é tratado como singular. O
-# número de condição mede quanto um erro pequeno nos dados vira erro
-# grande na solução; em ponto flutuante de 64 bits (cerca de 16
-# dígitos), 1e12 deixa uns 4 dígitos confiáveis. Um determinante
-# "quase zero" não serve para decidir: seu tamanho depende da escala
-# da matriz.
-LIMITE_CONDICAO = 1e12
+# O número de condição de I - A mede quanto um erro relativo nos dados
+# pode crescer na solução: 10 elevado a k custa cerca de k dos 16
+# dígitos do float64. Acima de 1/ε, a matriz é singular ou quase
+# singular para o computador e o sistema é recusado. ε é o épsilon da
+# máquina, cerca de 2,2e-16 (sys.float_info.epsilon, o mesmo número que
+# numpy.finfo(float).eps). Acima de 1e8, a solução é calculada, mas com
+# aviso: o 1e8 é uma convenção, que garante uns 8 dos 16 dígitos. Um
+# determinante "quase zero" não serve para decidir: o tamanho dele
+# depende da escala da matriz. O posto (numpy.linalg.matrix_rank)
+# completa a regra: ele conta como zero os valores singulares menores
+# que n x ε vezes o maior, porque o erro de arredondamento das contas
+# cresce com o tamanho da matriz. Assim ele pega a matriz singular cujo
+# número de condição o arredondamento deixou logo abaixo de 1/ε.
+LIMITE_CONDICAO = 1 / sys.float_info.epsilon
+LIMITE_AVISO_CONDICAO = 1e8
 
 # Só para a mensagem: abaixo disto, o determinante calculado é "zero"
 # (um determinante que daria zero exato em papel quase nunca dá zero
@@ -89,16 +107,17 @@ RiscoEquipamento = namedtuple(
     "RiscoEquipamento", "equipamento soma_cvss fator proprio efetivo")
 
 # O que a verificação de I - A concluiu. invertivel: I - A é tratada
-# como invertível (dominância, ou número de condição abaixo do limite),
-# e o computador calcula a solução com confiança; com posto cheio e
-# condição alta, ela tem inversa em teoria, mas o campo fica False.
+# como invertível (dominância, ou número de condição até 1/ε com posto
+# cheio), e o computador calcula a solução; senão, o campo fica False.
 # utilizavel: além disso, a solução tem sentido de risco (x >= b).
 # ordem e posto: o n de I - A (n x n) e o seu posto; o posto é n
 # exatamente quando I - A tem inversa (teorema da matriz invertível).
+# aviso: texto para mostrar quando o número de condição passa de 1e8
+# (a solução sai, mas pode ter poucos dígitos confiáveis); senão, "".
 Diagnostico = namedtuple(
     "Diagnostico",
     "invertivel utilizavel dominante maior_soma determinante condicao "
-    "motivo ordem posto", defaults=(0, 0))
+    "motivo ordem posto aviso", defaults=(0, 0, ""))
 
 
 class SistemaSingularError(Exception):
@@ -179,18 +198,20 @@ class ModeloRisco:
              I - A é estritamente diagonal dominante, o que garante que
              é invertível e que nenhum risco efetivo fica menor que o
              próprio.
-          2. Sem essa garantia, o número de condição (np.linalg.cond,
-             limite LIMITE_CONDICAO) decide se I - A é tratada como
-             invertível. Se não for, o posto diz o motivo: com posto
-             cheio, a matriz é só mal condicionada; com posto menor, o
-             teorema de Rouché-Capelli diz se não há solução ou se há
-             infinitas (_quantas_solucoes).
+          2. Sem essa garantia, o número de condição (np.linalg.cond)
+             decide: acima de 1/ε (LIMITE_CONDICAO), I - A é singular ou
+             quase singular. O posto completa a regra: com posto menor
+             que n, I - A também é tratada como singular, e o teorema
+             de Rouché-Capelli diz se não há solução ou se há infinitas
+             (_quantas_solucoes).
           3. Se for tratada como invertível, a solução é conferida:
-             risco herdado só
-             soma, então o efetivo não pode ficar menor que o próprio
-             (x >= b). Se ficar, a solução não tem sentido.
-        O determinante e o posto de I - A são calculados para informar:
-        não decidem.
+             risco herdado só soma, então o efetivo não pode ficar
+             menor que o próprio (x >= b). Se ficar, a solução não tem
+             sentido.
+        Nos casos 1 e 3, um número de condição acima de 1e8
+        (LIMITE_AVISO_CONDICAO) vira o aviso de que a solução pode ter
+        poucos dígitos confiáveis. O determinante e o posto de I - A
+        são calculados para informar: não decidem.
         """
         n = len(self.b)
         if n == 0:
@@ -205,6 +226,7 @@ class ModeloRisco:
         determinante = float(np.linalg.det(i_menos_a))
         condicao = float(np.linalg.cond(i_menos_a))
         posto = int(np.linalg.matrix_rank(i_menos_a))
+        aviso = self._aviso_de_condicao(condicao)
 
         maior_br = formatacao.fracao_br(maior)
         if dominante:
@@ -212,45 +234,28 @@ class ModeloRisco:
                       f"soma de linha de A é {maior_br}, menor que 1. "
                       f"Invertível.")
             return Diagnostico(True, True, True, maior, determinante,
-                               condicao, motivo, n, posto)
+                               condicao, motivo, n, posto, aviso)
 
-        condicao_br = formatacao.numero_compacto(condicao)
-        limite_br = formatacao.numero_compacto(LIMITE_CONDICAO)
-        invertivel = bool(np.isfinite(condicao) and condicao < LIMITE_CONDICAO)
-        if not invertivel:
-            if posto == n:
-                # Posto cheio: invertível em teoria (teorema da matriz
-                # invertível), mas mal condicionada demais para confiar.
-                motivo = (f"I - A tem posto cheio ({n} de {n}), então é "
-                          f"invertível em teoria e a solução existe e é "
-                          f"única, mas é mal condicionada: o número de "
-                          f"condição é {condicao_br} (limite {limite_br}) e "
-                          f"a maior soma de linha de A é {maior_br}. No "
-                          f"computador, a solução perderia quase todos os "
-                          f"dígitos e não seria confiável.")
-            else:
-                motivo = (f"I - A não é invertível: a maior soma de linha "
-                          f"de A é {maior_br} (precisa ser menor que 1) e o "
-                          f"número de condição é {condicao_br} (limite "
-                          f"{limite_br}).")
-                motivo += self._sobre_o_determinante(determinante)
-                motivo += self._quantas_solucoes(i_menos_a, posto)
-            motivo += (" Reduza as frações de dependência de algum "
-                       "equipamento até a soma ficar abaixo de 1.")
+        x = self._resolver_sem_garantia(i_menos_a, condicao, posto)
+        if x is None:
+            motivo = self._motivo_nao_invertivel(i_menos_a, maior,
+                                                 determinante, condicao,
+                                                 posto)
             return Diagnostico(False, False, False, maior, determinante,
                                condicao, motivo, n, posto)
 
         # Invertível, sem a garantia da dominância: confere a solução.
-        x = np.linalg.solve(i_menos_a, self.b)
+        condicao_br = formatacao.numero_compacto(condicao)
+        limite_br = formatacao.numero_compacto(LIMITE_CONDICAO)
         if np.all(x >= self.b - FOLGA_SOLUCAO):
             motivo = (f"A maior soma de linha de A é {maior_br} (não é "
                       f"menor que 1), mas o número de condição "
-                      f"({condicao_br}) está abaixo do limite "
-                      f"({limite_br}): I - A é invertível. A "
-                      f"solução foi conferida: nenhum risco efetivo ficou "
-                      f"menor que o próprio.")
+                      f"({condicao_br}) não passa do limite 1/épsilon "
+                      f"({limite_br}) e o posto é cheio: I - A é tratada "
+                      f"como invertível. A solução foi conferida: nenhum "
+                      f"risco efetivo ficou menor que o próprio.")
             return Diagnostico(True, True, False, maior, determinante,
-                               condicao, motivo, n, posto)
+                               condicao, motivo, n, posto, aviso)
 
         motivo = (f"I - A é invertível (número de condição {condicao_br}), "
                   f"mas a solução daria a algum equipamento um risco "
@@ -260,7 +265,86 @@ class ModeloRisco:
                   f"reduza-as até a soma de cada linha de A ficar abaixo "
                   f"de 1.")
         return Diagnostico(True, False, False, maior, determinante,
-                           condicao, motivo, n, posto)
+                           condicao, motivo, n, posto, aviso)
+
+    def _resolver_sem_garantia(self, i_menos_a, condicao, posto):
+        """Resolve (I - A) x = b sem a dominância; None se singular.
+
+        I - A é tratada como invertível com o número de condição até
+        1/ε e o posto cheio (o posto completa a regra: veja
+        LIMITE_CONDICAO). Se, mesmo assim, a eliminação de Gauss
+        encontrar um pivô zero, a matriz é singular para o computador.
+        """
+        if not (np.isfinite(condicao) and condicao <= LIMITE_CONDICAO
+                and posto == len(self.b)):
+            return None
+        try:
+            return np.linalg.solve(i_menos_a, self.b)
+        except np.linalg.LinAlgError:
+            return None
+
+    def _motivo_nao_invertivel(self, i_menos_a, maior, determinante,
+                               condicao, posto):
+        """Explica por que I - A não foi tratada como invertível."""
+        n = len(self.b)
+        maior_br = formatacao.fracao_br(maior)
+        condicao_br = formatacao.numero_compacto(condicao)
+        limite_br = formatacao.numero_compacto(LIMITE_CONDICAO)
+        # "not <=", e não ">": um número de condição indefinido (NaN)
+        # também conta como acima do limite.
+        acima = not condicao <= LIMITE_CONDICAO
+        if posto < n:
+            motivo = (f"I - A não é invertível: a maior soma de linha de "
+                      f"A é {maior_br} (precisa ser menor que 1) e ")
+            if acima:
+                motivo += (f"o número de condição é {condicao_br}, acima "
+                           f"do limite 1/épsilon = {limite_br}.")
+            else:
+                motivo += (f"o posto de I - A é menor que {n}. O número de "
+                           f"condição ({condicao_br}) não chega ao limite "
+                           f"1/épsilon = {limite_br}, mas, com muitos "
+                           f"equipamentos, o posto é o teste mais "
+                           f"rigoroso: o NumPy conta como zero o que fica "
+                           f"abaixo de uma tolerância que cresce com o "
+                           f"tamanho da matriz, como o erro de "
+                           f"arredondamento.")
+            motivo += self._sobre_o_determinante(determinante)
+            motivo += self._quantas_solucoes(i_menos_a, posto)
+        elif acima:
+            # Posto cheio: invertível em teoria (teorema da matriz
+            # invertível), mas mal condicionada demais para confiar. Na
+            # prática não acontece: com o número de condição acima de
+            # 1/ε, o posto já sai menor que n (matrix_rank usa uma
+            # tolerância n vezes maior).
+            motivo = (f"I - A tem posto cheio ({n} de {n}), então é "
+                      f"invertível em teoria e a solução existe e é única, "
+                      f"mas o número de condição é {condicao_br}, acima do "
+                      f"limite 1/épsilon = {limite_br}, e a maior soma de "
+                      f"linha de A é {maior_br}. No computador, a solução "
+                      f"não teria nenhum dígito confiável.")
+        else:
+            motivo = (f"I - A tem posto cheio ({n} de {n}) e número de "
+                      f"condição {condicao_br}, mas a eliminação de Gauss "
+                      f"encontrou um pivô zero: para o computador, a "
+                      f"matriz é singular.")
+        return motivo + (" Reduza as frações de dependência de algum "
+                         "equipamento até a soma ficar abaixo de 1.")
+
+    @staticmethod
+    def _aviso_de_condicao(condicao):
+        """Avisa quando o número de condição passa de 1e8.
+
+        Com 10 elevado a k, a solução perde cerca de k dos 16 dígitos
+        do float64. Acima de 1/ε não há aviso: o sistema é recusado.
+        """
+        if not LIMITE_AVISO_CONDICAO < condicao <= LIMITE_CONDICAO:
+            return ""
+        perdidos = int(math.log10(condicao))
+        return (f"Atenção: o número de condição de I - A é "
+                f"{formatacao.numero_compacto(condicao)}, acima de "
+                f"{formatacao.numero_compacto(LIMITE_AVISO_CONDICAO)}: a "
+                f"solução pode ter poucos dígitos confiáveis (perde cerca "
+                f"de {perdidos} dos 16 dígitos do float64).")
 
     @staticmethod
     def _sobre_o_determinante(determinante):
@@ -294,9 +378,10 @@ class ModeloRisco:
         ampliada = int(np.linalg.matrix_rank(
             np.column_stack([i_menos_a, self.b / escala])))
         if ampliada > posto:
-            conclusao = "não tem solução"
+            conclusao = "não tem solução (é um sistema impossível)"
         else:
-            conclusao = "tem infinitas soluções"
+            conclusao = ("tem infinitas soluções (é um sistema possível "
+                         "e indeterminado)")
         return (f" Pelo teorema de Rouché-Capelli, o sistema {conclusao}: "
                 f"o posto de I - A é {posto} (de {n}) e o da matriz "
                 f"ampliada [I - A | b] é {ampliada}.")
@@ -573,18 +658,22 @@ if __name__ == "__main__":
     d_b = ModeloRisco(singular).diagnosticar()
     assert d_b.posto == 2 and "não tem solução" in d_b.motivo, d_b.motivo
     print(f"Com b = (5, 0, 0): {d_b.motivo}")
-    # Quase singular: no computador o posto é cheio, mas o número de
-    # condição passa do limite. Em teoria a solução é única; na
-    # prática, não se confia nela.
+    # Cada equipamento herda 0,5 + 0,5 = 1 dos outros dois: o número de
+    # condição passa longe do limite 1/ε.
+    assert diag.condicao > LIMITE_CONDICAO
+    # Quase singular, mas abaixo de 1/ε: P1 e P2 herdam 1 - 1e-13 um do
+    # outro. O número de condição (cerca de 2e13) passa de 1e8, mas não
+    # de 1/ε: a solução sai, com o aviso de que pode ter poucos dígitos
+    # confiáveis.
     par = Inventario()
     p1, p2 = [par.cadastrar_equipamento(
         TipoEquipamento.OUTRO, f"P{k}", "A", "B", "C") for k in range(2)]
     p1.dependencias[p2.id] = 1 - 1e-13
     p2.dependencias[p1.id] = 1 - 1e-13
     d_par = ModeloRisco(par).diagnosticar()
-    assert not d_par.invertivel and d_par.posto == 2, d_par
-    assert "mal condicionada" in d_par.motivo, d_par.motivo
-    assert "não é invertível" not in d_par.motivo   # posto cheio
+    assert d_par.invertivel and d_par.utilizavel and d_par.posto == 2
+    assert "poucos dígitos confiáveis" in d_par.aviso, d_par.aviso
+    assert "perde cerca de 13" in d_par.aviso, d_par.aviso
     # Soma de linha maior que 1 não é, sozinha, sinal de singularidade:
     # E1 herda 0,9 de E2 e 0,9 de E3 (soma 1,8), e os outros não herdam
     # nada. I - A é triangular com 1 na diagonal: det = 1, invertível.

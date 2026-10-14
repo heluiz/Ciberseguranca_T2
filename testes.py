@@ -21,6 +21,8 @@ import tempfile
 import unittest
 from unittest import mock
 
+from numpy.linalg import LinAlgError
+
 import cores
 import main
 from armazenamento import ArquivoInventario, BaseInvalidaError
@@ -94,16 +96,17 @@ class TesteDoPrograma(unittest.TestCase):
     # --- cenário do enunciado, pelo menu ------------------------------
 
     CENARIO = [
-        # E1 estação com V1 (4,0)
+        # E1 estação com V1 (4,0). Depois do tipo, "n" pula a ficha
+        # técnica; na vulnerabilidade nova, "" pula a CVE e o CWE.
         "1", "ESTACAO-01", "Fulano de Tal", "Cartório", "Estação", "1",
-        "s", "Vulnerabilidade V1", "6", "4", "1", "n",
+        "n", "s", "", "Vulnerabilidade V1", "6", "", "4", "1", "n",
         # E2 servidor: V1 (já existente) e V2 (6,0)
         "1", "SERVIDOR-01", "Fulano de Tal", "Sala técnica", "Servidor",
-        "2", "s", "1", "1", "1", "s", "Vulnerabilidade V2", "6", "6", "1",
-        "n",
+        "2", "n", "s", "1", "1", "1", "s", "", "Vulnerabilidade V2", "6",
+        "", "6", "1", "n",
         # E3 banco com V2 (já existente)
         "1", "BANCO-01", "Fulano de Tal", "Sala técnica", "Banco", "6",
-        "s", "1", "2", "1", "n",
+        "n", "s", "1", "2", "1", "n",
         # dependências: 1 herda 0,5 de 2; 2 herda 0,5 de 3;
         # 3 herda 0,25 de 2
         "11", "1", "2", "0,5",
@@ -158,7 +161,7 @@ class TesteDoPrograma(unittest.TestCase):
     def test_corrigir_vulnerabilidade_baixa_o_risco(self):
         """Marcar V2 como Corrigida no servidor tira V2 de M."""
         saida = self.rodar(self.CENARIO + [
-            "8", "2", "2", "", "", "", "3", "13", "0"])
+            "8", "2", "2", "", "", "", "", "", "3", "13", "0"])
         # b2 = 1,5 x 4 = 6; x2 = 12 / 0,875 = 13,71
         self.assertRegex(saida, r"SERVIDOR-01\s+Servidor\s+4,0\s+1,5\s+"
                                 r"6,00\s+13,71")
@@ -248,8 +251,8 @@ class TesteDoPrograma(unittest.TestCase):
     def test_excluir_a_ultima_ocorrencia_tira_do_catalogo(self):
         """Sem equipamento nenhum, a vulnerabilidade sai do catálogo."""
         saida = self.rodar([
-            "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1",
-            "s", "Vuln única", "1", "5", "1", "n",
+            "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1", "n",
+            "s", "", "Vuln única", "1", "", "5", "1", "n",
             "9", "1", "1", "s", "0"])
         self.assertIn("Nenhum outro equipamento a tinha", saida)
         self.assertEqual(self.lido()[0]["vulnerabilidades"], [])
@@ -259,7 +262,7 @@ class TesteDoPrograma(unittest.TestCase):
         self.rodar(self.CENARIO + [
             "5", "3", "s",
             "1", "NOVO-01", "Fulano de Tal", "Setor", "Estação", "1", "n",
-            "0"])
+            "n", "0"])
         self.assertEqual([e["id"] for e in self.lido()], [1, 2, 4])
 
     # --- validações do cadastro ---------------------------------------
@@ -268,9 +271,9 @@ class TesteDoPrograma(unittest.TestCase):
         """O menu insiste até vir um hostname válido e único."""
         saida = self.rodar([
             "1", "PC 01", "-pc", "12345", "PC-01", "Fulano de Tal",
-            "Setor", "Descrição", "1", "n",
+            "Setor", "Descrição", "1", "n", "n",
             "1", "pc-01", "PC-02", "Fulano de Tal", "Setor", "Descrição",
-            "1", "n", "0"])
+            "1", "n", "n", "0"])
         self.assertIn("caractere(s) não permitido(s)", saida)
         self.assertIn("não pode começar nem terminar com hífen", saida)
         self.assertIn("não pode ser composto só de números", saida)
@@ -281,9 +284,9 @@ class TesteDoPrograma(unittest.TestCase):
     def test_nota_cvss_invalida_pergunta_de_novo(self):
         """Fora da faixa, 2 casas, NaN e texto não passam; 7,5 passa."""
         saida = self.rodar([
-            "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1",
-            "s", "Falha qualquer", "6", "0", "11", "8,25", "nan", "abc",
-            "7,5", "1", "n", "0"])
+            "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1", "n",
+            "s", "", "Falha qualquer", "6", "", "0", "11", "8,25", "nan",
+            "abc", "7,5", "1", "n", "0"])
         self.assertIn("A nota CVSS deve ficar entre 0,1 e 10,0", saida)
         self.assertIn("A nota CVSS tem uma casa decimal só", saida)
         self.assertIn("severidade Alta, nota 7,5", saida)
@@ -293,7 +296,7 @@ class TesteDoPrograma(unittest.TestCase):
 
     # Um equipamento cadastrado, até a pergunta da nota CVSS.
     ATE_A_NOTA = ["1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1",
-                  "s", "Falha qualquer", "6"]
+                  "n", "s", "", "Falha qualquer", "6", ""]
     # Respostas da calculadora: Enter (versão 4.0) e as 11 perguntas,
     # que dão o vetor de uma falha explorável pela rede, sem login.
     PERGUNTAS_40 = ["", "1", "1", "1", "1", "1", "1", "1", "1",
@@ -388,9 +391,9 @@ class TesteDoPrograma(unittest.TestCase):
         """Opção 8: o vetor novo muda a nota; a nota digitada o tira."""
         saida = self.rodar(self.ATE_A_NOTA + [
             self.VETOR_31, "1", "n",
-            "8", "1", "1", "", "", "calcular"] + self.PERGUNTAS_40 + [
-            "s", "",
-            "8", "1", "1", "", "", "6,5", ""] + ["0"])
+            "8", "1", "1", "", "", "", "", "calcular"] + self.PERGUNTAS_40
+            + ["s", "",
+               "8", "1", "1", "", "", "", "", "6,5", ""] + ["0"])
         self.assertIn("Vetor CVSS .... " + self.VETOR_31, saida)
         self.assertIn("Vetor CVSS .... " + self.VETOR_40, saida)
         self.assertIn("o vetor antigo foi retirado", saida)
@@ -404,7 +407,7 @@ class TesteDoPrograma(unittest.TestCase):
         """Mesma descrição, categoria e nota: nada muda."""
         saida = self.rodar(self.ATE_A_NOTA + [
             self.VETOR_31, "1", "n",
-            "8", "1", "1", "falha qualquer", "6", "8,8", "", "0"])
+            "8", "1", "1", "falha qualquer", "", "", "6", "8,8", "", "0"])
         self.assertIn("Nada foi alterado.", saida)
         self.assertEqual(self.lido()[0]["vulnerabilidades"][0]["vetor"],
                          self.VETOR_31)
@@ -412,7 +415,7 @@ class TesteDoPrograma(unittest.TestCase):
     def test_mudar_o_tipo_troca_a_classe_e_mantem_as_relacoes(self):
         """Servidor que vira banco muda o fator, mas não os dados."""
         saida = self.rodar(self.CENARIO + [
-            "4", "2", "", "", "", "", "6", "13", "0"])
+            "4", "2", "", "", "", "", "6", "n", "13", "0"])
         self.assertIn("Equipamento atualizado (1 campo(s))", saida)
         self.assertEqual(self.lido()[1]["tipo"], 6)
         # fator 2,0: b2 = 2 x 10 = 20
@@ -675,6 +678,138 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("precisa ficar abaixo de 1", saida)
         self.assertIn("Dependência registrada", saida)
 
+    # --- número de condição alto --------------------------------------
+
+    def test_aviso_de_condicao_alta_no_menu(self):
+        """Condição acima de 1e8: o risco sai, com o aviso."""
+        inventario = Inventario()
+        ids = [inventario.cadastrar_equipamento(
+            TipoEquipamento.OUTRO, f"Q-0{k}", "A", "B", "C").id
+            for k in (1, 2, 3)]
+        inventario.registrar_vulnerabilidade(
+            ids[0], "x", OrigemVulnerabilidade.OUTRA, 5.0,
+            SituacaoTratamento.ABERTA)
+        for (i, j), fracao in {(0, 1): 0.5, (0, 2): 0.5001,
+                               (1, 0): 0.9999, (2, 0): 0.9999}.items():
+            inventario.buscar_por_id(ids[i]).dependencias[ids[j]] = fracao
+        ArquivoInventario(self.caminho).salvar(inventario)
+        saida = self.rodar(["13", "0"])
+        self.assertIn("a solução pode ter poucos dígitos confiáveis", saida)
+        self.assertIn("EFETIVO", saida)
+
+    # --- CVE, CWE e ficha técnica ------------------------------------
+
+    def test_cve_e_cwe_no_cadastro_e_na_busca(self):
+        """A CVE já cadastrada é reaproveitada; a busca acha os dois."""
+        saida = self.rodar([
+            "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1", "n",
+            "s", "cve-2019-0708", "BlueKeep no servidor", "2", "416",
+            "9,8", "1", "n",
+            # No servidor, "nova" com a mesma CVE: vira a já cadastrada.
+            "1", "SRV-01", "Fulano de Tal", "Setor", "Servidor", "2", "n",
+            "s", "2", "CVE-2019-0708", "", "1", "n",
+            "3", "7", "2019-0708",
+            "3", "7", "bluekeep", "CWE-798",
+            "0"])
+        self.assertIn("A CVE-2019-0708 já está no catálogo: [1]", saida)
+        self.assertIn("CVE-2019-0708 em 2 equipamento(s)", saida)
+        busca = saida[saida.index("CVE-2019-0708 em 2"):]
+        self.assertIn("PC-01 · Aberta · Falta de atualização · "
+                      "CVE-2019-0708 · CWE-416", busca)
+        self.assertIn("SRV-01 · Aberta", busca)
+        self.assertIn("! Digite uma CVE, como CVE-2019-0708, ou um CWE, "
+                      "como CWE-416.", saida)
+        self.assertIn("Nenhum equipamento tem a CWE-798.", saida)
+        dados = self.lido()
+        vuln = dados[0]["vulnerabilidades"][0]
+        self.assertEqual((vuln["cve"], vuln["cwe"], vuln["cvss"]),
+                         ("CVE-2019-0708", "CWE-416", 9.8))
+        self.assertEqual(dados[1]["vulnerabilidades"],
+                         [dict(vuln, situacao=1)])
+        recarregado = ArquivoInventario(self.caminho).carregar()
+        self.assertEqual(len(recarregado.vulnerabilidades()), 1)
+
+    def test_cve_invalida_repetida_e_recusada(self):
+        """Formato errado e CVE que o equipamento já tem: de novo."""
+        saida = self.rodar([
+            "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1", "n",
+            "s", "CVE-2014-0160", "Heartbleed", "2", "", "7,5", "1", "n",
+            "6", "1", "CVE-21-1", "CVE-2014-0160", "",
+            "Outra falha", "1", "", "5", "1",
+            # No servidor: recusa a já cadastrada e cadastra outra.
+            "1", "SRV-01", "Fulano de Tal", "Setor", "Servidor", "2", "n",
+            "s", "2", "CVE-2014-0160", "n", "",
+            "Falha do servidor", "1", "", "6", "1", "n",
+            "0"])
+        self.assertIn("! A CVE tem o formato CVE-ano-número, como "
+                      "CVE-2019-0708.", saida)
+        self.assertIn("PC-01 já tem a CVE-2014-0160 (vulnerabilidade 1).",
+                      saida)
+        dados = self.lido()
+        self.assertEqual([v.get("cve") for v in dados[0]["vulnerabilidades"]],
+                         ["CVE-2014-0160", None])
+        self.assertEqual([v["id"] for v in dados[1]["vulnerabilidades"]],
+                         [3])
+        self.assertNotIn("cve", dados[1]["vulnerabilidades"][0])
+
+    def test_atualizar_cve_e_apagar_cwe(self):
+        """Opção 8: CVE de outra recusada, nova aceita, "-" apaga."""
+        saida = self.rodar([
+            "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1", "n",
+            "s", "CVE-2019-0708", "BlueKeep", "2", "", "9,8", "1",
+            "s", "2", "CVE-2014-0160", "Heartbleed", "2", "CWE-125", "7,5",
+            "1", "n",
+            "8", "1", "2", "", "CVE-2019-0708", "CVE-2024-3094", "-",
+            "", "", "", "0"])
+        self.assertIn("CVE ........... CVE-2014-0160", saida)
+        self.assertIn("CWE ........... CWE-125", saida)
+        self.assertIn("! A CVE-2019-0708 já está na vulnerabilidade 1.",
+                      saida)
+        self.assertIn("Vulnerabilidade atualizada (2 campo(s)).", saida)
+        vuln = self.lido()[0]["vulnerabilidades"][1]
+        self.assertEqual(vuln["cve"], "CVE-2024-3094")
+        self.assertNotIn("cwe", vuln)
+
+    def test_ficha_tecnica_no_cadastro_na_busca_e_na_atualizacao(self):
+        """Fabricante, modelo, série, patrimônio, sistema e versão."""
+        saida = self.rodar([
+            "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1", "s",
+            "Dell", "OptiPlex  7010", "ABC123", "445566", "Windows 11 Pro",
+            "23H2", "n",
+            # Patrimônio repetido: pergunta de novo.
+            "1", "PC-02", "Fulano de Tal", "Setor", "Estação", "1", "s",
+            "", "", "", "445566", "445567", "", "", "n",
+            "3", "6", "optiplex",
+            # Opção 4: mantém tudo, menos modelo (apagado) e versão.
+            "4", "1", "", "", "", "", "", "s",
+            "", "-", "", "445567", "", "", "24H2",
+            "0"])
+        self.assertIn("! Patrimônio: o patrimônio 445566 já é do "
+                      "equipamento 1 (PC-01).", saida)
+        self.assertIn("Modelo ........ OptiPlex 7010", saida)
+        self.assertIn("Patrimônio .... 445566", saida)
+        self.assertIn("Versão ........ 23H2", saida)
+        self.assertIn("! Patrimônio: o patrimônio 445567 já é do "
+                      "equipamento 2 (PC-02).", saida)
+        self.assertIn("Equipamento atualizado (2 campo(s)).", saida)
+        dados = self.lido()
+        self.assertEqual(dados[0]["ficha"], {
+            "fabricante": "Dell", "numero_serie": "ABC123",
+            "patrimonio": "445566", "sistema": "Windows 11 Pro",
+            "versao": "24H2"})
+        self.assertEqual(dados[1]["ficha"], {"patrimonio": "445567"})
+        self.assertEqual(list(dados[0])[:7], [
+            "id", "tipo", "hostname", "custodiante", "lotacao",
+            "descricao", "ficha"])
+
+    def test_sem_ficha_o_arquivo_nao_ganha_o_campo(self):
+        """Equipamento sem ficha técnica: o JSON fica como antes."""
+        self.rodar(self.CENARIO + ["0"])
+        dados = self.lido()
+        self.assertTrue(all("ficha" not in e for e in dados))
+        self.assertTrue(all("cve" not in v and "cwe" not in v
+                            for e in dados for v in e["vulnerabilidades"]))
+
 
 class TesteDoModelo(unittest.TestCase):
     """O modelo de risco sobre os arquivos de exemplo do projeto."""
@@ -725,26 +860,83 @@ class TesteDoModelo(unittest.TestCase):
         return ModeloRisco(inventario)
 
     def test_sistema_quase_critico_mas_valido_e_resolvido(self):
-        """Condição 4,5e8: a solução confere e é aceita."""
+        """Condição 4,5e8: a solução confere e é aceita, com aviso."""
         modelo = self.montar({(1, 2): 0.5, (1, 3): 0.5001,
                               (2, 1): 0.9999, (3, 1): 0.9999})
-        self.assertTrue(modelo.diagnosticar().utilizavel)
+        diagnostico = modelo.diagnosticar()
+        self.assertTrue(diagnostico.utilizavel)
+        # Acima de 1e8: poucos dígitos confiáveis.
+        self.assertIn("poucos dígitos confiáveis", diagnostico.aviso)
+        self.assertIn("perde cerca de 8 dos 16", diagnostico.aviso)
         x = modelo.resolver()                    # não levanta erro
         self.assertGreater(min(x), 1e4)          # x grande...
         self.assertLess(modelo.residuo, 1e-6)    # ...e o erro pequeno
 
     def test_posto_cheio_mal_condicionado_nao_contradiz_o_teorema(self):
-        """Posto cheio e condição 6e12: invertível em teoria."""
+        """Posto cheio, condição 6e12 < 1/épsilon: resolve e avisa."""
         modelo = self.montar({(1, 2): 0.9998, (1, 3): 0.0001,
                               (2, 1): 0.9999, (2, 3): 0.0001,
                               (3, 1): 0.5001, (3, 2): 0.9999})
         diagnostico = modelo.diagnosticar()
-        self.assertFalse(diagnostico.utilizavel)
+        self.assertTrue(diagnostico.invertivel and diagnostico.utilizavel)
         self.assertEqual(diagnostico.posto, 3)
-        self.assertIn("posto cheio", diagnostico.motivo)
-        self.assertIn("mal condicionada", diagnostico.motivo)
+        self.assertIn("perde cerca de 12 dos 16", diagnostico.aviso)
         self.assertNotIn("não é invertível", diagnostico.motivo)
         self.assertNotIn("zero dentro da tolerância", diagnostico.motivo)
+        modelo.resolver()                        # a solução confere
+
+    def test_quase_singular_e_recusado(self):
+        """Linhas de A somando 1: condição acima de 1/épsilon, recusa.
+
+        Cada linha soma 1 (0,15 + 0,85; 0,45 + 0,55; 0,35 + 0,65),
+        então I - A é singular em teoria; no computador, o determinante
+        sai perto de 1e-16, e não zero, e o número de condição, perto
+        de 1e18.
+        """
+        modelo = self.montar({(1, 2): 0.15, (1, 3): 0.85,
+                              (2, 1): 0.45, (2, 3): 0.55,
+                              (3, 1): 0.35, (3, 2): 0.65})
+        diagnostico = modelo.diagnosticar()
+        self.assertFalse(diagnostico.invertivel)
+        self.assertEqual(diagnostico.posto, 2)
+        self.assertGreater(diagnostico.condicao, 1e16)
+        self.assertIn("acima do limite 1/épsilon", diagnostico.motivo)
+        self.assertIn("zero dentro da tolerância", diagnostico.motivo)
+        self.assertEqual(diagnostico.aviso, "")
+        with self.assertRaises(SistemaSingularError):
+            modelo.resolver()
+
+    def test_posto_menor_que_n_recusa_abaixo_de_1_sobre_eps(self):
+        """Posto menor que n recusa, mesmo abaixo de 1/épsilon.
+
+        Com dezenas de equipamentos, o arredondamento pode deixar o
+        número de condição de uma matriz singular logo abaixo de
+        1/épsilon.
+        O teste simula isso no cenário singular (posto 2 de 3).
+        """
+        modelo = ModeloRisco(self.carregar("cenario_singular.json"))
+        with mock.patch("risco.np.linalg.cond", return_value=4e15):
+            diagnostico = modelo.diagnosticar()
+        self.assertFalse(diagnostico.invertivel or diagnostico.utilizavel)
+        self.assertEqual((diagnostico.ordem, diagnostico.posto), (3, 2))
+        self.assertIn("o posto de I - A é menor que 3", diagnostico.motivo)
+        self.assertIn("não chega ao limite 1/épsilon", diagnostico.motivo)
+        self.assertIn("Rouché-Capelli", diagnostico.motivo)
+        self.assertEqual(diagnostico.aviso, "")
+        with self.assertRaises(SistemaSingularError):
+            modelo.resolver()
+
+    def test_pivo_zero_no_solve_e_recusado(self):
+        """Se a eliminação de Gauss achar um pivô zero, recusa."""
+        # Soma 1,8 na linha de E1, sem ciclo: posto cheio e condição
+        # baixa, mas o solve é forçado a falhar.
+        modelo = self.montar({(1, 2): 0.9, (1, 3): 0.9})
+        with mock.patch("risco.np.linalg.solve",
+                        side_effect=LinAlgError("Singular matrix")):
+            diagnostico = modelo.diagnosticar()
+        self.assertFalse(diagnostico.invertivel or diagnostico.utilizavel)
+        self.assertEqual(diagnostico.posto, 3)
+        self.assertIn("pivô zero", diagnostico.motivo)
 
     def test_solucao_que_nao_confere_e_recusada(self):
         """Se (I - A) x não der b, com tolerância, nada é mostrado."""
@@ -776,6 +968,46 @@ class TesteDoModelo(unittest.TestCase):
             arquivo.salvar(original)
             self.assertEqual(arquivo.carregar().para_dict(),
                              original.para_dict())
+
+    def test_exemplos_regravados_saem_iguais_letra_por_letra(self):
+        """Os campos novos são opcionais: os exemplos não mudam."""
+        for nome in ("inventario_exemplo.json", "cenario_3_equipamentos.json",
+                     "cenario_singular.json"):
+            with self.subTest(arquivo=nome):
+                caminho = os.path.join(PASTA, "dados_exemplo", nome)
+                with open(caminho, encoding="utf-8") as f:
+                    original = f.read().replace("\r\n", "\n")
+                with tempfile.TemporaryDirectory() as pasta:
+                    arquivo = ArquivoInventario(os.path.join(pasta, "x.json"))
+                    arquivo.salvar(ArquivoInventario(caminho).carregar())
+                    with open(arquivo.caminho, encoding="utf-8") as f:
+                        self.assertEqual(f.read(), original)
+
+    def test_arquivo_com_cve_ou_patrimonio_repetido_e_recusado(self):
+        """Duas vulnerabilidades com a mesma CVE ou dois patrimônios."""
+        inventario = Inventario()
+        for nome in ("PC-01", "PC-02"):
+            pc = inventario.cadastrar_equipamento(
+                TipoEquipamento.OUTRO, nome, "A", "B", "C")
+            inventario.registrar_vulnerabilidade(
+                pc.id, f"falha de {nome}", OrigemVulnerabilidade.OUTRA, 5.0,
+                SituacaoTratamento.ABERTA)
+        bom = inventario.para_dict()
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = os.path.join(pasta, "base.json")
+            for nome, mudar in (
+                    ("CVE", lambda d: [e["vulnerabilidades"][0].update(
+                        cve="CVE-2024-3094") for e in d]),
+                    ("patrimônio", lambda d: [e.update(
+                        ficha={"patrimonio": "0001"}) for e in d])):
+                with self.subTest(repetido=nome):
+                    dados = json.loads(json.dumps(bom))
+                    mudar(dados)
+                    with open(caminho, "w", encoding="utf-8") as f:
+                        json.dump(dados, f)
+                    with self.assertRaisesRegex(BaseInvalidaError, "0001|"
+                                                "CVE-2024-3094"):
+                        ArquivoInventario(caminho).carregar()
 
     def test_ler_e_gravar_nao_muda_o_texto(self):
         """Textos como X Y e a SSH voltam do arquivo sem mudança."""
@@ -899,7 +1131,7 @@ class TesteDoModelo(unittest.TestCase):
             with open(caminho, "w", encoding="utf-8") as f:
                 json.dump(dados, f)
             with self.assertRaisesRegex(BaseInvalidaError,
-                                        "nota ou vetor diferente"):
+                                        "com dados diferentes"):
                 ArquivoInventario(caminho).carregar()
 
     def test_arquivo_gravado_e_json_estrito(self):
@@ -926,15 +1158,24 @@ class TesteDosAutotestes(unittest.TestCase):
     """Roda o autoteste de cada módulo, como "python modulo.py"."""
 
     def test_autotestes_dos_modulos(self):
-        """Cada módulo com bloco de teste termina com código 0."""
+        """Cada módulo com bloco de teste termina com código 0.
+
+        A saída de cada autoteste vai para um cano (capture_output). No
+        Windows, o Python grava o que vai para um cano em cp1252, que
+        não tem, por exemplo, as letras gregas. Os autotestes rodam com
+        cp1252 em qualquer sistema: um texto que o Windows não consegue
+        gravar falha aqui também no Linux, e não só no Windows.
+        """
+        ambiente = dict(os.environ, PYTHONIOENCODING="cp1252")
         for modulo in ("classificacoes", "formatacao", "validacao",
                        "calculadora_cvss", "vulnerabilidades",
-                       "equipamentos", "inventario", "armazenamento",
-                       "risco"):
+                       "ficha_tecnica", "equipamentos", "inventario",
+                       "armazenamento", "risco"):
             with self.subTest(modulo=modulo):
                 resultado = subprocess.run(
                     [sys.executable, os.path.join(PASTA, modulo + ".py")],
-                    capture_output=True, text=True, cwd=PASTA, timeout=120)
+                    capture_output=True, encoding="cp1252", env=ambiente,
+                    cwd=PASTA, timeout=120)
                 self.assertEqual(resultado.returncode, 0,
                                  resultado.stdout[-800:] + resultado.stderr)
                 self.assertIn("OK", resultado.stdout)

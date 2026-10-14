@@ -2,15 +2,20 @@
 
 Uma vulnerabilidade existe uma vez só, com a descrição, a origem, a
 nota CVSS e, se houver, o vetor CVSS de onde a nota saiu, e pode
-afetar vários equipamentos. Quem diz quais é o
-próprio equipamento (equipamentos.py), junto com a situação do
-tratamento naquele equipamento. É essa relação "equipamento i tem a
-vulnerabilidade j" que vira a matriz M do modelo de risco (risco.py).
+afetar vários equipamentos. Quem diz quais é o próprio equipamento
+(equipamentos.py), junto com a situação do tratamento naquele
+equipamento. É essa relação "equipamento i tem a vulnerabilidade j" que
+vira a matriz M do modelo de risco (risco.py).
+
+Dois identificadores públicos são opcionais: a CVE, que aponta uma
+falha específica num produto (CVE-2019-0708), e o CWE, que dá o tipo
+de fraqueza que a causou (CWE-416). Os dois seguem o formato oficial.
 
 A classe não lê do teclado nem grava em disco.
 """
 
 import math
+import re
 
 import formatacao
 from calculadora_cvss import analisar_vetor
@@ -26,6 +31,15 @@ from validacao import (
 
 CVSS_MINIMO = 0.1   # 0,0 significa "nenhum impacto": não é vulnerabilidade
 CVSS_MAXIMO = 10.0
+
+# Formato oficial da CVE: CVE-ano-número, com o número de 4 a 19
+# dígitos (o do CWE é CWE-número). Na digitação, o prefixo pode faltar:
+# "2019-0708" vira "CVE-2019-0708". [0-9], e não \d, porque \d
+# aceitaria dígitos de outros alfabetos.
+_FORMATO_CVE = re.compile(r"(?:CVE-)?([0-9]{4})-([0-9]{4,19})")
+_FORMATO_CWE = re.compile(r"(?:CWE-)?([1-9][0-9]{0,5})")
+# O programa CVE começou em 1999: não há CVE de ano anterior.
+PRIMEIRO_ANO_CVE = 1999
 
 
 def validar_cvss(valor):
@@ -64,20 +78,72 @@ def conferir_vetor(vetor, nota):
     return arrumado
 
 
+def validar_cve(texto):
+    """Devolve a CVE no formato oficial (CVE-2019-0708), ou ValueError.
+
+    Aceita minúsculas e o número sem o prefixo ("2019-0708").
+    """
+    if not isinstance(texto, str):
+        raise ValueError(f"A CVE deve ser um texto, veio {texto!r}")
+    achado = _FORMATO_CVE.fullmatch(texto.strip().upper())
+    if achado is None:
+        raise ValueError("A CVE tem o formato CVE-ano-número, como "
+                         "CVE-2019-0708")
+    ano, numero = achado.groups()
+    if int(ano) < PRIMEIRO_ANO_CVE:
+        raise ValueError(f"O ano de uma CVE vai de {PRIMEIRO_ANO_CVE} em "
+                         f"diante")
+    return f"CVE-{ano}-{numero}"
+
+
+def validar_cwe(texto):
+    """Devolve o CWE no formato oficial (CWE-416), ou ValueError.
+
+    Aceita minúsculas e o número sem o prefixo ("416").
+    """
+    if not isinstance(texto, str):
+        raise ValueError(f"O CWE deve ser um texto, veio {texto!r}")
+    achado = _FORMATO_CWE.fullmatch(texto.strip().upper())
+    if achado is None:
+        raise ValueError("O CWE tem o formato CWE-número, como CWE-416")
+    return f"CWE-{achado.group(1)}"
+
+
+def validar_referencia(texto):
+    """Devolve uma CVE ou um CWE no formato oficial, ou ValueError.
+
+    Serve para a busca, que aceita os dois: "2019-0708" é uma CVE, e
+    "416", um CWE.
+    """
+    for validar in (validar_cve, validar_cwe):
+        try:
+            return validar(texto)
+        except ValueError:
+            pass
+    raise ValueError("Digite uma CVE, como CVE-2019-0708, ou um CWE, como "
+                     "CWE-416")
+
+
 class Vulnerabilidade:
     """Vulnerabilidade do catálogo: descrição, origem e nota CVSS.
 
     A severidade (baixa, média, alta, crítica) não é guardada: é
     calculada da nota quando pedida, para as duas nunca discordarem.
-    O vetor CVSS é opcional; quando existe, a nota é a que ele dá.
+    O vetor CVSS, a CVE e o CWE são opcionais (None quando não há);
+    com vetor, a nota é a que ele dá.
     """
 
     # O id fica de fora: os equipamentos apontam para ele.
-    CAMPOS_EDITAVEIS = ("descricao", "origem", "cvss", "vetor")
+    CAMPOS_EDITAVEIS = ("descricao", "origem", "cvss", "vetor", "cve",
+                        "cwe")
 
     def __init__(self, id_vulnerabilidade, descricao, origem, cvss,
-                 vetor=None):
-        """Cria a vulnerabilidade; dado inválido levanta ValueError."""
+                 vetor=None, *, cve=None, cwe=None):
+        """Cria a vulnerabilidade; dado inválido levanta ValueError.
+
+        cve e cwe só podem ser passados pelo nome (cve="CVE-..."): com
+        tantos parâmetros, a posição sozinha confundiria.
+        """
         if not isinstance(origem, OrigemVulnerabilidade):
             raise ValueError("A origem deve ser uma OrigemVulnerabilidade")
         if not descricao.strip():
@@ -90,6 +156,8 @@ class Vulnerabilidade:
         self.origem = origem
         self.cvss = nota
         self.vetor = vetor
+        self.cve = None if cve is None else validar_cve(cve)
+        self.cwe = None if cwe is None else validar_cwe(cwe)
 
     @property
     def gravidade(self):
@@ -100,10 +168,12 @@ class Vulnerabilidade:
         """Aplica as alterações {campo: valor} à vulnerabilidade.
 
         "vetor" com um texto troca o vetor e a nota passa a ser a dele;
-        "vetor" None tira o vetor. Levanta ValueError em campo
-        protegido, valor inválido ou nota que não confere com o vetor
-        que fica; nesse caso nada muda: a validação termina antes de
-        qualquer atribuição.
+        "vetor" None tira o vetor; "cve" e "cwe" None tiram o
+        identificador. Levanta ValueError em campo protegido, valor
+        inválido ou nota que não confere com o vetor que fica; nesse
+        caso nada muda: a validação termina antes de qualquer
+        atribuição. Que a CVE não se repita no catálogo é conferido pelo
+        Inventario.
         """
         for campo in alteracoes:
             if campo not in self.CAMPOS_EDITAVEIS:
@@ -120,6 +190,10 @@ class Vulnerabilidade:
                 raise ValueError("A origem deve ser uma "
                                  "OrigemVulnerabilidade")
             novos["origem"] = alteracoes["origem"]
+        for campo, validar in (("cve", validar_cve), ("cwe", validar_cwe)):
+            if campo in alteracoes:
+                valor = alteracoes[campo]
+                novos[campo] = None if valor is None else validar(valor)
         novos["cvss"], novos["vetor"] = self._nota_e_vetor(alteracoes)
 
         for campo, valor in novos.items():
@@ -145,15 +219,17 @@ class Vulnerabilidade:
     def para_dict(self):
         """Devolve o objeto JSON da vulnerabilidade (só tipos JSON).
 
-        O campo "vetor" só aparece quando existe: um arquivo sem
-        vetores fica igual ao de antes deste campo existir.
+        Os campos opcionais (cve, cwe, vetor) só aparecem quando
+        existem: um arquivo sem eles fica igual ao de antes de eles
+        existirem.
         """
-        objeto = {
-            "id": self.id,
-            "descricao": self.descricao,
-            "origem": self.origem.value,
-            "cvss": self.cvss,
-        }
+        objeto = {"id": self.id, "descricao": self.descricao}
+        if self.cve is not None:
+            objeto["cve"] = self.cve
+        if self.cwe is not None:
+            objeto["cwe"] = self.cwe
+        objeto["origem"] = self.origem.value
+        objeto["cvss"] = self.cvss
         if self.vetor is not None:
             objeto["vetor"] = self.vetor
         return objeto
@@ -178,12 +254,17 @@ class Vulnerabilidade:
             f"{nome}: campo 'origem'")
         cvss = exigir_numero(
             exigir_campo(dados, "cvss", nome), f"{nome}: campo 'cvss'")
-        # Campo opcional: ausente ou null quer dizer "sem vetor".
-        vetor = dados.get("vetor")
-        if vetor is not None:
-            vetor = exigir_texto(vetor, f"{nome}: campo 'vetor'")
+        # Campos opcionais: ausente ou null quer dizer "não tem".
+        opcionais = {}
+        for campo in ("vetor", "cve", "cwe"):
+            valor = dados.get(campo)
+            if valor is not None:
+                valor = exigir_texto(valor, f"{nome}: campo '{campo}'")
+            opcionais[campo] = valor
         try:
-            vulnerabilidade = cls(id_vuln, descricao, origem, cvss, vetor)
+            vulnerabilidade = cls(id_vuln, descricao, origem, cvss,
+                                  opcionais["vetor"], cve=opcionais["cve"],
+                                  cwe=opcionais["cwe"])
         except ValueError as erro:
             raise ValueError(f"{nome}: {erro}") from erro
         # Vale o texto gravado: formatar de novo mudaria o arquivo a
@@ -199,7 +280,8 @@ class Vulnerabilidade:
 
     def __repr__(self):
         """Texto para depuração, como Vulnerabilidade(3, CVSS 7.5)."""
-        return f"Vulnerabilidade({self.id}, CVSS {self.cvss})"
+        cve = f"{self.cve}, " if self.cve is not None else ""
+        return f"Vulnerabilidade({self.id}, {cve}CVSS {self.cvss})"
 
 
 # Teste: exercita a classe sem ninguém digitar nada.
@@ -267,6 +349,47 @@ if __name__ == "__main__":
     assert copia == v, "a cópia lida difere da original"
     print(f"Ida e volta pelo JSON: {copia.para_dict()}")
 
+    # --- CVE e CWE ----------------------------------------------------
+    for digitado, esperado in (("CVE-2019-0708", "CVE-2019-0708"),
+                               (" cve-2014-0160 ", "CVE-2014-0160"),
+                               ("2024-123456", "CVE-2024-123456")):
+        assert validar_cve(digitado) == esperado, digitado
+    for digitado, esperado in (("CWE-416", "CWE-416"), ("cwe-798", "CWE-798"),
+                               ("287", "CWE-287")):
+        assert validar_cwe(digitado) == esperado, digitado
+    assert validar_referencia("2019-0708") == "CVE-2019-0708"
+    assert validar_referencia("cwe-416") == "CWE-416"
+    for ruim in ("CVE-19-0708", "CVE-2019-123", "CVE-1998-0001",
+                 "CVE 2019 0708", "CVE-2019-0708x", "", "CVE-٢٠١٩-0708",
+                 None, 2021):
+        try:
+            validar_cve(ruim)
+            raise AssertionError(f"aceitou a CVE {ruim!r}")
+        except ValueError:
+            pass
+    for ruim in ("CWE-", "CWE-0", "CWE-0416", "RCE", "CWE-416a", None):
+        try:
+            validar_cwe(ruim)
+            raise AssertionError(f"aceitou o CWE {ruim!r}")
+        except ValueError:
+            pass
+    bluekeep = Vulnerabilidade(9, "bluekeep na área de trabalho remota",
+                               OrigemVulnerabilidade.FALTA_ATUALIZACAO, 9.8,
+                               cve="cve-2019-0708", cwe="416")
+    assert (bluekeep.cve, bluekeep.cwe) == ("CVE-2019-0708", "CWE-416")
+    assert list(bluekeep.para_dict()) == ["id", "descricao", "cve", "cwe",
+                                          "origem", "cvss"]
+    assert Vulnerabilidade.de_dict(bluekeep.para_dict()) == bluekeep
+    bluekeep.atualizar({"cwe": None})
+    assert bluekeep.cwe is None and "cwe" not in bluekeep.para_dict()
+    try:
+        bluekeep.atualizar({"descricao": "outra", "cve": "CVE-19-1"})
+        raise AssertionError("aceitou CVE inválida na atualização")
+    except ValueError:
+        assert bluekeep.descricao == "Bluekeep na área de trabalho remota"
+    assert "cve" not in v.para_dict(), "CVE apareceu sem ter sido dada"
+    print(f"CVE e CWE: {bluekeep!r}, {bluekeep.para_dict()}")
+
     for nome, dados in (
             ("sem id", {"descricao": "x", "origem": 1, "cvss": 5}),
             ("origem 99", {"id": 1, "descricao": "x", "origem": 99,
@@ -279,7 +402,12 @@ if __name__ == "__main__":
                                      "origem": 1, "cvss": 5.0,
                                      "vetor": rdp}),
             ("vetor número", {"id": 1, "descricao": "x", "origem": 1,
-                              "cvss": 5.0, "vetor": 5})):
+                              "cvss": 5.0, "vetor": 5}),
+            ("CVE fora do formato", {"id": 1, "descricao": "x",
+                                     "origem": 1, "cvss": 5.0,
+                                     "cve": "CVE-21-1"}),
+            ("CWE número", {"id": 1, "descricao": "x", "origem": 1,
+                            "cvss": 5.0, "cwe": 89})):
         try:
             Vulnerabilidade.de_dict(dados)
             raise AssertionError(f"aceitou o objeto adulterado: {nome}")

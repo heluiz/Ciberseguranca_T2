@@ -11,6 +11,7 @@ import cores
 import formatacao
 from classificacoes import NivelGravidade
 from formatacao import fracao_br, numero_br
+from risco import LIMITE_AVISO_CONDICAO, LIMITE_CONDICAO
 
 LARGURA_MENU = 62
 
@@ -87,6 +88,8 @@ def mostrar_equipamento(equipamento):
           + cores.discreto(f"(fator de exposição "
                            f"{numero_br(equipamento.fator_exposicao)})"))
     print(f"  Descrição ..... {equipamento.descricao}")
+    for rotulo, valor in equipamento.ficha.preenchidos():
+        print(f"  {rotulo} {'.' * (14 - len(rotulo))} {valor}")
 
 
 # ----------------------------------------------------------------------
@@ -97,18 +100,21 @@ def imprimir_ocorrencias(itens, com_hostname=False):
     """Imprime vulnerabilidades em duas linhas cada, na ordem recebida.
 
     Cada item é (equipamento, vulnerabilidade, situação). Primeira
-    linha: severidade e nota, id e descrição. Segunda: situação e
-    origem. Com com_hostname (relatório de pendentes), a segunda linha
-    começa pelo hostname do equipamento. Se a nota veio de um vetor
-    CVSS, ele aparece numa terceira linha.
+    linha: severidade e nota, id e descrição. Segunda: situação,
+    origem e, se houver, a CVE e o CWE. Com com_hostname (relatório de
+    pendentes), a segunda linha começa pelo hostname do equipamento. Se
+    a nota veio de um vetor CVSS, ele aparece numa terceira linha.
     """
     # Largura do id tirada da própria lista, para alinhar [3] e [147].
     largura_id = max(len(f"[{v.id}]") for _, v, _ in itens)
 
     for equipamento, vuln, situacao in itens:
         marcador = f"[{vuln.id}]"
-        legenda = (f"{cores.situacao(situacao.rotulo, situacao)} · "
-                   f"{vuln.origem.rotulo}")
+        partes = [cores.situacao(situacao.rotulo, situacao),
+                  vuln.origem.rotulo]
+        partes += [codigo for codigo in (vuln.cve, vuln.cwe)
+                   if codigo is not None]
+        legenda = " · ".join(partes)
         if com_hostname:
             legenda = f"{equipamento.hostname} · {legenda}"
         # Alinha a severidade antes de pintar, para a coluna não andar.
@@ -141,9 +147,11 @@ def mostrar_vulnerabilidade_em_edicao(vuln, situacao, equipamento,
     """Mostra os dados atuais de uma vulnerabilidade, antes de editar.
 
     afetados são os equipamentos que a têm: com mais de um, avisa que
-    descrição, categoria e nota mudam para todos.
+    descrição, CVE, CWE, categoria e nota mudam para todos.
     """
     print(f"\n  Descrição ..... {vuln.descricao}")
+    print(f"  CVE ........... {vuln.cve or cores.discreto('nenhuma')}")
+    print(f"  CWE ........... {vuln.cwe or cores.discreto('nenhum')}")
     print(f"  Categoria ..... {vuln.origem.rotulo}")
     print(f"  Nota CVSS ..... {numero_br(vuln.cvss)} "
           f"({vuln.gravidade.rotulo})")
@@ -153,24 +161,27 @@ def mostrar_vulnerabilidade_em_edicao(vuln, situacao, equipamento,
           f" (em {equipamento.hostname})")
     if len(afetados) > 1:
         print("\n  " + cores.aviso(
-            f"Descrição, categoria e nota valem para os {len(afetados)} "
-            f"equipamentos que têm esta vulnerabilidade "
+            f"Descrição, CVE, CWE, categoria e nota valem para os "
+            f"{len(afetados)} equipamentos que têm esta vulnerabilidade "
             f"({', '.join(e.hostname for e in afetados)}). O status vale "
             f"só para {equipamento.hostname}."))
 
 
 def mostrar_catalogo(inventario):
-    """Mostra o catálogo de vulnerabilidades, uma linha por entrada."""
+    """Mostra o catálogo de vulnerabilidades, uma linha por entrada.
+
+    Com todos os tetos, a linha mais larga tem 120 caracteres.
+    """
     linhas = []
     for v in inventario.vulnerabilidades():
         linhas.append((str(v.id), numero_br(v.cvss), v.gravidade.rotulo,
                        v.origem.rotulo,
                        str(len(inventario.afetados_por(v.id))),
-                       v.descricao))
+                       v.cve or "-", v.descricao))
     imprimir_tabela(
-        ("ID", "CVSS", "SEVERIDADE", "ORIGEM", "EQUIP.", "DESCRIÇÃO"),
-        (5, 4, 10, 30, 6, 52),
-        (True, True, False, False, True, False), linhas)
+        ("ID", "CVSS", "SEVERIDADE", "ORIGEM", "EQUIP.", "CVE", "DESCRIÇÃO"),
+        (5, 4, 10, 30, 6, 16, 35),
+        (True, True, False, False, True, False, False), linhas)
 
 
 def resumo_por_severidade(itens):
@@ -240,13 +251,18 @@ def mostrar_diagnostico(diagnostico):
     else:
         print("\n  " + cores.erro("! Verificação de I - A: ")
               + cores.erro(diagnostico.motivo))
+    if diagnostico.aviso:
+        print("  " + cores.aviso(diagnostico.aviso))
+    compacto = formatacao.numero_compacto
     print("  " + cores.discreto(
-        f"det(I - A) = {formatacao.numero_compacto(diagnostico.determinante)}"
+        f"det(I - A) = {compacto(diagnostico.determinante)}"
         f" · número de condição de I - A = "
-        f"{formatacao.numero_compacto(diagnostico.condicao)}"))
+        f"{compacto(diagnostico.condicao)} (aviso acima de "
+        f"{compacto(LIMITE_AVISO_CONDICAO)}; recusa acima de 1/épsilon = "
+        f"{compacto(LIMITE_CONDICAO)})"))
     if diagnostico.ordem:
         if diagnostico.posto == diagnostico.ordem:
-            sobre = "posto cheio"
+            sobre = "posto cheio, então o sistema é possível e determinado"
         else:
             sobre = (f"menor que {diagnostico.ordem}, então I - A não tem "
                      f"inversa")
