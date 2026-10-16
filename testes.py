@@ -25,9 +25,11 @@ from unittest import mock
 
 from numpy.linalg import LinAlgError
 
+import arvore
 import base_cve
 import cores
 import main
+import telas
 from armazenamento import ArquivoInventario, BaseInvalidaError
 from atualizacao_cve import (
     AtualizacaoError,
@@ -602,6 +604,37 @@ class TesteDoPrograma(unittest.TestCase):
         saida = self.rodar(self.CENARIO + ["12", "1", "2", "s", "0"])
         self.assertIn("Dependência removida.", saida)
         self.assertEqual(self.lido()[0]["dependencias"], [])
+
+    def test_arvores_da_opcao_12(self):
+        """Opção 12: as duas árvores do servidor, com o ciclo marcado.
+
+        No cenário, E1 herda 0,5 de E2, E2 herda 0,5 de E3 e E3 herda
+        0,25 de E2: E2 e E3 dependem um do outro.
+        """
+        saida = self.rodar(self.CENARIO + ["12", "2", "", "0"])
+        trecho = saida[saida.index("Quem depende de SERVIDOR-01"):]
+        self.assertIn("Quem depende de SERVIDOR-01 (2 equipamentos, "
+                      "contando os indiretos)\n"
+                      "  [2] SERVIDOR-01\n"
+                      "  ├─ [3] BANCO-01  herda 0,25 (ciclo)\n"
+                      "  └─ [1] ESTACAO-01  herda 0,5\n", trecho)
+        self.assertIn("Do que SERVIDOR-01 depende (1 equipamento, "
+                      "contando os indiretos)\n"
+                      "  [2] SERVIDOR-01\n"
+                      "  └─ [3] BANCO-01  repassa 0,5 (ciclo)\n", trecho)
+        self.assertIn("Dependências diretas (linha SERVIDOR-01 da matriz "
+                      "A):\n    [3] BANCO-01", trecho)
+        # Enter na pergunta da remoção: nada muda.
+        self.assertEqual(len(self.lido()[1]["dependencias"]), 1)
+
+    def test_opcao_12_sem_ligacoes(self):
+        """Sem dependências: árvores vazias e nada a remover."""
+        saida = self.rodar(self.CENARIO[:6] + ["n", "n", "12", "1", "0"])
+        self.assertIn("Quem depende de ESTACAO-01\n    ninguém depende "
+                      "dele", saida)
+        self.assertIn("Do que ESTACAO-01 depende\n    não depende de "
+                      "nenhum equipamento", saida)
+        self.assertNotIn("Dependências diretas", saida)
 
     def test_solucao_que_nao_confere_e_avisada_no_menu(self):
         """Opção 13: se (I - A) x não der b, avisa e não mostra nada."""
@@ -1541,6 +1574,163 @@ class TesteDoModelo(unittest.TestCase):
         self.assertEqual(dados[0]["hostname"], "PC-01")
 
 
+class TesteDaArvore(unittest.TestCase):
+    """A árvore de dependências (arvore.py) e a tela dela (telas.py)."""
+
+    @classmethod
+    def setUpClass(cls):
+        """Lê a base de exemplo, com 76 equipamentos e 164 ligações."""
+        cls.inventario = ArquivoInventario(os.path.join(
+            PASTA, "dados_exemplo", "inventario_exemplo.json")).carregar()
+        cls.por_nome = {e.hostname: e for e in cls.inventario.todos()}
+
+    def id_de(self, hostname):
+        """O id do equipamento da base de exemplo."""
+        return self.por_nome[hostname].id
+
+    def alcance(self, id_equipamento, sentido):
+        """Os alcançados, por uma busca independente da do módulo."""
+        vizinhos = {e.id: set() for e in self.inventario.todos()}
+        for e in self.inventario.todos():
+            for destino in e.dependencias:
+                if sentido == arvore.QUEM_DEPENDE:
+                    vizinhos[destino].add(e.id)
+                else:
+                    vizinhos[e.id].add(destino)
+        vistos, fila = set(), [id_equipamento]
+        while fila:
+            for vizinho in vizinhos[fila.pop()] - vistos:
+                vistos.add(vizinho)
+                fila.append(vizinho)
+        return vistos - {id_equipamento}
+
+    @staticmethod
+    def itens(arv):
+        """Todos os itens da árvore, com o id do equipamento de cima."""
+        saida, pilha = [], [(i, arv.raiz.id) for i in arv.itens]
+        while pilha:
+            item, de_cima = pilha.pop()
+            saida.append((item, de_cima))
+            pilha.extend((f, item.equipamentos[0].id) for f in item.filhos)
+        return saida
+
+    def test_cada_equipamento_aparece_uma_vez(self):
+        """Em toda árvore da base, cada alcançado aparece uma vez só."""
+        for e in self.inventario.todos():
+            for sentido in arvore.SENTIDOS:
+                with self.subTest(equipamento=e.hostname, sentido=sentido):
+                    arv = arvore.montar(self.inventario, e.id, sentido)
+                    ids = [x.id for x in arvore.equipamentos_da_arvore(arv)]
+                    self.assertEqual(len(ids), len(set(ids)))
+                    self.assertEqual(set(ids), self.alcance(e.id, sentido))
+                    self.assertEqual(arv.total, len(ids))
+
+    def test_nenhuma_ligacao_some(self):
+        """Cada ligação aparece uma vez: no de cima ou em "outras"."""
+        for e in self.inventario.todos():
+            arv = arvore.montar(self.inventario, e.id, arvore.QUEM_DEPENDE)
+            mostradas = sum(len(item.equipamentos) * (1 + len(item.outras))
+                            for item, _ in self.itens(arv))
+            # No sentido quem depende, cada um mostra todas as suas.
+            esperadas = sum(len(x.dependencias)
+                            for x in arvore.equipamentos_da_arvore(arv))
+            self.assertEqual(mostradas, esperadas, e.hostname)
+
+            arv = arvore.montar(self.inventario, e.id, arvore.DO_QUE_DEPENDE)
+            nos = {x.id for x in arvore.equipamentos_da_arvore(arv)} | {e.id}
+            mostradas = sum(len(item.equipamentos) * (1 + len(item.outras))
+                            for item, _ in self.itens(arv))
+            # No outro, cada um mostra quem depende dele entre os
+            # equipamentos da árvore e o de partida.
+            esperadas = sum(1 for x in nos
+                            for destino in self.inventario.buscar_por_id(
+                                x).dependencias if destino in nos
+                            and destino != e.id)
+            self.assertEqual(mostradas, esperadas, e.hostname)
+
+    def test_ligacao_mais_especifica(self):
+        """Estações sob o servidor; DP1-PC01, sob o roteador da DP.
+
+        Do controlador de domínio (DRPC-SRV02) dependem 57 equipamentos;
+        do roteador de borda (DRPC-RT01), 73: a estação que depende dos
+        dois fica sob o controlador. DP1-PC01 depende do controlador, do
+        SIS-REDS e do roteador da 1ª DP, de que só 2 dependem.
+        """
+        arv = arvore.montar(self.inventario, self.id_de("DRPC-UPS01"),
+                            arvore.QUEM_DEPENDE)
+        pais = {}
+        for item, de_cima in self.itens(arv):
+            for e in item.equipamentos:
+                pais[e.hostname] = (self.inventario.buscar_por_id(
+                    de_cima).hostname, item)
+        de_cima, grupo = pais["DAJEC-PC01"]
+        self.assertEqual((de_cima, len(grupo.equipamentos), grupo.fracao),
+                         ("DRPC-SRV02", 21, 0.2))
+        self.assertEqual([(lig.equipamento.hostname, lig.fracao)
+                          for lig in grupo.outras], [("DRPC-RT01", 0.25)])
+        self.assertEqual(pais["DP1-PC01"][0], "DP1-RT01")
+        self.assertEqual(pais["PERICIA-PC01"][0], "PERICIA-DB01")
+        # A cadeia do nobreak até o roteador de borda.
+        self.assertEqual(pais["DRPC-SW01"][0], "DRPC-UPS01")
+        self.assertEqual(pais["DRPC-RT01"][0], "DRPC-SW01")
+
+    def test_ciclo_marcado_e_so_ligacao_de_ciclo(self):
+        """DRPC-SRV01 e DRPC-SRV02 dependem um do outro.
+
+        Na árvore do que DRPC-DB01 depende, DRPC-SRV02 só se liga a
+        DRPC-SRV01 pela ligação de ciclo: fica sob ele, marcado.
+        """
+        srv01, srv02 = self.id_de("DRPC-SRV01"), self.id_de("DRPC-SRV02")
+        arv = arvore.montar(self.inventario, srv01, arvore.QUEM_DEPENDE)
+        primeiro = {i.equipamentos[0].id: i for i in arv.itens}
+        self.assertTrue(primeiro[srv02].ciclo)
+        arv = arvore.montar(self.inventario, self.id_de("DRPC-DB01"),
+                            arvore.DO_QUE_DEPENDE)
+        sob_o_srv01 = [item for item, de_cima in self.itens(arv)
+                       if de_cima == srv01]
+        self.assertEqual([i.equipamentos[0].id for i in sob_o_srv01
+                          if i.ciclo], [srv02])
+
+    def test_sem_ligacoes_e_entradas_erradas(self):
+        """Sem ligações, árvore vazia; sentido ou id errado: erro."""
+        ups = self.id_de("DRPC-UPS01")
+        self.assertEqual(arvore.montar(self.inventario, ups,
+                                       arvore.DO_QUE_DEPENDE).itens, ())
+        self.assertEqual(arvore.montar(self.inventario, self.id_de(
+            "PERICIA-PC01"), arvore.QUEM_DEPENDE).total, 0)
+        with self.assertRaises(ValueError):
+            arvore.montar(self.inventario, ups, "para cima")
+        with self.assertRaises(ValueError):
+            arvore.montar(self.inventario, 9999, arvore.QUEM_DEPENDE)
+
+    def test_cadeia_mais_longa_que_o_limite_de_recursao(self):
+        """Cadeia de 1.100 equipamentos: monta e imprime sem erro."""
+        inventario = Inventario()
+        ids = [inventario.cadastrar_equipamento(
+            TipoEquipamento.OUTRO, f"ELO-{n}", "Teste", "Teste",
+            "Elo da cadeia").id for n in range(1100)]
+        for anterior, seguinte in zip(ids, ids[1:]):
+            inventario.registrar_dependencia(seguinte, anterior, 0.5)
+        arv = arvore.montar(inventario, ids[0], arvore.QUEM_DEPENDE)
+        self.assertEqual(arv.total, 1099)
+        saida = io.StringIO()
+        with contextlib.redirect_stdout(saida):
+            telas.mostrar_arvore(arv)
+        self.assertIn("[1100] ELO-1099  herda 0,5", saida.getvalue())
+
+    def test_linhas_cabem_em_80_colunas(self):
+        """Toda árvore da base de exemplo cabe em 80 colunas."""
+        for e in self.inventario.todos():
+            for sentido in arvore.SENTIDOS:
+                saida = io.StringIO()
+                with contextlib.redirect_stdout(saida):
+                    telas.mostrar_arvore(arvore.montar(self.inventario,
+                                                       e.id, sentido))
+                maior = max(len(linha) for linha in
+                            saida.getvalue().splitlines())
+                self.assertLessEqual(maior, 80, (e.hostname, sentido))
+
+
 class TesteDosAutotestes(unittest.TestCase):
     """Roda o autoteste de cada módulo, como "python modulo.py"."""
 
@@ -1557,7 +1747,7 @@ class TesteDosAutotestes(unittest.TestCase):
         for modulo in ("classificacoes", "formatacao", "validacao",
                        "calculadora_cvss", "vulnerabilidades",
                        "ficha_tecnica", "equipamentos", "inventario",
-                       "armazenamento", "risco", "base_cve",
+                       "armazenamento", "risco", "arvore", "base_cve",
                        "atualizacao_cve"):
             with self.subTest(modulo=modulo):
                 resultado = subprocess.run(

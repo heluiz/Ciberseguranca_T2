@@ -414,6 +414,37 @@ pela internet. Qualquer CVE mostrada pode ser registrada num equipamento, com
 os dados da base. Os detalhes estão em
 [Base de CVEs exploradas](#base-de-cves-exploradas).
 
+**A opção 12** mostra a árvore de dependências de um equipamento nos dois
+sentidos: quem depende dele (quem herda parte do risco dele), direta e
+indiretamente, e do que ele depende. Um equipamento pode depender de vários
+outros, e dois podem depender um do outro; para a árvore não repetir ninguém,
+cada equipamento aparece uma vez só, sob a ligação mais específica: a do
+equipamento com menos dependentes, num sentido, ou com menos dependências, no
+outro. Uma estação que depende do controlador de domínio e do roteador de
+borda fica sob o controlador, de que menos equipamentos dependem. As outras
+ligações de cada um vêm na linha "também", e os que têm as mesmas ligações e
+nada abaixo viram um item só, com a lista deles. No fim vêm as dependências
+diretas do equipamento, das quais se pode remover uma. Um trecho, da base de
+exemplo:
+
+```
+  Do que PERICIA-PC01 depende (7 equipamentos, contando os indiretos)
+  [28] PERICIA-PC01
+  └─ [31] PERICIA-DB01  repassa 0,2
+     ├─ [1] DRPC-SRV01  repassa 0,2
+     │  │  também repassa 0,1 a [2] DRPC-SRV02 (ciclo)
+     │  │  outras 3 dependências diretas aparecem em outros ramos
+     │  └─ [3] DRPC-RT01  repassa 0,15
+     │     │  também repassa 0,25 a [28] PERICIA-PC01, 0,2 a [30] PERICIA-SRV01
+     │     │  e 0,15 a [2] DRPC-SRV02
+  ...
+```
+
+"Herda 0,2" quer dizer que o equipamento herda 20% do risco efetivo do de
+cima; "repassa 0,2", que o de cima herda 20% do risco efetivo dele. Os dois
+descrevem a mesma entrada da matriz A, vista de um lado ou do outro. "(ciclo)"
+marca dois equipamentos que dependem um do outro.
+
 **A nota CVSS** de uma vulnerabilidade nova (opções 1 e 6) ou alterada
 (opção 8) pode ser dada de três jeitos:
 
@@ -465,7 +496,7 @@ Um trecho da tela do `calcular`:
 | 9 | Tira uma vulnerabilidade de um equipamento (cadastro errado ou duplicado) |
 | 10 | Lista as vulnerabilidades pendentes de todos os equipamentos, da mais grave |
 | 11 | Cadastra uma dependência entre dois equipamentos |
-| 12 | Mostra as dependências de um equipamento e permite remover uma |
+| 12 | Mostra a árvore de dependências de um equipamento nos dois sentidos (quem depende dele e do que ele depende, direta e indiretamente) e permite remover uma dependência direta |
 | 13 | Mostra o risco próprio e o efetivo de **todos** os equipamentos |
 | 14 | Mostra, passo a passo, como o risco de **um** equipamento foi calculado |
 | 15 | Mostra M, v, M v, F, b e A (para poucos equipamentos), o posto de M e a dimensão do seu núcleo, e a verificação de I − A, com o determinante, o número de condição e o posto |
@@ -501,6 +532,7 @@ de duas branches e merges também continua valendo: veja
 | `vulnerabilidades.py` | Classe `Vulnerabilidade`: entrada do catálogo (descrição, CVE e CWE opcionais, origem, nota CVSS) |
 | `inventario.py` | Classe `Inventario`: o conjunto dos equipamentos e das vulnerabilidades e as regras entre eles (hostname e patrimônio únicos, CVE única no catálogo, cascata, dependências, buscas) |
 | `risco.py` | Classe `ModeloRisco`: monta M, v, A e b, verifica a invertibilidade (com o posto e o teorema de Rouché-Capelli), resolve o sistema e confere a solução |
+| `arvore.py` | A árvore de dependências de um equipamento (opção 12), nos dois sentidos: cada equipamento aparece uma vez, sob a ligação mais específica, com as outras ligações no item e os iguais agrupados |
 | `armazenamento.py` | Classe `ArquivoInventario`: lê e grava o JSON, com gravação atômica |
 | `migracao.py` | Converte uma base do Trabalho 1 para o formato novo |
 | `base_cve.py` | Classe `BaseCVE`: a base das CVEs exploradas, com a busca por palavras, a navegação por fabricante e produto, as sugestões pela ficha técnica e a leitura e a gravação do arquivo da base |
@@ -1132,6 +1164,14 @@ nem pelo DHS.
   módulo que a usa. O código mais exposto fica num lugar só, fácil de revisar,
   e a atualização é testada sem internet: a função que abre os endereços é um
   parâmetro (`abrir`), e os testes passam uma que responde sozinha.
+- **Árvore sem repetição.** As dependências formam um grafo, e não uma
+  árvore: um equipamento depende de vários, e há ciclos. Repetir cada um sob
+  cada equipamento de que ele depende faria a árvore do nobreak da base de
+  exemplo ter 810 linhas, para 75 equipamentos. Por isso cada um aparece uma
+  vez, sob a ligação mais específica, e as outras ligações vêm escritas no
+  item: nenhuma some (um teste confere). A regra também garante que a
+  montagem termina mesmo com ciclos: fora de um ciclo, quem fica em cima
+  alcança mais equipamentos que quem fica embaixo, e a árvore não volta.
 - **Tipo do equipamento é mudável**, mas um objeto não muda de classe:
   `Equipamento.converter_para()` cria outro objeto da subclasse certa, com o
   mesmo id e as mesmas relações, e o `Inventario` o coloca no lugar.
@@ -1277,9 +1317,12 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 python testes.py
 ```
 
-São 86 testes, só com a biblioteca padrão: o programa inteiro rodando por
+São 95 testes, só com a biblioteca padrão: o programa inteiro rodando por
 dentro com o teclado simulado (do cadastro ao risco, incluindo o cenário de 3
-equipamentos), a nota CVSS pelo vetor e pelas perguntas do `calcular`, a CVE e
+equipamentos), a árvore de dependências (cada equipamento uma vez, nenhuma
+ligação perdida, a ligação mais específica, o ciclo, uma cadeia de 1.100
+equipamentos e as 80 colunas da tela), a nota CVSS pelo vetor e pelas
+perguntas do `calcular`, a CVE e
 o CWE (formato, CVE única no catálogo, busca, atualização), a ficha técnica
 (cadastro, patrimônio único, busca, atualização), a base de CVEs exploradas
 (busca, navegação, sugestões, cadastro com os dados da base, escolha da nota,
@@ -1304,7 +1347,7 @@ python -m pytest testes.py
 ```
 
 Cobertura, com o coverage.py (configurado em `.coveragerc`): os testes passam
-por 88% das linhas do programa, sem contar os autotestes dos módulos, que rodam
+por 89% das linhas do programa, sem contar os autotestes dos módulos, que rodam
 em outro processo.
 
 ```
@@ -1328,16 +1371,18 @@ regra só reconhece verbos em inglês. O Ruff substitui o flake8 e o pydocstyle
 usados antes: o pydocstyle foi descontinuado em 2023, e o próprio projeto
 indica o Ruff no lugar.
 
-O pylint, outra ferramenta de análise estática, dá nota 9,80 de 10
+O pylint, outra ferramenta de análise estática, dá nota 9,81 de 10
 (`pip install pylint` e `pylint *.py`). Os avisos que restam foram mantidos de
 propósito:
 
 - os nomes `M` e `A`, iguais aos do enunciado;
 - limites de tamanho, como funções com mais de cinco parâmetros
   (`registrar_vulnerabilidade` recebe um parâmetro por dado da
-  vulnerabilidade), classes com mais de 20 métodos públicos e os dois
-  arquivos com mais de 1.000 linhas (`main.py`, com uma ação por opção do
-  menu, e `testes.py`, com um teste por comportamento);
+  vulnerabilidade), classes com mais de 20 métodos públicos ou com mais de
+  sete atributos (a que monta a árvore de dependências guarda as ligações
+  nos dois sentidos) e os dois arquivos com mais de 1.000 linhas
+  (`main.py`, com uma ação por opção do menu, e `testes.py`, com um teste
+  por comportamento);
 - o `except Exception` do laço do menu, que impede um erro inesperado de
   derrubar o programa, e o `global` que desliga as cores;
 - o import circular entre `armazenamento.py` e `migracao.py`, que é só
@@ -1380,7 +1425,7 @@ histórico mesmo quando não há conflito:
 
 | Prefixo | Uso | Exemplo neste repositório |
 | --- | --- | --- |
-| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves` |
+| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves`, `feature/arvore-de-dependencias` |
 | `fix/` | Correção de defeito | `fix/normas-oficiais` |
 | `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
