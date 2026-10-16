@@ -78,7 +78,7 @@ PALAVRAS_VAZIAS = frozenset(
 # fabricantes e trariam sugestões sem relação com o equipamento.
 PALAVRAS_GENERICAS = frozenset(
     "pro server servidor standard enterprise edition home plus ultimate "
-    "professional business datacenter essentials core".split())
+    "professional business datacenter essentials core firmware web".split())
 # Peso de uma palavra achada em cada parte do registro, do maior para
 # o menor (a busca para no primeiro que achar).
 PESOS = (("fabricante", 3), ("produto", 3), ("nome", 2), ("resto", 1))
@@ -356,9 +356,10 @@ class BaseCVE:
         o sistema da ficha com o fabricante e o produto de cada CVE.
         Números, palavras de menos de 3 letras, PALAVRAS_VAZIAS e
         PALAVRAS_GENERICAS não contam. Palavra no produto vale mais que
-        no fabricante: "Windows" diz mais que "Microsoft". Devolve
-        [(registro, palavras que combinaram)], da combinação mais forte
-        para a mais fraca.
+        no fabricante: "Windows" diz mais que "Microsoft". O nome do
+        fabricante repetido no produto, como em "Cisco IP Phones", conta
+        uma vez só, como fabricante. Devolve [(registro, palavras que
+        combinaram)], da combinação mais forte para a mais fraca.
         """
         termos = set()
         for valor in (ficha.fabricante, ficha.modelo, ficha.sistema):
@@ -369,8 +370,10 @@ class BaseCVE:
                     termos.add(p)
         achados = []
         for cve, registro in self.registros.items():
-            no_fabricante = termos & self._indice[cve]["fabricante_set"]
-            no_produto = termos & self._indice[cve]["produto_set"]
+            indice = self._indice[cve]
+            no_fabricante = termos & indice["fabricante_set"]
+            no_produto = termos & (indice["produto_set"]
+                                   - indice["fabricante_set"])
             if no_fabricante or no_produto:
                 pontos = 2 * len(no_fabricante) + 3 * len(no_produto)
                 achados.append((pontos, registro,

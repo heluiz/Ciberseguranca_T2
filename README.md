@@ -549,7 +549,7 @@ de duas branches e merges também continua valendo: veja
 | `ruff.toml` | Regras de estilo conferidas pelo Ruff: PEP 8 e PEP 257 |
 | `.github/workflows/verificacao.yml`, `.coveragerc` | Verificação automática no GitHub (estilo, testes e imagem Docker) e configuração da medida de cobertura |
 | `base_cve/` | A base de CVEs que vem com o programa (`kev.json`) e os avisos de licença das fontes (`AVISOS.txt`) |
-| `dados_exemplo/` | Base fictícia de 76 equipamentos e dois cenários pequenos: um de 3 equipamentos, resolvido à mão, e um singular |
+| `dados_exemplo/` | Base fictícia de 76 equipamentos, com ficha técnica, CVEs, CWEs e vetores CVSS, e dois cenários pequenos: um de 3 equipamentos, resolvido à mão, e um singular |
 
 Só `entrada.py` chama `input()`, só `atualizacao_cve.py` usa a rede, e só
 `armazenamento.py` lê e grava a base do inventário (a conversão manual de
@@ -601,10 +601,10 @@ O núcleo de M é o conjunto dos vetores *u*, com um valor por vulnerabilidade,
 tais que `M u = 0`: são as mudanças nas notas que não mudam a soma `M v` de
 nenhum equipamento. Pelo teorema do núcleo e da imagem, o posto de M mais a
 dimensão do núcleo dá o número de colunas (as vulnerabilidades). Na base de
-exemplo, M é 76 × 79, com posto 56, então o núcleo tem dimensão 23
-(56 + 23 = 79). Catorze colunas são nulas: vulnerabilidades corrigidas em todos
-os equipamentos em que aparecem, que continuam no catálogo mas não pesam no
-risco. A opção 15 mostra o posto e a dimensão do núcleo.
+exemplo, M é 76 × 88, com posto 56, então o núcleo tem dimensão 32
+(56 + 32 = 88). Dezessete colunas são nulas: vulnerabilidades corrigidas em
+todos os equipamentos em que aparecem, que continuam no catálogo mas não pesam
+no risco. A opção 15 mostra o posto e a dimensão do núcleo.
 
 O enunciado define `b = M v` e sugere que "cada tipo de equipamento pode definir
 um fator de exposição que pondera o seu risco próprio". É o que `F` faz: `M v` é
@@ -995,12 +995,14 @@ produto, da maior nota para a menor.
 **Sugestões (item 3)**, para um equipamento com ficha técnica: as palavras do
 fabricante, do modelo e do sistema da ficha são comparadas, inteiras, com as do
 fabricante e do produto de cada CVE. Números, palavras de menos de 3 letras e
-palavras genéricas, como `server`, `pro` e `enterprise`, não contam. Uma
-palavra que combina com o produto vale mais que uma que combina com o
-fabricante: `Windows` diz mais que `Microsoft`. As CVEs que o equipamento já
-tem aparecem com `*`. **A combinação é pelo nome, e não pela versão**: o KEV
-não diz que versões cada falha afeta. Cada sugestão é uma pista, a conferir no
-boletim do fabricante.
+palavras genéricas, como `server`, `pro`, `enterprise`, `firmware` e `web`, não
+contam. Uma palavra que combina com o produto vale mais que uma que combina com
+o fabricante: `Windows` diz mais que `Microsoft`. O nome do fabricante repetido
+no produto, como em `Cisco IP Phones`, conta uma vez só, como fabricante: senão,
+qualquer produto com Cisco no nome passaria à frente do IOS, num roteador
+Cisco. As CVEs que o equipamento já tem aparecem com `*`. **A combinação é
+pelo nome, e não pela versão**: o KEV não diz que versões cada falha afeta.
+Cada sugestão é uma pista, a conferir no boletim do fabricante.
 
 Um trecho da tela, numa busca:
 
@@ -1230,7 +1232,8 @@ nem pelo DHS.
   (`urllib`).
 - **Nada sensível no repositório.** A pasta `dados/`, com a base real, fica
   fora do Git (`.gitignore`) e da imagem (`.dockerignore`); a base de exemplo
-  é fictícia; não há senhas nem chaves no código. A base real merece ainda
+  é fictícia, inclusive as fichas técnicas e os números de série e de
+  patrimônio; não há senhas nem chaves no código. A base real merece ainda
   mais cuidado com a ficha técnica e as CVEs: fabricante, modelo e versão de
   cada equipamento, junto com as falhas abertas, mostram a um atacante o que
   explorar e onde.
@@ -1317,7 +1320,7 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 python testes.py
 ```
 
-São 95 testes, só com a biblioteca padrão: o programa inteiro rodando por
+São 100 testes, só com a biblioteca padrão: o programa inteiro rodando por
 dentro com o teclado simulado (do cadastro ao risco, incluindo o cenário de 3
 equipamentos), a árvore de dependências (cada equipamento uma vez, nenhuma
 ligação perdida, a ligação mais específica, o ciclo, uma cadeia de 1.100
@@ -1332,11 +1335,14 @@ norma), a recusa de bases inválidas
 (inclusive JSON fora da norma) e do sistema singular (com o posto e o teorema
 de Rouché-Capelli), os dois limites do número de condição e o posto que
 completa a regra, a conversão da base do Trabalho 1, o comportamento no
-container (inclusive `sair` e Ctrl+D) e o modelo de risco sobre os arquivos de
-exemplo. O último teste roda o autoteste de cada módulo, com a saída em cp1252,
-a codificação que o Windows usa quando a saída vai para um arquivo ou para
-outro programa. Nada toca em `dados/inventario.json` nem em
-`dados/base_cve.json`: os testes usam pastas temporárias.
+container (inclusive `sair` e Ctrl+D), o modelo de risco sobre os arquivos de
+exemplo, a base de exemplo (fichas completas, números de série e de patrimônio
+fictícios, CVEs iguais às da base de CVEs) e os passos do
+[roteiro de demonstração](#roteiro-de-demonstração). O último teste roda o
+autoteste de cada módulo, com a saída em cp1252, a codificação que o Windows
+usa quando a saída vai para um arquivo ou para outro programa. Nada toca em
+`dados/inventario.json` nem em `dados/base_cve.json`: os testes usam pastas
+temporárias.
 
 Os mesmos testes rodam no pytest, que entende os testes escritos com o
 unittest:
@@ -1413,6 +1419,8 @@ estavam no código ganharam um teste, para não voltarem:
 | `limpar` numa pergunta do `calcular` apagava a pergunta da tela | A pergunta é desenhada de novo | `test_letra_anterior_e_cancelar_nas_perguntas` |
 | Um vetor com métricas não definidas (valor `X`) era recusado | As métricas `X` são ignoradas | `test_vetor_com_metricas_nao_definidas_e_aceito` |
 | `"vetor": null` no arquivo era recusado | `null` vale como sem vetor | `test_vetor_no_arquivo_tem_de_conferir_com_a_nota` |
+| Nas sugestões da opção 16, `firmware` e `web` contavam como palavras da ficha: a câmera Hikvision, com sistema "Firmware", recebia antes as falhas de firmwares de outros fabricantes, e a da própria Hikvision vinha depois | `firmware` e `web` entraram nas palavras genéricas | `test_busca_sugestoes_e_nome_curto` |
+| Nas sugestões da opção 16, o nome do fabricante repetido no produto contava duas vezes: no roteador Cisco, falhas de produtos como `Cisco IP Phones` passavam à frente da falha do IOS XE já registrada nele | O nome do fabricante conta uma vez só, como fabricante | `test_fabricante_repetido_no_produto_conta_uma_vez` |
 | Com o usuário do container trocado para o UID 10001, o programa não gravava no volume criado pela versão anterior | Um `chown` único no volume, descrito em [Em container Docker](#em-container-docker) | Conferido à mão, no container |
 | A explicação da interação "Passiva" do CVSS dava como exemplo clicar num link, que a especificação do FIRST classifica como "Ativa" | Texto corrigido pela especificação | Revisão dos textos contra a especificação |
 
@@ -1446,11 +1454,13 @@ segurança do GitHub. O resultado aparece na aba Actions do repositório.
 ## Dados de exemplo
 
 `dados_exemplo/inventario_exemplo.json` é a base de exemplo do Trabalho 1,
-convertida e acrescida de dependências: 76 equipamentos, 79 vulnerabilidades
-(88 registros equipamento–vulnerabilidade) e 164 dependências. **Os dados são
-fictícios**: os setores e os sistemas citados existem, mas hostnames,
-vulnerabilidades, notas, situações e dependências foram inventados e não
-descrevem a rede real da 1ª DRPC Uberlândia.
+convertida e completada com o que o Trabalho 2 acrescentou: 76 equipamentos,
+todos com ficha técnica, 88 vulnerabilidades (103 registros
+equipamento–vulnerabilidade), 9 delas com CVE, e 164 dependências. **Os dados
+são fictícios**: os setores e os sistemas citados existem, mas hostnames,
+fichas técnicas, vulnerabilidades, notas, situações e dependências foram
+inventados e não descrevem a rede real da 1ª DRPC Uberlândia. Fabricantes e
+modelos são de equipamentos comuns no mercado, escolhidos para o exemplo.
 
 Para usar no computador, copie para o lugar da base:
 
@@ -1475,10 +1485,67 @@ com `docker cp dados_exemplo/inventario_exemplo.json
 inventario:/app/dados/inventario.json` e reinicie com
 `docker restart inventario`: a base é lida uma vez, ao abrir.
 
-A base de exemplo não tem ficha técnica nem CVE, que são opcionais: ela vem
-do Trabalho 1. Para ver as sugestões da opção 16, preencha antes a ficha de um
-equipamento na opção 4, por exemplo a do `DRPC-SRV02` (ID 2), um servidor, com
-fabricante `Dell`, modelo `PowerEdge R740` e sistema `Windows Server 2019`.
+Isso substitui o inventário que estiver no volume. Para guardar o atual
+antes: `docker cp inventario:/app/dados/inventario.json inventario_antigo.json`.
+
+### O que a base de exemplo tem
+
+| Parte | O que tem |
+| --- | --- |
+| Ficha técnica | Fabricante e modelo nos 76 equipamentos; sistema e versão nos que têm sistema. Servidores Dell PowerEdge com Windows Server, roteador e switch Cisco na sede, roteadores MikroTik e TP-Link nos outros setores, câmeras Hikvision, nobreaks APC, impressoras HP, Brother e Samsung e estações Dell, HP, Lenovo e Positivo. Nos bancos de dados, o sistema é o do servidor em que o banco roda |
+| Série e patrimônio | Fictícios e fáceis de reconhecer: a série é `EX` (de exemplo), duas letras do fabricante e o ID (`EXDL0065`, um Dell); o patrimônio é 1011000 mais o ID (`1011065`). Os sistemas internos e os bancos de dados, que são programas, não têm nenhum dos dois. A `DP5-PC01` fica sem patrimônio de propósito: a falha registrada nela é "Estação sem etiqueta patrimonial" |
+| Versões | Combinam com as falhas: Windows 7 nas duas estações com "Windows 7, sem suporte do fabricante"; Windows 11 24H2, cujo suporte nas edições Home e Pro acabou em 13/10/2026, nas três estações "sem atualizações" ainda não corrigidas; Windows Server 2008 R2 e 2012 R2, fora do suporte, nos servidores com o BlueKeep e o EternalBlue; RouterOS 6.40.5, anterior à correção da falha do Winbox (6.40.8), nos dois MikroTik em que ela está aberta ou em tratamento, e 6.49.10 no que já foi corrigido; IOS XE 17.9.4a, versão que corrige a CVE-2023-20198, no roteador da sede; firmware de 2017 na câmera em que a falha da Hikvision está aberta, e de 2022 na que foi corrigida |
+| CVEs | Nove CVEs reais do catálogo KEV, as exploradas em ataques (tabela abaixo), registradas como a opção 16 registra: nome, CWE, nota e vetor da base que vem com o programa, e categoria "falta de atualização" |
+| CWE | Em 45 vulnerabilidades: as nove CVEs e 36 falhas do Trabalho 1, como senha padrão de fábrica (CWE-1392), disco sem criptografia (CWE-311) e pasta com permissão para todos (CWE-732) |
+| Vetor CVSS | Em 23 vulnerabilidades, sempre conferindo com a nota: as nove CVEs, com o vetor da base, e 14 falhas do Trabalho 1, com o vetor que dá a nota que elas já tinham |
+
+| CVE | Falha | Equipamentos (status) |
+| --- | --- | --- |
+| CVE-2019-0708 | BlueKeep, na Área de Trabalho Remota do Windows | `INTEL-SRV01` (aberta), `DPLAN-PC02` (aberta), `DP4-PC01` (em tratamento) |
+| CVE-2017-0144 | EternalBlue, no SMBv1 do Windows | `PERICIA-SRV01` (em tratamento) |
+| CVE-2021-34527 | PrintNightmare, no spooler de impressão do Windows | `DRPC-SRV01` (corrigida) |
+| CVE-2020-0618 | Reporting Services do SQL Server | `DRPC-DB01` (corrigida) |
+| CVE-2023-20198 | Interface web do Cisco IOS XE | `DRPC-RT01` (corrigida) |
+| CVE-2018-0171 | Smart Install do Cisco IOS | `DRPC-SW01` (aberta) |
+| CVE-2018-14847 | Winbox do MikroTik RouterOS | `DP3-RT01` (aberta), `DP7-RT01` (em tratamento), `DP1-RT01` (corrigida) |
+| CVE-2021-36260 | Servidor web das câmeras Hikvision | `DEIFRVA-CAM01` (aberta), `DPLAN-CAM01` (corrigida) |
+| CVE-2023-38831 | WinRAR | `FRAUD-PC01` (aberta), `FRAUD-PC02` (corrigida) |
+
+Os testes conferem a base: as fichas, o padrão dos números de série e de
+patrimônio e as CVEs, iguais às da base de CVEs que vem com o programa.
+
+### Roteiro de demonstração
+
+Um roteiro para a apresentação, de uns 15 minutos, que passa pelos quatro
+requisitos do Trabalho 2 e pelo que o programa tem a mais. Antes, ponha a base
+de exemplo no volume, como acima, e ligue o container. Os números são os da
+base de exemplo sem alterações; um teste confere os principais
+(`test_roteiro_de_demonstracao_na_base_de_exemplo`).
+
+| # | O que fazer | O que mostrar |
+| --- | --- | --- |
+| 1 | `docker ps` | O container `inventario` no ar (`Up`) e saudável (`(healthy)`): requisito 3. No servidor do docente, o `Up` mostra há quanto tempo |
+| 2 | `docker attach inventario` e Enter | A tela de abertura e "Base carregada: 76 equipamento(s), 88 vulnerabilidade(s)." |
+| 3 | Opção 2 | Os 76 equipamentos, cada um um objeto da subclasse do seu tipo: requisito 1 |
+| 4 | Opção 7, ID `65` | O `INTEL-SRV01`: o tipo, com o fator de exposição da subclasse (1,5), a ficha técnica (Dell PowerEdge R430, Windows Server 2008 R2) e as três vulnerabilidades, uma delas o BlueKeep, aberto, com CVE, CWE e vetor |
+| 5 | Opção 3, item 7, `CVE-2019-0708` | Onde está uma falha quando ela sai no noticiário: `DPLAN-PC02` e `INTEL-SRV01` (abertas) e `DP4-PC01` (em tratamento) |
+| 6 | Opção 3, item 6, `MikroTik` | A busca pela ficha técnica: os três roteadores das delegacias |
+| 7 | Opção 16, item 3, ID `3` | As CVEs exploradas que combinam com a ficha do roteador da sede (Cisco, IOS XE). A primeira, CVE-2023-20198, tem `*`: já está registrada nele. Para voltar ao menu, escolha uma e responda `n` |
+| 8 | Opção 16, item 1, `remote desktop` | A busca na base de CVEs, sem internet: o BlueKeep em primeiro |
+| 9 | Opção 12, ID `28`, e Enter | As duas árvores do `PERICIA-PC01`: quem depende dele e do que ele depende, com as frações. O Enter no fim não remove nada |
+| 10 | Opção 13 | A verificação de `I − A` antes da conta (diagonal dominante, determinante 0,98, número de condição 7,98, posto 76) e o risco próprio e o efetivo de todos: no topo, `PERICIA-SRV01` (40,61), `DRPC-SRV01` (40,01) e `INTEL-SRV01` (37,61). Requisito 4 |
+| 11 | Opção 14, ID `65` | A conta do `INTEL-SRV01`: b = 1,5 × 19,6 = 29,40; herdado de quem ele depende, 8,21; x = 29,40 + 8,21 = 37,61 |
+| 12 | Opção 8, ID `65`, vulnerabilidade `80`, Enter cinco vezes e status `3` | O BlueKeep corrigido no `INTEL-SRV01` |
+| 13 | Opção 14, ID `65`; depois opção 13 | O risco efetivo do `INTEL-SRV01` cai de 37,61 para 22,91, e o da `INTEL-PC01`, que herda 0,2 dele, de 28,85 para 25,91 (0,2 × 14,70 = 2,94) |
+| 14 | Opção 15 | M é 76 × 88, com posto 56 e núcleo de dimensão 32; 17 colunas nulas. As matrizes não cabem na tela, mas a verificação de `I − A`, sim |
+| 15 | Ctrl+P e Ctrl+Q; depois `docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_3_equipamentos.json inventario:1.0` e opções 15 e 13 | O cenário de 3 equipamentos: M, v, F, b e A na tela, na opção 15, e os riscos efetivos 16, 24 e 18, na 13, a conta da [validação à mão](#validação-à-mão-cenário-de-3-equipamentos) |
+| 16 | O mesmo `docker run`, com `cenario_singular.json`, e opção 13 | A recusa: `I − A` não é invertível e, pelo teorema de Rouché-Capelli, o sistema não tem solução |
+| 17 | `dados_exemplo/inventario_exemplo.json`, no GitHub | O arquivo de dados: um array JSON de objetos, um por equipamento. Requisito 2 |
+| 18 | `python testes.py` e a aba Actions do GitHub | Os 100 testes e a verificação automática a cada push |
+
+O passo 12 grava no volume. Para voltar à base de exemplo depois, copie-a de
+novo, como acima. Nos passos 15 e 16, o `--rm` apaga o container do cenário
+quando o programa termina (opção 0), e o `inventario` continua rodando.
 
 `dados_exemplo/cenario_3_equipamentos.json` é o cenário resolvido à mão em
 [Validação à mão](#validação-à-mão-cenário-de-3-equipamentos).
