@@ -2,10 +2,10 @@
 
 A classe Aplicacao liga as peças: pergunta ao usuário (entrada.py e,
 para a nota CVSS, pergunta_cvss.py), chama as regras do Inventario,
-calcula o risco (risco.py), consulta a base de CVEs exploradas
-(base_cve.py) e a atualiza (atualizacao_cve.py), grava
-(armazenamento.py) e mostra o resultado (telas.py). Para rodar:
-python main.py.
+calcula o risco (risco.py), monta a árvore de dependências (arvore.py),
+consulta a base de CVEs exploradas (base_cve.py) e a atualiza
+(atualizacao_cve.py), grava (armazenamento.py) e mostra o resultado
+(telas.py). Para rodar: python main.py.
 
 Trabalho 2: o programa inteiro foi reescrito em orientação a objetos
 (equipamentos.py, vulnerabilidades.py, inventario.py), guarda os dados
@@ -19,6 +19,7 @@ import sys
 import time
 from collections import namedtuple
 
+import arvore
 import atualizacao_cve
 import banner
 import cores
@@ -97,7 +98,7 @@ OPCOES_MENU = (
     )),
     ("Dependências e risco", (
         (11, "Cadastrar dependência entre equipamentos"),
-        (12, "Ver ou remover dependências de um equipamento"),
+        (12, "Árvore de dependências de um equipamento (e remoção)"),
         (13, "Risco de todos os equipamentos (próprio e efetivo)"),
         (14, "Risco de um equipamento (passo a passo)"),
         (15, "Matrizes do modelo (M, v, F, A) e verificação de I - A"),
@@ -824,7 +825,12 @@ class Aplicacao:
             f"{fracao_br(origem.soma_dependencias)}."))
 
     def ver_dependencias(self):
-        """Opção 12: mostra as dependências e permite remover uma."""
+        """Opção 12: mostra as árvores de dependência e remove uma.
+
+        As duas árvores (arvore.py) mostram quem depende do equipamento
+        e do que ele depende, direta e indiretamente. A remoção vale
+        para uma das dependências diretas, listadas por último.
+        """
         print("\n" + cores.titulo("--- DEPENDÊNCIAS DE UM EQUIPAMENTO ---")
               + "\n")
         equipamento = self._ler_equipamento()
@@ -832,7 +838,12 @@ class Aplicacao:
             return
 
         telas.mostrar_equipamento(equipamento)
-        telas.mostrar_dependencias(self.inventario, equipamento)
+        telas.mostrar_dependencias(
+            self.inventario, equipamento,
+            arvore.montar(self.inventario, equipamento.id,
+                          arvore.QUEM_DEPENDE),
+            arvore.montar(self.inventario, equipamento.id,
+                          arvore.DO_QUE_DEPENDE))
         if not equipamento.dependencias:
             return
 

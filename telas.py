@@ -9,6 +9,7 @@ import textwrap
 
 import cores
 import formatacao
+from arvore import QUEM_DEPENDE
 from base_cve import nome_curto
 from classificacoes import NivelGravidade
 from formatacao import fracao_br, numero_br
@@ -284,33 +285,187 @@ def mostrar_nomes_numerados(itens, inicio):
 # Dependências
 # ----------------------------------------------------------------------
 
-def mostrar_dependencias(inventario, equipamento):
-    """Mostra de quem o equipamento depende e quem depende dele."""
-    print(f"\n  {cores.titulo('Depende de')} "
-          f"(herda parte do risco destes; linha {equipamento.hostname} "
-          f"na matriz A):")
-    if equipamento.dependencias:
-        for destino, fracao in sorted(equipamento.dependencias.items()):
-            alvo = inventario.buscar_por_id(destino)
-            print(f"    [{destino}] {alvo.hostname:<24} "
-                  f"fração {fracao_br(fracao)}")
-        soma = equipamento.soma_dependencias
-        sobra = round(1 - soma, 9)
-        print("    " + cores.discreto(
-            f"soma {fracao_br(soma)} (precisa ficar abaixo de 1; "
-            f"sobra menos que {fracao_br(sobra)})"))
-    else:
-        print("    " + cores.discreto("nenhuma"))
+def mostrar_dependencias(inventario, equipamento, quem_depende,
+                         do_que_depende):
+    """Mostra as árvores de dependência do equipamento (opção 12).
 
-    print(f"\n  {cores.titulo('Dependem dele')} "
-          f"(herdam parte do risco deste):")
-    dependentes = inventario.dependentes_de(equipamento.id)
-    if dependentes:
-        for outro, fracao in dependentes:
-            print(f"    [{outro.id}] {outro.hostname:<24} "
-                  f"fração {fracao_br(fracao)}")
+    quem_depende e do_que_depende são as Arvore montadas por
+    arvore.montar(). Por último vêm as dependências diretas, com a soma
+    das frações: é delas que a opção 12 remove uma, logo abaixo.
+    """
+    print()
+    _paragrafo("Cada equipamento aparece uma vez, sob a ligação mais "
+               "específica; as outras ligações dele vêm na linha "
+               "\"também\". \"Herda 0,2\": herda 20% do risco efetivo do "
+               "equipamento de cima. \"Repassa 0,2\": o de cima herda 20% "
+               "do risco efetivo deste.", "  ", LARGURA_EXPLICACAO + 4,
+               cores.discreto)
+    mostrar_arvore(quem_depende)
+    mostrar_arvore(do_que_depende)
+    if not equipamento.dependencias:
+        return
+    print(f"\n  {cores.titulo('Dependências diretas')} "
+          f"(linha {equipamento.hostname} da matriz A):")
+    # Largura do id tirada da própria lista, para alinhar [3] e [31].
+    largura_id = max(len(f"[{d}]") for d in equipamento.dependencias)
+    for destino, fracao in sorted(equipamento.dependencias.items()):
+        alvo = inventario.buscar_por_id(destino)
+        ciclo = (cores.aviso(" (ciclo)")
+                 if equipamento.id in alvo.dependencias else "")
+        print(f"    {f'[{destino}]':<{largura_id}} {alvo.hostname:<24} "
+              f"fração {fracao_br(fracao)}{ciclo}")
+    soma = equipamento.soma_dependencias
+    sobra = round(1 - soma, 9)
+    print("    " + cores.discreto(
+        f"soma {fracao_br(soma)} (precisa ficar abaixo de 1; "
+        f"sobra menos que {fracao_br(sobra)})"))
+
+
+# Largura das árvores: cabe no terminal de 80 colunas. Num ramo muito
+# fundo, o texto ainda ganha ao menos LARGURA_MINIMA_ARVORE colunas.
+LARGURA_ARVORE = 80
+LARGURA_MINIMA_ARVORE = 30
+
+# Traços da árvore, com 3 colunas cada, como os do comando tree: ramo,
+# último ramo, linha que continua e espaço.
+RAMO, ULTIMO_RAMO, CONTINUA, ESPACO = "├─ ", "└─ ", "│  ", "   "
+
+
+def _juntar(partes):
+    """Junta textos como numa frase: "a", "a e b", "a, b e c"."""
+    if len(partes) <= 1:
+        return "".join(partes)
+    return ", ".join(partes[:-1]) + " e " + partes[-1]
+
+
+# Espaço que não quebra linha: junta as palavras de uma ligação ("0,1 de
+# [4] DRPC-SW01") para a quebra cair só entre uma ligação e outra. Vira
+# espaço comum antes de imprimir.
+_JUNTO = "\u00a0"
+
+
+def _quebrar(texto, largura):
+    """Quebra o texto em linhas, sem partir hostnames nem ligações."""
+    return [linha.replace(_JUNTO, " ")
+            for linha in textwrap.wrap(texto, largura,
+                                       break_on_hyphens=False,
+                                       break_long_words=False)]
+
+
+def _ligacoes(ligacoes, preposicao):
+    """'0,1 de [1] SRV01 (ciclo) e 0,1 de [4] SW01', para a linha."""
+    return _juntar([_JUNTO.join([fracao_br(lig.fracao), preposicao,
+                                 f"[{lig.equipamento.id}]",
+                                 lig.equipamento.hostname]
+                                + (["(ciclo)"] if lig.ciclo else []))
+                    for lig in ligacoes])
+
+
+def _nota_de_fora(item, desce):
+    """O aviso dos vizinhos de baixo que estão em outros ramos."""
+    n = item.fora
+    if desce:
+        if n == 1:
+            texto = ("outro dependente direto aparece" if item.filhos
+                     else "o dependente direto dele aparece")
+            return texto + " em outro ramo"
+        texto = (f"outros {n} dependentes diretos aparecem" if item.filhos
+                 else f"os {n} dependentes diretos dele aparecem")
+        return texto + " em outros ramos"
+    if n == 1:
+        texto = ("outra dependência direta aparece" if item.filhos
+                 else "a dependência direta dele aparece")
+        return texto + " em outro ramo"
+    texto = (f"outras {n} dependências diretas aparecem" if item.filhos
+             else f"as {n} dependências diretas dele aparecem")
+    return texto + " em outros ramos"
+
+
+def _textos_do_item(item, desce):
+    """A linha principal do item e os textos de apoio, ainda sem quebra.
+
+    Devolve (principal, também, nomes, nota); os três últimos ficam
+    vazios quando não se aplicam.
+    """
+    fracao = fracao_br(item.fracao)
+    if len(item.equipamentos) == 1:
+        equipamento = item.equipamentos[0]
+        verbo = "herda" if desce else "repassa"
+        principal = (f"[{equipamento.id}] {equipamento.hostname}  "
+                     f"{verbo} {fracao}")
+        nomes = ""
     else:
-        print("    " + cores.discreto("nenhum"))
+        verbo = "herdam" if desce else "repassam"
+        principal = (f"{len(item.equipamentos)} equipamentos {verbo} "
+                     f"{fracao}")
+        nomes = ", ".join(f"[{e.id}]{_JUNTO}{e.hostname}"
+                          for e in item.equipamentos)
+    tambem = ""
+    if item.outras:
+        tambem = (f"também {verbo} "
+                  + _ligacoes(item.outras, "de" if desce else "a"))
+    nota = _nota_de_fora(item, desce) if item.fora else ""
+    return principal, tambem, nomes, nota
+
+
+def _pintar_tambem(linha):
+    """Linha de apoio apagada, com o "(ciclo)" em destaque."""
+    return cores.aviso("(ciclo)").join(
+        cores.discreto(parte) if parte else ""
+        for parte in linha.split("(ciclo)"))
+
+
+def _imprimir_item(item, prefixo, ultimo, desce):
+    """Imprime um item da árvore: a linha dele e as de apoio, embaixo.
+
+    As linhas de apoio (as outras ligações, os nomes de um grupo e a
+    nota dos outros ramos) ficam alinhadas ao texto do item. Se o item
+    tem filhos, a linha que desce até eles aparece também nelas.
+    """
+    principal, tambem, nomes, nota = _textos_do_item(item, desce)
+    ciclo = cores.aviso(" (ciclo)") if item.ciclo else ""
+    print(f"{prefixo}{ULTIMO_RAMO if ultimo else RAMO}{principal}{ciclo}")
+    recuo = (prefixo + (ESPACO if ultimo else CONTINUA)
+             + (CONTINUA if item.filhos else ESPACO))
+    largura = max(LARGURA_MINIMA_ARVORE, LARGURA_ARVORE - len(recuo))
+    for linha in _quebrar(tambem, largura):
+        print(recuo + _pintar_tambem(linha))
+    for linha in _quebrar(nomes, largura):
+        print(recuo + linha)
+    if nota:
+        print(recuo + cores.discreto(nota))
+
+
+def mostrar_arvore(arvore):
+    """Imprime uma árvore de dependências (arvore.Arvore).
+
+    Os itens são visitados com uma pilha, e não por recursão: uma cadeia
+    longa de dependências não estoura a pilha do Python.
+    """
+    desce = arvore.sentido == QUEM_DEPENDE
+    raiz = arvore.raiz
+    titulo = (f"Quem depende de {raiz.hostname}" if desce
+              else f"Do que {raiz.hostname} depende")
+    quantos = (f"{arvore.total} equipamento{'s' if arvore.total > 1 else ''}"
+               f", contando os indiretos")
+    if not arvore.itens:
+        print(f"\n  {cores.titulo(titulo)}")
+        print("    " + cores.discreto(
+            "ninguém depende dele" if desce
+            else "não depende de nenhum equipamento"))
+        return
+    print(f"\n  {cores.titulo(titulo)} " + cores.discreto(f"({quantos})"))
+    print(f"  [{raiz.id}] {raiz.hostname}")
+    pilha = [(item, "  ", posicao == len(arvore.itens) - 1)
+             for posicao, item in enumerate(arvore.itens)]
+    pilha.reverse()
+    while pilha:
+        item, prefixo, ultimo = pilha.pop()
+        _imprimir_item(item, prefixo, ultimo, desce)
+        continua = prefixo + (ESPACO if ultimo else CONTINUA)
+        for posicao in range(len(item.filhos) - 1, -1, -1):
+            pilha.append((item.filhos[posicao], continua,
+                          posicao == len(item.filhos) - 1))
 
 
 # ----------------------------------------------------------------------
@@ -470,10 +625,14 @@ def mostrar_detalhe_risco(item, vulnerabilidades, parcelas):
 LARGURA_EXPLICACAO = 70
 
 
-def _paragrafo(texto, recuo, largura=LARGURA_EXPLICACAO):
-    """Imprime o texto quebrado em linhas, todas com o mesmo recuo."""
+def _paragrafo(texto, recuo, largura=LARGURA_EXPLICACAO, pintar=None):
+    """Imprime o texto quebrado em linhas, todas com o mesmo recuo.
+
+    pintar, se dado, é a função de cores.py aplicada a cada linha (a
+    quebra é feita antes, sobre o texto puro).
+    """
     for linha in textwrap.wrap(texto, largura):
-        print(f"{recuo}{linha}")
+        print(f"{recuo}{pintar(linha) if pintar else linha}")
 
 
 def mostrar_inicio_calculadora_cvss():
