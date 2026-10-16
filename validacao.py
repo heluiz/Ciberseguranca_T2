@@ -11,6 +11,22 @@ armazenamento transforma o ValueError em BaseInvalidaError.
 import math
 
 
+def objeto_sem_nome_repetido(pares):
+    """Monta um objeto JSON e recusa nome repetido nele.
+
+    A RFC 8259 (seção 4) pede nomes únicos num objeto; sozinho, o módulo
+    json ficaria em silêncio com o último valor de um nome repetido. É
+    o object_pairs_hook de json.load() e json.loads().
+    """
+    objeto = {}
+    for nome, valor in pares:
+        if nome in objeto:
+            raise ValueError(f"o nome {nome!r} aparece duas vezes no "
+                             f"mesmo objeto")
+        objeto[nome] = valor
+    return objeto
+
+
 def exigir_objeto(valor, nome):
     """Garante que o valor é um objeto JSON (dict) e o devolve."""
     if not isinstance(valor, dict):

@@ -101,6 +101,17 @@ def numero_br(valor, casas=1):
     return f"{valor:.{casas}f}".replace(".", ",")
 
 
+def inteiro_br(valor):
+    """Formata o inteiro com ponto de milhar: 1741 vira "1.741"."""
+    return f"{valor:,}".replace(",", ".")
+
+
+def data_br(texto):
+    """Formata a data AAAA-MM-DD (como no JSON) como DD/MM/AAAA."""
+    ano, mes, dia = texto.split("-")
+    return f"{dia}/{mes}/{ano}"
+
+
 def fracao_br(valor):
     """Formata frações sem zeros inúteis: 0.3 -> "0,3", 0.25 -> "0,25".
 
@@ -140,6 +151,8 @@ def para_busca(texto):
 
 # Teste rápido: roda só com "python formatacao.py", nunca no import.
 if __name__ == "__main__":
+    assert data_br("2026-10-13") == "13/10/2026"
+    assert (inteiro_br(1741), inteiro_br(12)) == ("1.741", "12")
     casos_titulo = [
         ("escrivão de plantão", "Escrivão de Plantão"),
         ("ESCRIVÃO DE PLANTÃO", "Escrivão de Plantão"),

@@ -9,6 +9,7 @@ import textwrap
 
 import cores
 import formatacao
+from base_cve import nome_curto
 from classificacoes import NivelGravidade
 from formatacao import fracao_br, numero_br
 from risco import LIMITE_AVISO_CONDICAO, LIMITE_CONDICAO
@@ -199,6 +200,84 @@ def resumo_por_severidade(itens):
     partes = [cores.gravidade(f"{nivel.rotulo} {contagem[nivel]}", nivel)
               for nivel in mais_grave_primeiro]
     return " · ".join(partes)
+
+
+# ----------------------------------------------------------------------
+# Base de CVEs exploradas (opção 16)
+# ----------------------------------------------------------------------
+
+def resumo_da_base_cve(base):
+    """Uma linha sobre a base: o catálogo, as CVEs e de onde veio."""
+    quando = formatacao.data_br(base.publicado) if base.publicado else "?"
+    if base.origem == "atualizada":
+        de_onde = f"atualizada em {formatacao.data_br(base.montado_em)}"
+    else:
+        de_onde = "a que vem com o programa"
+    total = formatacao.inteiro_br(len(base))
+    com_nota = formatacao.inteiro_br(base.com_nota())
+    return (f"Catálogo KEV da CISA de {quando}: {total} CVEs exploradas, "
+            f"{com_nota} com nota CVSS ({de_onde}).")
+
+
+def mostrar_registros_cve(registros, inicio, marcadas=()):
+    """Mostra uma página de CVEs da base, numeradas de inicio + 1.
+
+    marcadas são as CVEs que o equipamento já tem: o número delas leva
+    um *. A coluna FALHA é o nome sem o fabricante e o produto, que já
+    têm colunas próprias.
+    """
+    linhas = []
+    for numero, registro in enumerate(registros, inicio + 1):
+        marca = "*" if registro.cve in marcadas else ""
+        nota = "-" if registro.cvss is None else numero_br(registro.cvss)
+        linhas.append((f"{numero}{marca}", registro.cve, nota,
+                       registro.fabricante, registro.produto,
+                       nome_curto(registro)))
+    imprimir_tabela(("#", "CVE", "NOTA", "FABRICANTE", "PRODUTO", "FALHA"),
+                    (5, 16, 4, 14, 24, 34),
+                    (True, False, True, False, False, False), linhas)
+    if any(registro.cve in marcadas for registro in registros):
+        print("  " + cores.discreto("* já registrada neste equipamento"))
+
+
+def mostrar_registro_cve(registro):
+    """Mostra uma CVE da base com tudo o que ela tem."""
+    print(f"\n  {cores.titulo(registro.cve)} - {registro.nome}")
+    print(f"  Fabricante .... {registro.fabricante}")
+    print(f"  Produto ....... {registro.produto}")
+    if registro.cvss is None:
+        print(f"  Nota CVSS ..... "
+              f"{cores.discreto('sem nota no registro oficial')}")
+    else:
+        nivel = NivelGravidade.do_cvss(registro.cvss)
+        nota = f"{numero_br(registro.cvss)} ({nivel.rotulo})"
+        # O CNA é quem publicou a CVE (em geral, o fabricante); um ADP,
+        # como o da CISA, completa o registro de outro.
+        fonte = ("pelo CNA, quem publicou a CVE"
+                 if registro.fonte_nota == "CNA"
+                 else f"por {registro.fonte_nota}")
+        print(f"  Nota CVSS ..... {cores.gravidade(nota, nivel)}"
+              + cores.discreto(f" (dada {fonte})"))
+        print(f"  Vetor CVSS .... {registro.vetor}")
+    cwes = ", ".join(registro.cwes) or cores.discreto("não informado")
+    print(f"  CWE ........... {cwes}")
+    print(f"  No catálogo ... desde "
+          f"{formatacao.data_br(registro.adicionada)}")
+    if registro.ransomware:
+        print("  " + cores.aviso("Usada em campanhas de ransomware, segundo "
+                                 "a CISA."))
+    print()
+    _paragrafo(registro.descricao, "  ", LARGURA_EXPLICACAO + 4)
+    print("  " + cores.discreto("(Descrição em inglês, como no catálogo "
+                                "oficial.)"))
+
+
+def mostrar_nomes_numerados(itens, inicio):
+    """Mostra [(nome, quantas CVEs)] numerados de inicio + 1."""
+    largura = len(str(inicio + len(itens)))
+    for numero, (nome, quantas) in enumerate(itens, inicio + 1):
+        print(f"    {cores.destaque(str(numero).rjust(largura))} - {nome} "
+              f"({quantas})")
 
 
 # ----------------------------------------------------------------------

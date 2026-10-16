@@ -253,19 +253,23 @@ def ler_opcao(mensagem, quantas, padrao=None):
         print("  " + cores.erro(f"! Digite um número de 1 a {quantas}."))
 
 
-def ler_enum(mensagem, classe_enum, opcional=False):
+def ler_enum(mensagem, classe_enum, opcional=False, padrao=None):
     """Mostra as opções do Enum e só aceita um código da lista.
 
-    Com opcional=True, Enter vazio devolve None.
+    Com opcional=True, Enter vazio devolve None. Com padrao (um item do
+    Enum), Enter vazio devolve esse item, que a pergunta mostra.
     """
     print(f"\n{mensagem}")
     for item in classe_enum:
         print(f"    {cores.destaque(str(item.value))} - {item.rotulo}")
 
+    pergunta = ("  Código: " if padrao is None
+                else f"  Código (Enter: {padrao.rotulo}): ")
     while True:
-        codigo = ler_inteiro("  Código: ", opcional=opcional)
+        codigo = ler_inteiro(pergunta,
+                             opcional=opcional or padrao is not None)
         if codigo is None:
-            return None
+            return padrao
         try:
             return classe_enum(codigo)
         except ValueError:

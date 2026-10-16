@@ -10,6 +10,7 @@ também rodam aqui, como último teste.
 """
 
 import contextlib
+import datetime
 import io
 import json
 import os
@@ -19,19 +20,28 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import urllib.error
 from unittest import mock
 
 from numpy.linalg import LinAlgError
 
+import base_cve
 import cores
 import main
 from armazenamento import ArquivoInventario, BaseInvalidaError
+from atualizacao_cve import (
+    AtualizacaoError,
+    baixar_primeiro,
+    nota_do_registro,
+)
+from base_cve import BaseCVE, RegistroCVE, nome_curto
 from classificacoes import (
     OrigemVulnerabilidade,
     SituacaoTratamento,
     TipoEquipamento,
 )
 from equipamentos import criar_equipamento
+from ficha_tecnica import FichaTecnica
 from inventario import Inventario
 from risco import ModeloRisco, SistemaSingularError
 
@@ -42,6 +52,84 @@ PASTA = os.path.dirname(os.path.abspath(__file__))
 # processo; desligar() vale para este, que já importou cores.py.
 os.environ["NO_COLOR"] = "1"
 cores.desligar()
+
+
+# Base de CVEs dos testes: pequena e fixa, para os testes não dependerem
+# da base real, que muda a cada atualização do catálogo.
+RDP_31 = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"      # 9,8
+TOTAL_31 = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"    # 10,0
+
+
+def registro_cve(cve, fabricante, produto, nome, cvss=None, vetor=None,
+                 cwes=(), ransomware=False, dia="2024-01-10"):
+    """Um RegistroCVE para a base dos testes."""
+    return RegistroCVE(
+        cve=cve, fabricante=fabricante, produto=produto, nome=nome,
+        descricao=f"{nome}. It allows remote attackers to run code.",
+        cwes=tuple(cwes), adicionada=dia, prazo=dia, ransomware=ransomware,
+        cvss=cvss, vetor=vetor, fonte_nota=None if cvss is None else "CNA")
+
+
+def base_de_teste():
+    """Quatro CVEs: RDP, FortiOS e dois produtos Cisco (um sem nota)."""
+    return BaseCVE([
+        registro_cve("CVE-2019-0708", "Microsoft", "Remote Desktop Services",
+                     "Microsoft Remote Desktop Services Remote Code "
+                     "Execution Vulnerability", 9.8, RDP_31, ["CWE-416"],
+                     ransomware=True, dia="2021-11-03"),
+        registro_cve("CVE-2024-21762", "Fortinet", "FortiOS",
+                     "Fortinet FortiOS Out-of-Bound Write Vulnerability",
+                     9.8, RDP_31, ["CWE-787"], dia="2024-02-09"),
+        registro_cve("CVE-2023-20198", "Cisco", "IOS XE Web UI",
+                     "Cisco IOS XE Web UI Privilege Escalation "
+                     "Vulnerability", 10.0, TOTAL_31, ["CWE-420"],
+                     dia="2023-10-16"),
+        registro_cve("CVE-2024-20481", "Cisco", "Adaptive Security Appliance",
+                     "Cisco ASA Missing Release of Resource Vulnerability",
+                     dia="2024-10-24"),
+    ], catalogo="2026.10.13", publicado="2026-10-13",
+        montado_em="2026-10-14", origem="inicial")
+
+
+class RespostaSimulada(io.BytesIO):
+    """A resposta de um download simulado, como a de urlopen()."""
+
+    def __init__(self, corpo, url):
+        """Guarda o corpo (bytes, ou um objeto, que vira JSON)."""
+        if not isinstance(corpo, bytes):
+            corpo = json.dumps(corpo).encode()
+        super().__init__(corpo)
+        self.url = url
+
+    def geturl(self):
+        """O endereço de onde a resposta veio."""
+        return self.url
+
+
+def abrir_simulado(catalogo, oficiais):
+    """Uma função abrir(url) que responde sem usar a internet.
+
+    catalogo é o KEV; oficiais, {cve: registro oficial}. CVE fora de
+    oficiais responde 404, como o servidor de verdade.
+    """
+    def abrir(url):
+        """Responde com o catálogo ou com o registro da CVE."""
+        if url.endswith("known_exploited_vulnerabilities.json"):
+            return RespostaSimulada(catalogo, url)
+        cve = url.rsplit("/", 1)[1].removesuffix(".json")
+        if cve not in oficiais:
+            raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+        return RespostaSimulada(oficiais[cve], url)
+
+    return abrir
+
+
+def entrada_do_kev(cve, fabricante, produto, nome, dia):
+    """Uma entrada do catálogo KEV, com os campos que o programa lê."""
+    return {"cveID": cve, "vendorProject": fabricante, "product": produto,
+            "vulnerabilityName": nome, "shortDescription": f"{nome}.",
+            "dateAdded": dia, "dueDate": dia, "cwes": [],
+            "knownRansomwareCampaignUse": "Unknown", "notes": ""}
 
 
 class EntradaAcabou(EOFError):
@@ -57,6 +145,16 @@ class TesteDoPrograma(unittest.TestCase):
         self.addCleanup(self._pasta.cleanup)
         self.caminho = os.path.join(self._pasta.name, "dados",
                                     "inventario.json")
+        # A base de CVEs é vazia: o teste que usa a base põe a sua em
+        # self.base_cve, e o que atualiza põe em self.abrir o download
+        # simulado. A base atualizada iria para a pasta temporária.
+        self.base_cve = BaseCVE()
+        self.abrir = None
+        variavel = mock.patch.dict(os.environ, {
+            "INVENTARIO_BASE_CVE": os.path.join(self._pasta.name, "dados",
+                                                "base_cve.json")})
+        variavel.start()
+        self.addCleanup(variavel.stop)
 
     def rodar(self, respostas):
         """Roda o programa com as respostas e devolve a saída impressa.
@@ -77,7 +175,8 @@ class TesteDoPrograma(unittest.TestCase):
 
         saida = io.StringIO()
         arquivo = ArquivoInventario(self.caminho)
-        aplicacao = main.Aplicacao(arquivo)
+        aplicacao = main.Aplicacao(arquivo, base_cve=self.base_cve,
+                                   abrir=self.abrir)
         # stdin falso: não é terminal, então a pausa do Enter é pulada.
         with (mock.patch("builtins.input", teclado),
               mock.patch("sys.stdin", io.StringIO()),
@@ -697,7 +796,7 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("a solução pode ter poucos dígitos confiáveis", saida)
         self.assertIn("EFETIVO", saida)
 
-    # --- CVE, CWE e ficha técnica ------------------------------------
+    # --- CVE, CWE e ficha técnica -------------------------------------
 
     def test_cve_e_cwe_no_cadastro_e_na_busca(self):
         """A CVE já cadastrada é reaproveitada; a busca acha os dois."""
@@ -809,6 +908,294 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertTrue(all("ficha" not in e for e in dados))
         self.assertTrue(all("cve" not in v and "cwe" not in v
                             for e in dados for v in e["vulnerabilidades"]))
+
+    # --- base de CVEs exploradas (opção 16) ---------------------------
+
+    UM_PC = ["1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1", "n",
+             "n"]
+
+    def test_busca_na_base_e_registro_da_cve(self):
+        """Opção 16: busca por palavras, detalhes e registro no PC."""
+        self.base_cve = base_de_teste()
+        saida = self.rodar(self.UM_PC + [
+            "16", "1", "remote desktop", "1", "s", "1", "", "1", "0"])
+        self.assertIn("Catálogo KEV da CISA de 13/10/2026: 4 CVEs "
+                      "exploradas, 3 com nota CVSS", saida)
+        self.assertIn('1 CVE(s) com "remote desktop"', saida)
+        self.assertRegex(saida, r"1\s+CVE-2019-0708\s+9,8\s+Microsoft\s+"
+                                r"Remote Desktop Services\s+Remote Code "
+                                r"Execution")
+        self.assertIn("Usada em campanhas de ransomware", saida)
+        self.assertEqual(self.lido()[0]["vulnerabilidades"], [{
+            "id": 1, "descricao": "Microsoft Remote Desktop Services Remote "
+                                  "Code Execution Vulnerability",
+            "cve": "CVE-2019-0708", "cwe": "CWE-416", "origem": 2,
+            "cvss": 9.8, "vetor": RDP_31, "situacao": 1}])
+
+    def test_busca_sem_resultado_lembra_que_a_base_esta_em_ingles(self):
+        """Em português não acha; sem acento e pelo começo, acha."""
+        self.base_cve = base_de_teste()
+        saida = self.rodar(["16", "1", "área de trabalho remota", "0"])
+        self.assertIn("estão em inglês", saida)
+        saida = self.rodar(["16", "1", "REMÓTE DESK", "", "0"])
+        self.assertIn("CVE-2019-0708", saida)
+
+    def test_navegar_por_fabricante_e_produto(self):
+        """Fabricante com dois produtos: escolhe o produto e a CVE."""
+        self.base_cve = base_de_teste()
+        saida = self.rodar(["16", "2", "", "1", "2", "1", "n", "0"])
+        # A Cisco tem 2 CVEs e vem primeiro; os produtos vêm em ordem.
+        self.assertRegex(saida, r"1 - Cisco \(2\)")
+        self.assertIn("Produtos de Cisco:", saida)
+        self.assertRegex(saida, r"2 - IOS XE Web UI \(1\)")
+        self.assertIn("CVE-2023-20198 - Cisco IOS XE Web UI Privilege", saida)
+        self.assertIn("10,0 (Crítica)", saida)
+        # Com um produto só, a lista das CVEs vem direto.
+        saida = self.rodar(["16", "2", "forti", "1", "", "0"])
+        self.assertNotIn("Produtos de Fortinet", saida)
+        self.assertIn("Fortinet FortiOS: 1 CVE(s)", saida)
+
+    def test_sugestoes_pela_ficha_marcam_as_ja_registradas(self):
+        """Ficha com Fortinet e FortiOS: a CVE do FortiOS é sugerida."""
+        self.base_cve = base_de_teste()
+        saida = self.rodar([
+            "1", "FW-01", "Fulano de Tal", "Sala técnica", "Firewall", "3",
+            "s", "Fortinet", "FortiGate 60F", "", "", "FortiOS", "7.2", "n",
+            "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1", "n", "n",
+            "16", "3", "1", "1", "s", "", "1",
+            "16", "3", "1", "",
+            "16", "3", "2",
+            "0"])
+        self.assertIn("1 CVE(s) combinam com a ficha de FW-01 (fortinet, "
+                      "fortios)", saida)
+        self.assertIn("não pela versão", saida)
+        self.assertRegex(saida, r"1\*\s+CVE-2024-21762")
+        self.assertIn("* já registrada neste equipamento", saida)
+        self.assertIn("PC-01 não tem ficha técnica", saida)
+        self.assertEqual(self.lido()[0]["vulnerabilidades"][0]["cve"],
+                         "CVE-2024-21762")
+
+    def test_cadastro_com_cve_da_base_usa_os_dados_dela(self):
+        """No cadastro, a CVE da base traz descrição, CWE e nota."""
+        self.base_cve = base_de_teste()
+        saida = self.rodar([
+            "1", "PC-01", "Fulano de Tal", "Setor", "Estação", "1", "n",
+            "s", "cve-2019-0708", "", "", "1", "n",
+            # Outra, recusando os dados da base: tudo é perguntado.
+            "6", "1", "CVE-2024-21762", "n", "Falha no firewall", "2", "",
+            "7,5", "1",
+            "0"])
+        self.assertIn("A CVE-2019-0708 está na base de CVEs exploradas",
+                      saida)
+        primeira, segunda = self.lido()[0]["vulnerabilidades"]
+        self.assertEqual((primeira["cve"], primeira["cwe"], primeira["cvss"],
+                          primeira["vetor"]),
+                         ("CVE-2019-0708", "CWE-416", 9.8, RDP_31))
+        self.assertEqual(segunda, {"id": 2, "descricao": "Falha no firewall",
+                                   "cve": "CVE-2024-21762", "origem": 2,
+                                   "cvss": 7.5, "situacao": 1})
+
+    def test_cve_da_base_sem_nota_pergunta_a_nota(self):
+        """A CVE sem nota no registro oficial: a nota é perguntada."""
+        self.base_cve = base_de_teste()
+        saida = self.rodar(self.UM_PC + [
+            "16", "1", "CVE-2024-20481", "1", "s", "1", "", "5,8", "1", "0"])
+        self.assertIn("sem nota no registro oficial", saida)
+        vuln = self.lido()[0]["vulnerabilidades"][0]
+        self.assertEqual((vuln["cve"], vuln["cvss"]), ("CVE-2024-20481", 5.8))
+        self.assertNotIn("vetor", vuln)
+        self.assertNotIn("cwe", vuln)
+
+    def test_registrar_cve_que_ja_esta_no_catalogo_reaproveita(self):
+        """A mesma CVE em dois equipamentos é uma vulnerabilidade só."""
+        self.base_cve = base_de_teste()
+        saida = self.rodar(self.UM_PC + [
+            "1", "PC-02", "Fulano de Tal", "Setor", "Estação", "1", "n", "n",
+            "16", "1", "CVE-2019-0708", "1", "s", "1", "", "1",
+            "16", "1", "CVE-2019-0708", "1", "s", "2", "2",
+            "16", "1", "CVE-2019-0708", "1", "s", "1",
+            "0"])
+        self.assertIn("A CVE-2019-0708 já está no catálogo: [1]", saida)
+        self.assertIn("PC-01 já tem a CVE-2019-0708 (vulnerabilidade 1).",
+                      saida)
+        dados = self.lido()
+        self.assertEqual(dados[1]["vulnerabilidades"][0]["id"], 1)
+        self.assertEqual(dados[1]["vulnerabilidades"][0]["situacao"], 2)
+
+    def test_atualizar_sem_internet_mantem_a_base(self):
+        """Sem internet, a atualização avisa e nada muda."""
+        self.base_cve = base_de_teste()
+
+        def sem_internet(url):
+            """Simula a falta de internet."""
+            raise urllib.error.URLError(f"sem conexão com {url}")
+
+        self.abrir = sem_internet
+        saida = self.rodar(["16", "4", "", "16", "1", "forti", "", "0"])
+        self.assertIn("A base não foi atualizada", saida)
+        self.assertIn("continua com a base que já tem", saida)
+        self.assertIn("CVE-2024-21762", saida)          # a base continua
+        self.assertFalse(os.path.exists(os.environ["INVENTARIO_BASE_CVE"]))
+
+    def test_atualizar_grava_a_base_nova_e_passa_a_usar(self):
+        """Catálogo novo (simulado): grava, conta o que mudou e usa."""
+        self.base_cve = base_de_teste()
+        # Uma semana depois do catálogo da base que vem com o programa:
+        # a atualizada só vale se for mais nova que ela.
+        with open(base_cve.ARQUIVO_INICIAL, encoding="utf-8") as arquivo:
+            dia = datetime.date.fromisoformat(
+                json.load(arquivo)["publicado"]) + datetime.timedelta(7)
+        catalogo = {
+            "catalogVersion": dia.strftime("%Y.%m.%d"),
+            "dateReleased": f"{dia.isoformat()}T15:00:00.000Z",
+            "vulnerabilities": [
+                entrada_do_kev("CVE-2019-0708", "Microsoft",
+                               "Remote Desktop Services", "BlueKeep",
+                               "2021-11-03"),
+                entrada_do_kev("CVE-2025-0001", "Exemplo", "Roteador X",
+                               "Exemplo Roteador X Command Injection",
+                               "2026-10-20")]}
+        oficiais = {"CVE-2025-0001": {
+            "cveMetadata": {"cveId": "CVE-2025-0001"},
+            "containers": {"cna": {
+                "metrics": [{"cvssV3_1": {"vectorString": TOTAL_31}}],
+                "problemTypes": [{"descriptions": [{"cweId": "CWE-78"}]}]}}}}
+        self.abrir = abrir_simulado(catalogo, oficiais)
+        saida = self.rodar(["16", "4", "", "16", "1", "CVE-2025-0001", "1",
+                            "n", "0"])
+        corrido = " ".join(saida.split())
+        self.assertIn(f"Base atualizada: catálogo {dia:%Y.%m.%d}, 2 CVEs "
+                      f"(1 nova(s), 3 saíram); 1 nota(s) buscada(s).",
+                      corrido)
+        self.assertRegex(saida, r"\(atualizada em \d{2}/\d{2}/\d{4}\)")
+        self.assertIn("10,0 (Crítica)", saida)
+        self.assertIn("CWE ........... CWE-78", saida)
+        lida, aviso = BaseCVE.carregar()
+        self.assertEqual((len(lida), lida.origem, aviso),
+                         (2, "atualizada", ""))
+        # A nota que a CVE já tinha foi aproveitada, sem baixar de novo.
+        self.assertEqual(lida.buscar_cve("CVE-2019-0708").cvss, 9.8)
+
+
+class TesteDaBaseCVE(unittest.TestCase):
+    """A base de CVEs: a que vem com o programa, a nota e o download."""
+
+    def test_base_inicial_confere(self):
+        """A base que vem com o programa abre e é coerente."""
+        base, aviso = BaseCVE.carregar(
+            os.path.join(tempfile.gettempdir(), "nao-existe.json"))
+        self.assertEqual((aviso, base.origem), ("", "inicial"))
+        self.assertGreater(len(base), 1500)
+        self.assertGreaterEqual(base.com_nota(), 0.99 * len(base))
+        bluekeep = base.buscar_cve("CVE-2019-0708")
+        self.assertEqual((bluekeep.cvss, bluekeep.cwes, bluekeep.fonte_nota),
+                         (9.8, ("CWE-416",), "CISA-ADP"))
+        # Regravada, a base sai igual, letra por letra: formato fixo.
+        with open(base_cve.ARQUIVO_INICIAL, encoding="utf-8") as arquivo:
+            self.assertEqual(base.para_texto(), arquivo.read())
+
+    def test_nota_do_registro_oficial(self):
+        """A 3.1 vem antes da 4.0, o CNA antes do ADP; E:P sai."""
+        v40 = ("CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/"
+               "SA:N")
+
+        def oficial(cna, adp=()):
+            """Um registro oficial com as métricas do CNA e do ADP."""
+            return {"containers": {
+                "cna": {"metrics": cna},
+                "adp": [{"providerMetadata": {"shortName": "CISA-ADP"},
+                         "metrics": list(adp)}]}}
+
+        def metrica(versao, vetor):
+            """Uma métrica no formato dos registros oficiais."""
+            return {versao: {"vectorString": vetor}}
+
+        self.assertEqual(nota_do_registro(oficial(
+            [metrica("cvssV4_0", v40)], [metrica("cvssV3_1", RDP_31)])),
+            (9.8, RDP_31, "CISA-ADP"))
+        self.assertEqual(nota_do_registro(oficial(
+            [metrica("cvssV3_1", TOTAL_31)], [metrica("cvssV3_1", RDP_31)])),
+            (10.0, TOTAL_31, "CNA"))
+        # A nota é a base, e não a temporal que alguns registros dão.
+        self.assertEqual(nota_do_registro(oficial(
+            [metrica("cvssV3_1", RDP_31 + "/E:P/RL:U/RC:C")])),
+            (9.8, RDP_31, "CNA"))
+        self.assertEqual(nota_do_registro(oficial([metrica("cvssV4_0", v40)])),
+                         (9.3, v40, "CNA"))
+        self.assertEqual(nota_do_registro(oficial([metrica(
+            "cvssV2_0", "AV:N/AC:L/Au:N/C:P/I:P/A:P")])), (None, None, None))
+
+    def test_download_recusado(self):
+        """Resposta grande demais, sem HTTPS ou JSON fora da norma."""
+        for corpo, final, motivo in (
+                (b" " * 101, "https://x/a.json", "passou de"),
+                (b"{}", "http://x/a.json", "sem HTTPS"),
+                (b'{"a": NaN}', "https://x/a.json", "NaN"),
+                (b'{"a": 1, "a": 2}', "https://x/a.json", "duas vezes")):
+            with self.subTest(motivo=motivo):
+                def abrir(_url, corpo=corpo, final=final):
+                    """Responde com o corpo dado, vindo de final."""
+                    return RespostaSimulada(corpo, final)
+
+                with self.assertRaisesRegex(AtualizacaoError, motivo):
+                    baixar_primeiro(["https://x/a.json"], 100, abrir)
+
+    def test_atualizada_ruim_volta_para_a_inicial(self):
+        """Arquivo atualizado estragado: avisa e usa a base inicial."""
+        with tempfile.TemporaryDirectory() as pasta:
+            ruim = os.path.join(pasta, "base_cve.json")
+            with open(ruim, "w", encoding="utf-8") as arquivo:
+                arquivo.write('{"fonte": ')
+            base, aviso = BaseCVE.carregar(ruim)
+        self.assertEqual(base.origem, "inicial")
+        self.assertIn("não pôde ser lida", aviso)
+
+    def test_vale_a_base_mais_nova(self):
+        """A atualizada vale só se não for mais velha que a inicial."""
+        def gravar(caminho, dia):
+            """Grava a base dos testes com o catálogo do dia dado."""
+            base = base_de_teste()
+            BaseCVE(base.registros.values(), catalogo=dia.replace("-", "."),
+                    publicado=dia, montado_em=dia).salvar(caminho)
+
+        with tempfile.TemporaryDirectory() as pasta:
+            atualizada = os.path.join(pasta, "base_cve.json")
+            inicial = os.path.join(pasta, "kev.json")
+            gravar(inicial, "2026-10-13")
+            for dia, origem in (("2026-10-12", "inicial"),
+                                ("2026-10-13", "atualizada"),
+                                ("2026-10-20", "atualizada")):
+                with self.subTest(dia=dia):
+                    gravar(atualizada, dia)
+                    base, aviso = BaseCVE.carregar(atualizada, inicial)
+                    self.assertEqual((base.origem, aviso), (origem, ""))
+            # Sem a inicial, vale a atualizada; sem as duas, é erro.
+            os.remove(inicial)
+            self.assertEqual(
+                BaseCVE.carregar(atualizada, inicial)[0].origem,
+                "atualizada")
+            os.remove(atualizada)
+            with self.assertRaises(base_cve.BaseCVEInvalidaError):
+                BaseCVE.carregar(atualizada, inicial)
+
+    def test_busca_sugestoes_e_nome_curto(self):
+        """Começo da palavra, ordem pela nota e a ficha técnica."""
+        base = base_de_teste()
+        self.assertEqual([r.cve for r in base.buscar("forti")],
+                         ["CVE-2024-21762"])
+        # Empate em relevância: a de nota 10,0 antes da sem nota.
+        self.assertEqual([r.cve for r in base.buscar("cisco")],
+                         ["CVE-2023-20198", "CVE-2024-20481"])
+        self.assertEqual(base.buscar("o de the"), [])
+        self.assertEqual(base.fabricantes("cis"), [("Cisco", 2)])
+        ficha = FichaTecnica({"fabricante": "Cisco",
+                              "modelo": "Catalyst 9300",
+                              "sistema": "IOS XE 17.9"})
+        self.assertEqual([(r.cve, p) for r, p in base.sugestoes(ficha)],
+                         [("CVE-2023-20198", ["cisco", "ios"]),
+                          ("CVE-2024-20481", ["cisco"])])
+        self.assertEqual(nome_curto(base.buscar_cve("CVE-2019-0708")),
+                         "Remote Code Execution")
 
 
 class TesteDoModelo(unittest.TestCase):
@@ -1170,7 +1557,8 @@ class TesteDosAutotestes(unittest.TestCase):
         for modulo in ("classificacoes", "formatacao", "validacao",
                        "calculadora_cvss", "vulnerabilidades",
                        "ficha_tecnica", "equipamentos", "inventario",
-                       "armazenamento", "risco"):
+                       "armazenamento", "risco", "base_cve",
+                       "atualizacao_cve"):
             with self.subTest(modulo=modulo):
                 resultado = subprocess.run(
                     [sys.executable, os.path.join(PASTA, modulo + ".py")],

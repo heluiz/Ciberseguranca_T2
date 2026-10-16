@@ -18,25 +18,11 @@ import shutil
 
 import migracao
 from inventario import Inventario
+from validacao import objeto_sem_nome_repetido
 
 
 class BaseInvalidaError(Exception):
     """A base em disco está ilegível, corrompida ou adulterada."""
-
-
-def _objeto_sem_nome_repetido(pares):
-    """Monta um objeto JSON e recusa nome repetido nele.
-
-    A RFC 8259 (seção 4) pede nomes únicos num objeto; sozinho, o módulo
-    json ficaria em silêncio com o último valor de um nome repetido.
-    """
-    objeto = {}
-    for nome, valor in pares:
-        if nome in objeto:
-            raise ValueError(f"o nome {nome!r} aparece duas vezes no "
-                             f"mesmo objeto")
-        objeto[nome] = valor
-    return objeto
 
 
 # Caminho absoluto: a base fica ao lado do código, de onde quer que o
@@ -107,7 +93,7 @@ class ArquivoInventario:
         try:
             with open(self.caminho, encoding="utf-8-sig") as f:
                 dados = json.load(
-                    f, object_pairs_hook=_objeto_sem_nome_repetido)
+                    f, object_pairs_hook=objeto_sem_nome_repetido)
         except OSError as erro:
             raise BaseInvalidaError(
                 f"não foi possível abrir o arquivo ({erro})") from erro
