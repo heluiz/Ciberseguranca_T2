@@ -134,6 +134,19 @@ class FichaTecnica:
             return NotImplemented
         return self.para_dict() == outra.para_dict()
 
+    def __str__(self):
+        """Texto para a tela, com os campos informados.
+
+        Como "Dell PowerEdge R430 · Windows Server 2019 1809 · série
+        ABC123 · patrimônio 1011065", ou "sem ficha técnica".
+        """
+        partes = [
+            " ".join(v for v in (self.fabricante, self.modelo) if v),
+            " ".join(v for v in (self.sistema, self.versao) if v),
+            f"série {self.numero_serie}" if self.numero_serie else "",
+            f"patrimônio {self.patrimonio}" if self.patrimonio else ""]
+        return " · ".join(p for p in partes if p) or "sem ficha técnica"
+
     def __repr__(self):
         """Texto para depuração: FichaTecnica(fabricante='Dell')."""
         campos = ", ".join(f"{c}={v!r}" for c, v in self.para_dict().items())

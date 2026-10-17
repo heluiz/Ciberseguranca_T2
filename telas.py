@@ -579,7 +579,7 @@ def mostrar_detalhe_risco(item, vulnerabilidades, parcelas):
     ModeloRisco.contribuicoes().
     """
     e = item.equipamento
-    print(f"\n  {cores.titulo(e.hostname)} - {e.tipo.rotulo}")
+    print(f"\n  {cores.titulo(str(e))}")
 
     print(f"\n  {cores.titulo('Risco próprio')}  b = fator x (M v)")
     if not vulnerabilidades:

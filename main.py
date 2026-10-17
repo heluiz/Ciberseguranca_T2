@@ -173,7 +173,7 @@ class Aplicacao:
             print("\n  " + cores.aviso(
                 "Nenhum equipamento cadastrado ainda.\n"))
             return
-        telas.mostrar_tabela(self.inventario.todos())
+        telas.mostrar_tabela(list(self.inventario))
         print()
 
     def _ler_id_equipamento(self, mensagem="  ID do equipamento: "):
@@ -183,10 +183,10 @@ class Aplicacao:
     def _ler_equipamento(self, mensagem="  ID do equipamento: "):
         """Lê um ID e devolve o equipamento, ou avisa e devolve None."""
         id_equipamento = self._ler_id_equipamento(mensagem)
-        equipamento = self.inventario.buscar_por_id(id_equipamento)
-        if equipamento is None:
+        if id_equipamento not in self.inventario:
             self._erro(f"Nenhum equipamento com o ID {id_equipamento}.")
-        return equipamento
+            return None
+        return self.inventario[id_equipamento]
 
     # ------------------------------------------------------------------
     # Equipamentos (opções 1 a 5)
@@ -230,7 +230,7 @@ class Aplicacao:
             print("\n  " + cores.aviso("Nenhum equipamento cadastrado ainda."))
             return
 
-        telas.mostrar_tabela(self.inventario.todos())
+        telas.mostrar_tabela(list(self.inventario))
         # No fim, porque numa lista longa o título já saiu da tela.
         print(f"\n  Total: {len(self.inventario)} equipamento(s).")
 
@@ -283,6 +283,11 @@ class Aplicacao:
         else:
             print(f"\n  {len(encontrados)} equipamentos encontrados:")
             telas.mostrar_tabela(encontrados)
+            if opcao == 6:
+                # Na busca pela ficha, a ficha de cada um, numa linha.
+                print()
+                for equipamento in encontrados:
+                    print(f"  {equipamento}: {equipamento.ficha}")
             print("\n  Para ver a ficha e as vulnerabilidades de um deles, "
                   "use a opção 7.")
 
@@ -442,8 +447,8 @@ class Aplicacao:
                 + ", ".join(e.hostname for e, _ in dependentes)
                 + ". A dependência deles será removida."))
 
-        if not confirmar("\n  Confirma a exclusão do equipamento e do que "
-                         "está ligado a ele?"):
+        if not confirmar(f"\n  Confirma a exclusão de {equipamento} e do "
+                         f"que está ligado a ele?"):
             print("\n  " + cores.aviso("Exclusão cancelada."))
             return
 
@@ -736,7 +741,7 @@ class Aplicacao:
         print("  " + cores.aviso(
             "como Corrigida - apagar destrói o histórico."))
 
-        if not confirmar(f"\n  Confirma a exclusão de [{vuln.id}] em "
+        if not confirmar(f"\n  Confirma a exclusão de {vuln} em "
                          f"{equipamento.hostname}?"):
             print("\n  " + cores.aviso("Exclusão cancelada."))
             return
@@ -1365,9 +1370,7 @@ class Aplicacao:
 
     def _avisar_da_carga(self):
         """Conta o que foi carregado e avisa de qualquer problema."""
-        print(f"\n  Base carregada: {len(self.inventario)} equipamento(s), "
-              f"{len(self.inventario.vulnerabilidades())} "
-              f"vulnerabilidade(s).")
+        print(f"\n  Base carregada: {self.inventario}.")
 
         if self.arquivo.migracao_feita is not None:
             copia, avisos = self.arquivo.migracao_feita
