@@ -69,13 +69,46 @@ class Inventario:
     # Equipamentos: consulta
     # ------------------------------------------------------------------
 
+    # O inventário se comporta como uma coleção de equipamentos:
+    # len(inventario), for equipamento in inventario, 65 in inventario
+    # e inventario[65].
+
     def __len__(self):
         """Quantidade de equipamentos."""
         return len(self._equipamentos)
 
+    def __iter__(self):
+        """Percorre os equipamentos em ordem de id.
+
+        Percorre uma cópia da lista: excluir um equipamento durante a
+        repetição não a atrapalha.
+        """
+        return iter([self._equipamentos[i]
+                     for i in sorted(self._equipamentos)])
+
+    def __contains__(self, id_equipamento):
+        """Diz se há um equipamento com esse id."""
+        return id_equipamento in self._equipamentos
+
+    def __getitem__(self, id_equipamento):
+        """Devolve o equipamento com esse id.
+
+        Levanta KeyError se não houver (buscar_por_id devolve None).
+        """
+        try:
+            return self._equipamentos[id_equipamento]
+        except KeyError:
+            raise KeyError(f"Nenhum equipamento com o ID "
+                           f"{id_equipamento}") from None
+
+    def __str__(self):
+        """Texto para a tela: quantos equipamentos e falhas há."""
+        return (f"{len(self)} equipamento(s), "
+                f"{len(self._vulnerabilidades)} vulnerabilidade(s)")
+
     def todos(self):
-        """Devolve os equipamentos em ordem de id."""
-        return [self._equipamentos[i] for i in sorted(self._equipamentos)]
+        """Devolve a lista dos equipamentos, em ordem de id."""
+        return list(self)
 
     def buscar_por_id(self, id_equipamento):
         """Devolve o equipamento, ou None se o id não existir.
@@ -95,12 +128,12 @@ class Inventario:
         if campo not in CAMPOS_DE_BUSCA:
             raise ValueError(f"Campo sem busca por texto: '{campo}'")
         alvo = formatacao.para_busca(termo)
-        return [e for e in self.todos()
+        return [e for e in self
                 if alvo in formatacao.para_busca(getattr(e, campo))]
 
     def buscar_por_tipo(self, tipo):
         """Devolve os equipamentos do tipo, em ordem de id."""
-        return [e for e in self.todos() if e.tipo is tipo]
+        return [e for e in self if e.tipo is tipo]
 
     def buscar_na_ficha(self, termo):
         """Devolve os equipamentos com o termo em algum campo da ficha.
@@ -109,7 +142,7 @@ class Inventario:
         versão, como buscar_por_texto: parcial, sem acento e sem caixa.
         """
         alvo = formatacao.para_busca(termo)
-        return [e for e in self.todos()
+        return [e for e in self
                 if any(alvo in formatacao.para_busca(valor)
                        for _, valor in e.ficha.preenchidos())]
 
@@ -276,7 +309,7 @@ class Inventario:
 
     def afetados_por(self, id_vulnerabilidade):
         """Devolve os equipamentos afetados pela vulnerabilidade."""
-        return [e for e in self.todos()
+        return [e for e in self
                 if id_vulnerabilidade in e.vulnerabilidades]
 
     def vulnerabilidades_do(self, id_equipamento):
@@ -329,7 +362,7 @@ class Inventario:
         alvo = validar_referencia(referencia)
         campo = "cve" if alvo.startswith("CVE-") else "cwe"
         itens = []
-        for equipamento in self.todos():
+        for equipamento in self:
             for id_vuln, situacao in equipamento.vulnerabilidades.items():
                 vulnerabilidade = self._vulnerabilidades[id_vuln]
                 if getattr(vulnerabilidade, campo) == alvo:
@@ -428,7 +461,7 @@ class Inventario:
         opção 10. No empate, a ordem é a de cadastro.
         """
         itens = []
-        for equipamento in self.todos():
+        for equipamento in self:
             for id_vuln, situacao in equipamento.vulnerabilidades.items():
                 if situacao.pendente:
                     itens.append((equipamento,
@@ -466,7 +499,7 @@ class Inventario:
         É o sentido contrário de Equipamento.dependencias: quem herda
         risco do equipamento.
         """
-        return [(e, e.dependencias[id_equipamento]) for e in self.todos()
+        return [(e, e.dependencias[id_equipamento]) for e in self
                 if id_equipamento in e.dependencias]
 
     # ------------------------------------------------------------------
@@ -494,7 +527,7 @@ class Inventario:
         só objeto do catálogo.
         """
         lista = []
-        for equipamento in self.todos():
+        for equipamento in self:
             objeto = equipamento.para_dict()
             objeto["vulnerabilidades"] = [
                 dict(self._vulnerabilidades[id_vuln].para_dict(),
@@ -544,7 +577,7 @@ class Inventario:
             donos[vulnerabilidade.cve] = vulnerabilidade.id
 
         # Integridade referencial: a dependência precisa ter para onde.
-        for equipamento in self.todos():
+        for equipamento in self:
             for destino in equipamento.dependencias:
                 if destino not in self._equipamentos:
                     raise ValueError(

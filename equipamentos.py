@@ -18,11 +18,21 @@ Relações (composição, sem herança):
     parte do risco do outro equipamento que este herda: é uma entrada
     da linha deste equipamento na matriz A.
 
+Encapsulamento: os dados ficam em atributos privados (dois sublinhados)
+e são acessados pelas propriedades. Cada setter confere e padroniza o
+valor, então um dado inválido não entra nem por atribuição direta
+(equipamento.hostname = "PC 01" levanta ValueError). O id não muda. As
+vulnerabilidades e as dependências chegam a quem está fora da classe só
+para leitura e mudam pelos métodos, que conferem as regras: a soma das
+frações menor que 1, que garante que I - A é invertível, não pode ser
+contornada.
+
 A classe não lê do teclado nem grava em disco.
 """
 
 import string
 from abc import ABC, abstractmethod
+from types import MappingProxyType
 
 import formatacao
 from classificacoes import SituacaoTratamento, TipoEquipamento
@@ -47,6 +57,14 @@ _CARACTERES_HOSTNAME = set(string.ascii_letters + string.digits + "-")
 # abaixo deste valor. Soma menor que 1 em cada linha de A torna I - A
 # estritamente diagonal dominante, e portanto invertível.
 LIMITE_SOMA_DEPENDENCIAS = 1.0
+
+# Os campos de texto obrigatórios além do hostname: o nome usado nas
+# mensagens e a padronização aplicada ao que é digitado.
+_CAMPOS_DE_TEXTO = {
+    "custodiante": ("responsável", formatacao.titulo),
+    "lotacao": ("lotação", formatacao.titulo),
+    "descricao": ("descrição", formatacao.frase),
+}
 
 # Casas decimais guardadas nas frações: 0,3333 vale; 0,33333333 não.
 CASAS_DA_FRACAO = 4
@@ -77,7 +95,9 @@ class Equipamento(ABC):
     """Equipamento de TI: base de todos os tipos.
 
     Não se cria um Equipamento diretamente (a classe é abstrata): usa-se
-    a subclasse do tipo, ou criar_equipamento(tipo, ...).
+    a subclasse do tipo, ou criar_equipamento(tipo, ...). Os dados são
+    lidos e alterados pelas propriedades, que conferem cada valor (veja
+    o encapsulamento, no começo do módulo).
     """
 
     # Cada subclasse define o seu tipo; é o valor gravado no arquivo.
@@ -90,24 +110,115 @@ class Equipamento(ABC):
 
     def __init__(self, id_equipamento, hostname, custodiante, lotacao,
                  descricao):
-        """Cria o equipamento; ValueError se algum dado for inválido."""
-        problema = self.problema_no_hostname(hostname)
-        if problema:
-            raise ValueError(f"Hostname inválido: {problema}")
-        for nome, valor in (("responsável", custodiante),
-                            ("lotação", lotacao),
-                            ("descrição", descricao)):
-            if not valor.strip():
-                raise ValueError(f"O campo {nome} não pode ficar vazio")
+        """Cria o equipamento; ValueError se algum dado for inválido.
 
-        self.id = id_equipamento
-        self.hostname = hostname.strip().upper()
-        self.custodiante = formatacao.titulo(custodiante)
-        self.lotacao = formatacao.titulo(lotacao)
-        self.descricao = formatacao.frase(descricao)
-        self.ficha = FichaTecnica()
-        self.vulnerabilidades = {}
-        self.dependencias = {}
+        Os quatro textos passam pelos setters das propriedades, que
+        conferem e padronizam cada um.
+        """
+        self.__id = id_equipamento
+        self.hostname = hostname
+        self.custodiante = custodiante
+        self.lotacao = lotacao
+        self.descricao = descricao
+        self.__ficha = FichaTecnica()
+        self.__vulnerabilidades = {}
+        self.__dependencias = {}
+
+    # ------------------------------------------------------------------
+    # Encapsulamento: os dados, pelas propriedades
+    # ------------------------------------------------------------------
+
+    @property
+    def id(self):
+        """O identificador. Não muda: vínculos e dependências o usam."""
+        return self.__id
+
+    @property
+    def hostname(self):
+        """O nome da máquina, em maiúsculas."""
+        return self.__hostname
+
+    @hostname.setter
+    def hostname(self, valor):
+        self.__hostname = self._padronizar("hostname", valor)
+
+    @property
+    def custodiante(self):
+        """O responsável: de preferência o cargo ou o setor (LGPD)."""
+        return self.__custodiante
+
+    @custodiante.setter
+    def custodiante(self, valor):
+        self.__custodiante = self._padronizar("custodiante", valor)
+
+    @property
+    def lotacao(self):
+        """O setor onde o equipamento está."""
+        return self.__lotacao
+
+    @lotacao.setter
+    def lotacao(self, valor):
+        self.__lotacao = self._padronizar("lotacao", valor)
+
+    @property
+    def descricao(self):
+        """Para que serve o equipamento."""
+        return self.__descricao
+
+    @descricao.setter
+    def descricao(self, valor):
+        self.__descricao = self._padronizar("descricao", valor)
+
+    @property
+    def ficha(self):
+        """A FichaTecnica do equipamento (composição)."""
+        return self.__ficha
+
+    @ficha.setter
+    def ficha(self, nova):
+        if not isinstance(nova, FichaTecnica):
+            raise ValueError("A ficha técnica deve ser uma FichaTecnica")
+        self.__ficha = nova
+
+    @property
+    def vulnerabilidades(self):
+        """{id da vulnerabilidade: situação}, só para leitura.
+
+        Muda pelos métodos vincular_vulnerabilidade, alterar_situacao e
+        desvincular_vulnerabilidade, que conferem os dados.
+        """
+        return MappingProxyType(self.__vulnerabilidades)
+
+    @property
+    def dependencias(self):
+        """{id do equipamento de que este depende: fração}, só leitura.
+
+        Muda por definir_dependencia, que confere a regra da soma das
+        frações, e por remover_dependencia.
+        """
+        return MappingProxyType(self.__dependencias)
+
+    @staticmethod
+    def _padronizar(campo, valor):
+        """Confere o valor de um campo de texto e o devolve padronizado.
+
+        Levanta ValueError se ele for inválido. Os setters e o
+        atualizar() usam a mesma regra. A unicidade do hostname depende
+        dos outros equipamentos e fica no Inventario.
+        """
+        if campo == "hostname":
+            if not isinstance(valor, str):
+                raise ValueError("O hostname deve ser um texto")
+            problema = Equipamento.problema_no_hostname(valor)
+            if problema:
+                raise ValueError(f"Hostname inválido: {problema}")
+            return valor.strip().upper()
+        rotulo, padronizar = _CAMPOS_DE_TEXTO[campo]
+        if not isinstance(valor, str):
+            raise ValueError(f"O campo {rotulo} deve ser um texto")
+        if not valor.strip():
+            raise ValueError(f"O campo {rotulo} não pode ficar vazio")
+        return padronizar(valor)
 
     # ------------------------------------------------------------------
     # Polimorfismo: o que muda de um tipo para outro
@@ -166,30 +277,16 @@ class Equipamento(ABC):
         """Aplica as alterações {campo: valor} ao equipamento.
 
         Levanta ValueError em campo protegido ou valor inválido; nesse
-        caso nada muda. A unicidade do hostname é conferida antes pelo
-        Inventario.
+        caso nada muda (tudo ou nada): todos os valores são conferidos
+        antes de o primeiro ser gravado pelo setter. A unicidade do
+        hostname é conferida antes pelo Inventario.
         """
         for campo in alteracoes:
             if campo not in self.CAMPOS_EDITAVEIS:
                 raise ValueError(f"Campo não editável: '{campo}'")
-
-        # Valida tudo primeiro; só depois grava (tudo ou nada).
-        novos = {}
         for campo, valor in alteracoes.items():
-            if campo == "hostname":
-                problema = self.problema_no_hostname(valor)
-                if problema:
-                    raise ValueError(f"Hostname inválido: {problema}")
-                novos[campo] = valor.strip().upper()
-                continue
-            if not valor.strip():
-                raise ValueError(f"O campo '{campo}' não pode ficar vazio")
-            if campo == "descricao":
-                novos[campo] = formatacao.frase(valor)
-            else:
-                novos[campo] = formatacao.titulo(valor)
-
-        for campo, valor in novos.items():
+            self._padronizar(campo, valor)
+        for campo, valor in alteracoes.items():
             setattr(self, campo, valor)
 
     def converter_para(self, tipo):
@@ -202,10 +299,26 @@ class Equipamento(ABC):
         novo = criar_equipamento(tipo, self.id, self.hostname,
                                  self.custodiante, self.lotacao,
                                  self.descricao)
-        novo.ficha = self.ficha.copia()
-        novo.vulnerabilidades = dict(self.vulnerabilidades)
-        novo.dependencias = dict(self.dependencias)
+        novo.copiar_dados_de(self)
         return novo
+
+    def copiar_dados_de(self, outro):
+        """Copia de outro equipamento os textos, a ficha e as relações.
+
+        Os textos vêm como estão: padronizar de novo poderia mudar o que
+        veio do arquivo ("NOC" viraria "Noc"). A ficha e os dicionários
+        são copiados, e não compartilhados. O id e o tipo não mudam. Só
+        vale de outro Equipamento, cujos dados já foram conferidos.
+        """
+        if not isinstance(outro, Equipamento):
+            raise ValueError("Os dados só podem vir de outro Equipamento")
+        self.__hostname = outro.hostname
+        self.__custodiante = outro.custodiante
+        self.__lotacao = outro.lotacao
+        self.__descricao = outro.descricao
+        self.__ficha = outro.ficha.copia()
+        self.__vulnerabilidades = dict(outro.vulnerabilidades)
+        self.__dependencias = dict(outro.dependencias)
 
     # ------------------------------------------------------------------
     # Vulnerabilidades (quais afetam este equipamento)
@@ -215,23 +328,24 @@ class Equipamento(ABC):
         """Registra que a vulnerabilidade afeta este equipamento."""
         if not isinstance(situacao, SituacaoTratamento):
             raise ValueError("A situação deve ser uma SituacaoTratamento")
-        if id_vulnerabilidade in self.vulnerabilidades:
+        if id_vulnerabilidade in self.__vulnerabilidades:
             raise ValueError(f"A vulnerabilidade {id_vulnerabilidade} já "
                              f"está registrada neste equipamento")
-        self.vulnerabilidades[id_vulnerabilidade] = situacao
+        self.__vulnerabilidades[id_vulnerabilidade] = situacao
 
     def alterar_situacao(self, id_vulnerabilidade, situacao):
         """Muda a situação do tratamento de uma vulnerabilidade."""
-        if id_vulnerabilidade not in self.vulnerabilidades:
+        if id_vulnerabilidade not in self.__vulnerabilidades:
             raise ValueError(f"A vulnerabilidade {id_vulnerabilidade} não "
                              f"está registrada neste equipamento")
         if not isinstance(situacao, SituacaoTratamento):
             raise ValueError("A situação deve ser uma SituacaoTratamento")
-        self.vulnerabilidades[id_vulnerabilidade] = situacao
+        self.__vulnerabilidades[id_vulnerabilidade] = situacao
 
     def desvincular_vulnerabilidade(self, id_vulnerabilidade):
         """Remove o vínculo; devolve False se ele não existia."""
-        return self.vulnerabilidades.pop(id_vulnerabilidade, None) is not None
+        return (self.__vulnerabilidades.pop(id_vulnerabilidade, None)
+                is not None)
 
     # ------------------------------------------------------------------
     # Dependências (linha deste equipamento na matriz A)
@@ -240,7 +354,7 @@ class Equipamento(ABC):
     @property
     def soma_dependencias(self):
         """Soma das frações de dependência (a soma da linha em A)."""
-        return round(sum(self.dependencias.values()), 9)
+        return round(sum(self.__dependencias.values()), 9)
 
     def definir_dependencia(self, id_destino, fracao):
         """Registra que o equipamento herda parte do risco do destino.
@@ -260,7 +374,7 @@ class Equipamento(ABC):
         fracao = validar_fracao(fracao)
 
         # Sem a dependência que está sendo substituída, se houver.
-        outras = round(sum(f for destino, f in self.dependencias.items()
+        outras = round(sum(f for destino, f in self.__dependencias.items()
                            if destino != id_destino), 9)
         # Arredonda a soma: em ponto flutuante, 0,7 + 0,2 + 0,1 dá
         # 0,9999999999999999, que passaria no teste "< 1" por engano.
@@ -276,11 +390,11 @@ class Equipamento(ABC):
                 f"abaixo de {formatacao.fracao_br(LIMITE_SOMA_DEPENDENCIAS)}"
                 f": já está em {formatacao.fracao_br(outras)}, então esta "
                 f"fração deve ser menor que {formatacao.fracao_br(sobra)}")
-        self.dependencias[id_destino] = fracao
+        self.__dependencias[id_destino] = fracao
 
     def remover_dependencia(self, id_destino):
         """Remove a dependência; devolve False se ela não existia."""
-        return self.dependencias.pop(id_destino, None) is not None
+        return self.__dependencias.pop(id_destino, None) is not None
 
     # ------------------------------------------------------------------
     # Formato do arquivo
@@ -341,12 +455,17 @@ class Equipamento(ABC):
             equipamento = criar_equipamento(tipo, id_eq, **textos)
         except ValueError as erro:
             raise ValueError(f"{nome}: {erro}") from erro
+        # Daqui em diante o próprio Equipamento monta o objeto lido,
+        # direto nos atributos privados: o arquivo vale como está. O
+        # pylint não reconhece o objeto como da própria classe.
+        # pylint: disable=protected-access,unused-private-member
         # O texto gravado já passou pela formatação quando foi digitado.
         # Formatar de novo mudaria o que está no arquivo a cada leitura
         # ("TI Setor" -> "Ti setor"), então vale o que veio, só sem
         # espaços repetidos.
-        for campo in ("custodiante", "lotacao", "descricao"):
-            setattr(equipamento, campo, " ".join(textos[campo].split()))
+        equipamento.__custodiante = " ".join(textos["custodiante"].split())
+        equipamento.__lotacao = " ".join(textos["lotacao"].split())
+        equipamento.__descricao = " ".join(textos["descricao"].split())
         # Campo opcional: ausente ou null quer dizer ficha vazia.
         if dados.get("ficha") is not None:
             equipamento.ficha = FichaTecnica.de_dict(
@@ -363,10 +482,10 @@ class Equipamento(ABC):
             situacao = exigir_enum(SituacaoTratamento,
                                    exigir_campo(item, "situacao", rotulo),
                                    f"{rotulo}: campo 'situacao'")
-            if id_vuln in equipamento.vulnerabilidades:
+            if id_vuln in equipamento.__vulnerabilidades:
                 raise ValueError(f"{nome}: vulnerabilidade {id_vuln} "
                                  f"repetida")
-            equipamento.vulnerabilidades[id_vuln] = situacao
+            equipamento.__vulnerabilidades[id_vuln] = situacao
 
         lista = exigir_lista(
             exigir_campo(dados, "dependencias", nome),
@@ -382,11 +501,13 @@ class Equipamento(ABC):
             if destino == id_eq:
                 raise ValueError(f"{rotulo}: um equipamento não pode "
                                  f"depender de si mesmo")
-            if destino in equipamento.dependencias:
+            if destino in equipamento.__dependencias:
                 raise ValueError(f"{nome}: dependência de {destino} "
                                  f"repetida")
             try:
-                equipamento.dependencias[destino] = validar_fracao(fracao)
+                # Direto no dicionário: o arquivo pode violar a regra da
+                # soma, e quem trata é o modelo de risco.
+                equipamento.__dependencias[destino] = validar_fracao(fracao)
             except ValueError as erro:
                 raise ValueError(f"{rotulo}: {erro}") from erro
         return equipamento
@@ -396,6 +517,10 @@ class Equipamento(ABC):
         if not isinstance(outro, Equipamento):
             return NotImplemented
         return self.para_dict() == outro.para_dict()
+
+    def __str__(self):
+        """Texto para a tela, como [1] DRPC-SRV01 - Servidor."""
+        return f"[{self.id}] {self.hostname} - {self.tipo.rotulo}"
 
     def __repr__(self):
         """Texto para depuração, como Servidor(1, 'DRPC-SRV01')."""
@@ -624,15 +749,18 @@ if __name__ == "__main__":
     assert isinstance(banco, BancoDados) and banco.id == srv.id
     assert banco.vulnerabilidades == srv.vulnerabilidades
     assert banco.dependencias == srv.dependencias
-    assert banco.dependencias is not srv.dependencias, "dict compartilhado"
+    alvo = next(iter(srv.dependencias))
+    banco.remover_dependencia(alvo)
+    assert alvo in srv.dependencias, "dicionário compartilhado"
     assert banco.ficha == srv.ficha and banco.ficha is not srv.ficha
 
     # --- Ida e volta pelo formato do arquivo --------------------------
     for tipo in TipoEquipamento:
         original = criar_equipamento(tipo, 3, "EQ-01", "Fulano", "Setor",
                                      "Descrição")
-        original.vulnerabilidades = {4: SituacaoTratamento.EM_TRATAMENTO}
-        original.dependencias = {1: 0.25, 2: 0.5}
+        original.vincular_vulnerabilidade(4, SituacaoTratamento.EM_TRATAMENTO)
+        original.definir_dependencia(1, 0.25)
+        original.definir_dependencia(2, 0.5)
         original.ficha.atualizar({"modelo": "Modelo X"})
         copia = Equipamento.de_dict(original.para_dict())
         assert type(copia) is type(original), "voltou com outra classe"

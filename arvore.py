@@ -60,7 +60,7 @@ def montar(inventario, id_raiz, sentido):
     """
     if sentido not in SENTIDOS:
         raise ValueError(f"Sentido desconhecido: {sentido!r}")
-    equipamentos = {e.id: e for e in inventario.todos()}
+    equipamentos = {e.id: e for e in inventario}
     if id_raiz not in equipamentos:
         raise ValueError(f"Não existe equipamento com o id {id_raiz}")
     return _Montagem(equipamentos, id_raiz, sentido).arvore()

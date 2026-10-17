@@ -136,7 +136,7 @@ class ModeloRisco:
 
     def __init__(self, inventario):
         """Monta as matrizes a partir dos dados do inventário."""
-        self.equipamentos = inventario.todos()
+        self.equipamentos = list(inventario)
         self.vulnerabilidades = inventario.vulnerabilidades()
         n, m = len(self.equipamentos), len(self.vulnerabilidades)
 
@@ -507,6 +507,21 @@ if __name__ == "__main__":
     ABERTA = SituacaoTratamento.ABERTA
     ORIGEM = OrigemVulnerabilidade.OUTRA
 
+    def editado_a_mao(inventario, fracoes):
+        """O inventário relido com as frações postas à mão no arquivo.
+
+        fracoes: {(id de origem, id de destino): fração}. O arquivo
+        aceita somas de frações iguais ou maiores que 1, que o cadastro
+        (definir_dependencia) recusaria: quem as trata é o modelo.
+        """
+        dados = inventario.para_dict()
+        for objeto in dados:
+            objeto["dependencias"] = [
+                {"equipamento_id": destino, "fracao": fracao}
+                for (origem, destino), fracao in sorted(fracoes.items())
+                if origem == objeto["id"]]
+        return Inventario.de_dict(dados)
+
     def exato(matriz_a, b):
         """Resolve (I - A) x = b com frações exatas (método de Gauss).
 
@@ -633,11 +648,8 @@ if __name__ == "__main__":
     ids = [singular.cadastrar_equipamento(
         TipoEquipamento.OUTRO, f"S{k}", "A", "B", "C").id
         for k in range(3)]
-    for i in ids:
-        for j in ids:
-            if i != j:
-                # direto no dicionário: o cadastro recusaria
-                singular.buscar_por_id(i).dependencias[j] = 0.5
+    singular = editado_a_mao(singular, {(i, j): 0.5 for i in ids
+                                        for j in ids if i != j})
     ruim = ModeloRisco(singular)
     diag = ruim.diagnosticar()
     print(f"\nSingular: {diag.motivo}")
@@ -665,12 +677,15 @@ if __name__ == "__main__":
     # outro. O número de condição (cerca de 2e13) passa de 1e8, mas não
     # de 1/ε: a solução sai, com o aviso de que pode ter poucos dígitos
     # confiáveis.
+    # Frações com mais de 4 casas não cabem no arquivo: a matriz A vai
+    # direto no modelo, que é o que este trecho confere.
     par = Inventario()
-    p1, p2 = [par.cadastrar_equipamento(
-        TipoEquipamento.OUTRO, f"P{k}", "A", "B", "C") for k in range(2)]
-    p1.dependencias[p2.id] = 1 - 1e-13
-    p2.dependencias[p1.id] = 1 - 1e-13
-    d_par = ModeloRisco(par).diagnosticar()
+    for k in range(2):
+        par.cadastrar_equipamento(TipoEquipamento.OUTRO, f"P{k}", "A", "B",
+                                  "C")
+    m_par = ModeloRisco(par)
+    m_par.A[0, 1] = m_par.A[1, 0] = 1 - 1e-13
+    d_par = m_par.diagnosticar()
     assert d_par.invertivel and d_par.utilizavel and d_par.posto == 2
     assert "poucos dígitos confiáveis" in d_par.aviso, d_par.aviso
     assert "perde cerca de 13" in d_par.aviso, d_par.aviso
@@ -682,8 +697,8 @@ if __name__ == "__main__":
     triang = Inventario()
     t1, t2, t3 = [triang.cadastrar_equipamento(
         TipoEquipamento.OUTRO, f"T{k}", "A", "B", "C") for k in range(3)]
-    t1.dependencias[t2.id] = 0.9
-    t1.dependencias[t3.id] = 0.9
+    triang = editado_a_mao(triang, {(t1.id, t2.id): 0.9,
+                                    (t1.id, t3.id): 0.9})
     d = ModeloRisco(triang).diagnosticar()
     print(f"\nSoma 1,8 mas triangular: {d.motivo}")
     assert d.invertivel and d.utilizavel and not d.dominante
@@ -696,9 +711,8 @@ if __name__ == "__main__":
     c1, c2, c3 = [ciclo.cadastrar_equipamento(
         TipoEquipamento.OUTRO, f"C{k}", "A", "B", "C") for k in range(3)]
     ciclo.registrar_vulnerabilidade(c1.id, "x", ORIGEM, 5.0, ABERTA)
-    c1.dependencias.update({c2.id: 0.9, c3.id: 0.9})
-    c2.dependencias[c1.id] = 0.9
-    c3.dependencias[c1.id] = 0.9
+    ciclo = editado_a_mao(ciclo, {(c1.id, c2.id): 0.9, (c1.id, c3.id): 0.9,
+                                  (c2.id, c1.id): 0.9, (c3.id, c1.id): 0.9})
     m_ciclo = ModeloRisco(ciclo)
     d = m_ciclo.diagnosticar()
     print(f"\nInvertível mas sem sentido: {d.motivo}")
@@ -717,9 +731,9 @@ if __name__ == "__main__":
     i1, i2, i3, i4 = [so_isolado.cadastrar_equipamento(
         TipoEquipamento.OUTRO, f"I{k}", "A", "B", "C") for k in range(4)]
     so_isolado.registrar_vulnerabilidade(i4.id, "x", ORIGEM, 7.5, ABERTA)
-    i1.dependencias.update({i2.id: 0.9, i3.id: 0.9})
-    i2.dependencias[i1.id] = 0.9
-    i3.dependencias[i1.id] = 0.9
+    so_isolado = editado_a_mao(so_isolado, {
+        (i1.id, i2.id): 0.9, (i1.id, i3.id): 0.9,
+        (i2.id, i1.id): 0.9, (i3.id, i1.id): 0.9})
     m_isolado = ModeloRisco(so_isolado)
     assert m_isolado.diagnosticar().utilizavel
     assert np.allclose(m_isolado.resolver(), [0, 0, 0, 7.5])
@@ -729,8 +743,8 @@ if __name__ == "__main__":
     q1, q2 = [quase.cadastrar_equipamento(
         TipoEquipamento.OUTRO, f"Q{k}", "A", "B", "C") for k in range(2)]
     quase.registrar_vulnerabilidade(q1.id, "x", ORIGEM, 1.0, ABERTA)
-    q1.dependencias[q2.id] = 0.9999
-    q2.dependencias[q1.id] = 0.9999
+    quase = editado_a_mao(quase, {(q1.id, q2.id): 0.9999,
+                                  (q2.id, q1.id): 0.9999})
     m_quase = ModeloRisco(quase)
     assert m_quase.diagnosticar().utilizavel
     assert abs(m_quase.resolver()[0] - 1 / (1 - 0.9999 ** 2)) < 1e-6

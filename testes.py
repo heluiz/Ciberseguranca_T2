@@ -42,7 +42,7 @@ from classificacoes import (
     SituacaoTratamento,
     TipoEquipamento,
 )
-from equipamentos import criar_equipamento
+from equipamentos import Equipamento, Servidor, criar_equipamento
 from ficha_tecnica import FichaTecnica
 from inventario import Inventario
 from risco import ModeloRisco, SistemaSingularError
@@ -91,6 +91,23 @@ def base_de_teste():
                      dia="2024-10-24"),
     ], catalogo="2026.10.13", publicado="2026-10-13",
         montado_em="2026-10-14", origem="inicial")
+
+
+def editado_a_mao(inventario, fracoes):
+    """O inventário relido com as frações postas à mão no arquivo.
+
+    fracoes: {(id de origem, id de destino): fração}. O arquivo aceita
+    somas de frações iguais ou maiores que 1, que o cadastro recusaria
+    (as dependências só mudam pelos métodos do equipamento): quem as
+    trata é o modelo de risco.
+    """
+    dados = inventario.para_dict()
+    for objeto in dados:
+        objeto["dependencias"] = [
+            {"equipamento_id": destino, "fracao": fracao}
+            for (origem, destino), fracao in sorted(fracoes.items())
+            if origem == objeto["id"]]
+    return Inventario.de_dict(dados)
 
 
 class RespostaSimulada(io.BytesIO):
@@ -606,6 +623,10 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("3 equipamentos encontrados", saida)
         for roteador in ("DP1-RT01", "DP3-RT01", "DP7-RT01"):
             self.assertIn(roteador, saida)
+        # Na busca pela ficha, a ficha de cada um, numa linha.
+        self.assertIn("[39] DP1-RT01 - Roteador: MikroTik hAP ac2 · "
+                      "RouterOS 6.49.10", saida)
+        self.assertIn("[65] INTEL-SRV01 - Servidor", saida)
         self.assertIn("combinam com a ficha de DRPC-RT01 (cisco, ios)",
                       saida)
         self.assertRegex(saida, r"1\*\s+CVE-2023-20198")
@@ -858,9 +879,10 @@ class TesteDoPrograma(unittest.TestCase):
         inventario.registrar_vulnerabilidade(
             ids[0], "x", OrigemVulnerabilidade.OUTRA, 5.0,
             SituacaoTratamento.ABERTA)
-        for (i, j), fracao in {(0, 1): 0.5, (0, 2): 0.5001,
-                               (1, 0): 0.9999, (2, 0): 0.9999}.items():
-            inventario.buscar_por_id(ids[i]).dependencias[ids[j]] = fracao
+        inventario = editado_a_mao(inventario, {
+            (ids[i], ids[j]): fracao
+            for (i, j), fracao in {(0, 1): 0.5, (0, 2): 0.5001,
+                                   (1, 0): 0.9999, (2, 0): 0.9999}.items()})
         ArquivoInventario(self.caminho).salvar(inventario)
         saida = self.rodar(["13", "0"])
         self.assertIn("a solução pode ter poucos dígitos confiáveis", saida)
@@ -1325,8 +1347,8 @@ class TesteDoModelo(unittest.TestCase):
         """Três equipamentos, nota 5,0 no primeiro e as frações dadas.
 
         fracoes: {(i, j): fração que o equipamento i herda do j}, com
-        i e j de 1 a 3. As frações vão direto no dicionário, como num
-        arquivo editado à mão: o cadastro recusaria somas maiores que 1.
+        i e j de 1 a 3. As frações vão pelo arquivo, como se ele fosse
+        editado à mão: o cadastro recusaria somas maiores que 1.
         """
         inventario = Inventario()
         ids = [inventario.cadastrar_equipamento(
@@ -1335,10 +1357,9 @@ class TesteDoModelo(unittest.TestCase):
         inventario.registrar_vulnerabilidade(
             ids[0], "x", OrigemVulnerabilidade.OUTRA, 5.0,
             SituacaoTratamento.ABERTA)
-        for (i, j), fracao in fracoes.items():
-            inventario.buscar_por_id(ids[i - 1]).dependencias[ids[j - 1]] = \
-                fracao
-        return ModeloRisco(inventario)
+        return ModeloRisco(editado_a_mao(inventario, {
+            (ids[i - 1], ids[j - 1]): fracao
+            for (i, j), fracao in fracoes.items()}))
 
     def test_sistema_quase_critico_mas_valido_e_resolvido(self):
         """Condição 4,5e8: a solução confere e é aceita, com aviso."""
@@ -1633,6 +1654,105 @@ class TesteDoModelo(unittest.TestCase):
         dados = json.loads(bruto.decode("utf-8"),
                            parse_constant=recusar)  # NaN, Infinity
         self.assertEqual(dados[0]["hostname"], "PC-01")
+
+
+class TesteDaOrientacaoAObjetos(unittest.TestCase):
+    """Encapsulamento, textos para a tela e inventário como coleção."""
+
+    def setUp(self):
+        """Um inventário com uma estação e uma vulnerabilidade."""
+        self.inventario = Inventario()
+        self.pc = self.inventario.cadastrar_equipamento(
+            TipoEquipamento.ESTACAO_TRABALHO, "pc-01", "escrivão de plantão",
+            "cartório", "estação do cartório")
+        self.vuln = self.inventario.registrar_vulnerabilidade(
+            self.pc.id, "senha padrão de fábrica",
+            OrigemVulnerabilidade.SENHA_FRACA, 9.8, SituacaoTratamento.ABERTA)
+
+    def test_setters_conferem_e_padronizam(self):
+        """Atribuir passa pelo setter: o inválido não entra."""
+        self.assertEqual(self.pc.hostname, "PC-01")
+        self.pc.hostname = "srv-02"
+        self.assertEqual(self.pc.hostname, "SRV-02")
+        with self.assertRaisesRegex(ValueError, "Hostname inválido"):
+            self.pc.hostname = "PC 01"
+        with self.assertRaisesRegex(ValueError, "responsável"):
+            self.pc.custodiante = "   "
+        with self.assertRaisesRegex(ValueError, "lotação deve ser um texto"):
+            self.pc.lotacao = 5
+        self.assertEqual((self.pc.hostname, self.pc.custodiante,
+                          self.pc.lotacao),
+                         ("SRV-02", "Escrivão de Plantão", "Cartório"))
+        self.pc.descricao = "servidor de arquivos"
+        self.assertEqual(self.pc.descricao, "Servidor de arquivos")
+
+    def test_id_e_relacoes_mudam_so_pelos_metodos(self):
+        """O id não muda, e vínculos e dependências só pelos métodos."""
+        srv = self.inventario.cadastrar_equipamento(
+            TipoEquipamento.SERVIDOR, "SRV-01", "A", "B", "C")
+        outro = self.inventario.cadastrar_equipamento(
+            TipoEquipamento.SERVIDOR, "SRV-02", "A", "B", "C")
+        with self.assertRaises(AttributeError):
+            self.pc.id = 7
+        with self.assertRaises(TypeError):
+            self.pc.dependencias[srv.id] = 0.9
+        with self.assertRaises(TypeError):
+            self.pc.vulnerabilidades[self.vuln.id] = (
+                SituacaoTratamento.CORRIGIDA)
+        with self.assertRaisesRegex(ValueError, "FichaTecnica"):
+            self.pc.ficha = "Dell"
+        # Pelos métodos, com as regras: a soma das frações fica < 1.
+        self.pc.definir_dependencia(srv.id, 0.5)
+        self.assertEqual(self.pc.dependencias, {srv.id: 0.5})
+        with self.assertRaisesRegex(ValueError, "abaixo de 1"):
+            self.pc.definir_dependencia(outro.id, 0.5)
+        self.assertEqual(self.pc.dependencias, {srv.id: 0.5})
+
+    def test_atualizar_e_tudo_ou_nada(self):
+        """Um valor inválido no meio: nenhum campo muda."""
+        with self.assertRaisesRegex(ValueError, "lotação"):
+            self.pc.atualizar({"hostname": "PC-02", "lotacao": ""})
+        self.assertEqual(self.pc.hostname, "PC-01")
+
+    def test_mudar_o_tipo_mantem_o_texto_do_arquivo(self):
+        """O texto lido do arquivo não é padronizado de novo."""
+        dados = dict(self.pc.para_dict(), custodiante="NOC")
+        lido = Equipamento.de_dict(dados)
+        self.assertEqual(lido.custodiante, "NOC")
+        servidor = lido.converter_para(TipoEquipamento.SERVIDOR)
+        self.assertIsInstance(servidor, Servidor)
+        self.assertEqual(servidor.custodiante, "NOC")
+
+    def test_textos_para_a_tela(self):
+        """__str__ é o texto para pessoas; __repr__, para depuração."""
+        self.assertEqual(str(self.pc), "[1] PC-01 - Estação de trabalho")
+        self.assertEqual(repr(self.pc), "EstacaoTrabalho(1, 'PC-01')")
+        self.assertEqual(str(self.vuln),
+                         "[1] Senha padrão de fábrica (CVSS 9,8, crítica)")
+        self.assertEqual(str(self.pc.ficha), "sem ficha técnica")
+        self.pc.ficha.atualizar({"fabricante": "Dell",
+                                 "modelo": "OptiPlex 7010",
+                                 "patrimonio": "123456"})
+        self.assertEqual(str(self.pc.ficha),
+                         "Dell OptiPlex 7010 · patrimônio 123456")
+        self.assertEqual(str(self.inventario),
+                         "1 equipamento(s), 1 vulnerabilidade(s)")
+
+    def test_inventario_como_colecao(self):
+        """len, for, in e [] pelo id, como numa coleção do Python."""
+        srv = self.inventario.cadastrar_equipamento(
+            TipoEquipamento.SERVIDOR, "SRV-01", "A", "B", "C")
+        self.assertEqual(len(self.inventario), 2)
+        self.assertEqual(list(self.inventario), [self.pc, srv])
+        self.assertIn(srv.id, self.inventario)
+        self.assertNotIn(99, self.inventario)
+        self.assertIs(self.inventario[srv.id], srv)
+        with self.assertRaisesRegex(KeyError, "Nenhum equipamento com o ID"):
+            self.inventario[99]   # pylint: disable=pointless-statement
+        # Excluir enquanto percorre não atrapalha a repetição.
+        for equipamento in self.inventario:
+            self.inventario.excluir_equipamento(equipamento.id)
+        self.assertEqual(len(self.inventario), 0)
 
 
 class TesteDaBaseDeExemplo(unittest.TestCase):

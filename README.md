@@ -38,6 +38,7 @@ está no [Roteiro de demonstração](#roteiro-de-demonstração).
 - [Como usar](#como-usar)
 - [Requisitos do Trabalho 2](#requisitos-do-trabalho-2)
 - [Estrutura](#estrutura)
+- [Orientação a objetos](#orientação-a-objetos)
 - [O modelo de risco](#o-modelo-de-risco)
 - [Formato do arquivo de dados](#formato-do-arquivo-de-dados)
 - [Base de CVEs exploradas](#base-de-cves-exploradas)
@@ -470,9 +471,10 @@ patrimônio, sistema (operacional ou firmware) e versão. O patrimônio identifi
 o bem no órgão e não pode se repetir entre equipamentos.
 
 A opção 3 busca também pela ficha técnica (por parte do fabricante, do modelo,
-da série, do patrimônio ou do sistema) e por CVE ou CWE. A busca por CVE
-responde à pergunta de quando sai uma falha nova: quais equipamentos a têm, e
-em que situação está cada um.
+da série, do patrimônio ou do sistema) e por CVE ou CWE. Na busca pela ficha,
+cada equipamento achado aparece também com a ficha dele, numa linha, o que
+deixa ver as versões lado a lado. A busca por CVE responde à pergunta de quando
+sai uma falha nova: quais equipamentos a têm, e em que situação está cada um.
 
 **A opção 16** consulta a base das CVEs que atacantes estão explorando, que
 vem com o programa e funciona sem internet. Ela busca por palavras, como
@@ -559,7 +561,7 @@ ambiente `NO_COLOR` definida, o programa imprime texto puro.
 
 | # | Requisito | Peso | Onde está |
 | --- | --- | --- | --- |
-| 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. A classe "equipamentos" do enunciado é a `Equipamento`, no módulo `equipamentos.py`: o nome segue a convenção da PEP 8 para classes (CapWords) e está no singular, porque cada objeto é *um* equipamento. Cada equipamento tem uma `FichaTecnica` (`ficha_tecnica.py`), com fabricante, modelo, série, patrimônio, sistema e versão: composição. |
+| 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. A classe "equipamentos" do enunciado é a `Equipamento`, no módulo `equipamentos.py`: o nome segue a convenção da PEP 8 para classes (CapWords) e está no singular, porque cada objeto é *um* equipamento. Cada equipamento tem uma `FichaTecnica` (`ficha_tecnica.py`), com fabricante, modelo, série, patrimônio, sistema e versão: composição. Os dados ficam protegidos por propriedades que conferem cada valor; veja [Orientação a objetos](#orientação-a-objetos). |
 | 2 | Armazenamento em JSON formado por um array de objetos | 20% | `armazenamento.py` grava o que `Inventario.para_dict()` monta: um array JSON na raiz, um objeto por equipamento. Veja [o formato](#formato-do-arquivo-de-dados). |
 | 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker) e [No servidor do docente](#no-servidor-do-docente). |
 | 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu. A matriz A fica no mesmo JSON (campo `dependencias`), e o NumPy está declarado em `requirements.txt`, que o `Dockerfile` instala. Veja [o modelo de risco](#o-modelo-de-risco). |
@@ -586,7 +588,7 @@ e os mesmos comandos globais:
 | Arquivo | Responsabilidade |
 | --- | --- |
 | `main.py` | Classe `Aplicacao`: o menu e as ações. Liga as demais peças. É o ponto de partida |
-| `equipamentos.py` | Classe abstrata `Equipamento`, as sete subclasses e o fator de exposição de cada tipo |
+| `equipamentos.py` | Classe abstrata `Equipamento`, com os dados protegidos por propriedades, as sete subclasses e o fator de exposição de cada tipo |
 | `ficha_tecnica.py` | Classe `FichaTecnica`: fabricante, modelo, número de série, patrimônio, sistema e versão de um equipamento, todos opcionais |
 | `vulnerabilidades.py` | Classe `Vulnerabilidade`: entrada do catálogo (descrição, CVE e CWE opcionais, origem, nota CVSS) |
 | `inventario.py` | Classe `Inventario`: o conjunto dos equipamentos e das vulnerabilidades e as regras entre eles (hostname e patrimônio únicos, CVE única no catálogo, cascata, dependências, buscas) |
@@ -617,6 +619,42 @@ de CVEs, um arquivo à parte, é lida e gravada por `base_cve.py`). As classes d
 domínio (`Equipamento`, `FichaTecnica`, `Vulnerabilidade`, `Inventario`,
 `ModeloRisco`) não sabem de teclado, tela nem arquivo, por isso cada módulo tem
 um bloco de teste que roda sozinho (`python equipamentos.py`).
+
+## Orientação a objetos
+
+Cada equipamento do inventário é um objeto, criado a partir de uma das
+subclasses de `Equipamento`. Os quatro pilares da orientação a objetos
+aparecem assim:
+
+| Pilar | Onde | Como |
+| --- | --- | --- |
+| Abstração | `Equipamento` (`equipamentos.py`) | Classe abstrata (`ABC`): diz o que todo equipamento tem e exige, com `@abstractmethod`, que cada tipo defina o seu `fator_exposicao`. Não se cria um `Equipamento` direto, só um objeto de uma subclasse; `criar_equipamento()` escolhe qual, pelo tipo |
+| Herança | As 7 subclasses de `Equipamento` (`Servidor`, `Roteador`...) | Herdam da classe-mãe os dados, as validações e os métodos e acrescentam só o que muda: o tipo e o fator de exposição. Como não acrescentam atributos, herdam o `__init__` inteiro, sem precisar de `super()`. Os enums (de `Enum`) e as exceções (de `Exception`) também são subclasses |
+| Polimorfismo | `fator_exposicao` | O modelo de risco (`risco.py`) chama `equipamento.fator_exposicao` sem saber o tipo do objeto, e cada subclasse responde com o seu valor: servidor 1,5, banco de dados 2,0, impressora 0,5... |
+| Encapsulamento | `Equipamento` e `Inventario` | Os dados do equipamento ficam em atributos privados (`__hostname`...) e são lidos e alterados pelas propriedades (`@property`). Cada setter confere e padroniza o valor: `equipamento.hostname = "PC 01"` levanta `ValueError` em vez de gravar um nome inválido. O `id` não tem setter e não muda. As vulnerabilidades e as dependências saem da classe só para leitura (`MappingProxyType`) e mudam pelos métodos, que conferem as regras: a soma das frações menor que 1, que garante que `I − A` é invertível, não tem como ser contornada. O `Inventario` guarda os equipamentos e o catálogo em dicionários internos e só os expõe pelos métodos dele |
+
+A composição completa o desenho: o equipamento *tem* uma `FichaTecnica`, em
+vez de herdar dela. Os dois sublinhados, que o Python transforma em
+`_Equipamento__hostname`, seguem a recomendação da PEP 8 para atributos de uma
+classe feita para ter subclasses: as subclasses usam as propriedades, e não o
+atributo guardado. Um dado inválido levanta `ValueError`, e quem chama decide o
+que fazer: no menu, a pergunta é repetida com a explicação.
+
+Os métodos especiais usados:
+
+| Método | Onde | Para quê |
+| --- | --- | --- |
+| `__init__` | Todas as classes | Cria o objeto; no equipamento, os textos já passam pelos setters |
+| `__str__` | `Equipamento`, `Vulnerabilidade`, `FichaTecnica`, `Inventario` | O texto para a tela, como `[65] INTEL-SRV01 - Servidor`: aparece nas confirmações de exclusão, no passo a passo do risco (opção 14), na busca pela ficha técnica e no aviso da base carregada |
+| `__repr__` | `Equipamento`, `Vulnerabilidade`, `FichaTecnica` | O texto para depuração, como `Servidor(65, 'INTEL-SRV01')` |
+| `__eq__` | `Equipamento`, `Vulnerabilidade`, `FichaTecnica` | Igualdade pelos dados, usada para conferir que o arquivo, lido e gravado de novo, devolve os mesmos objetos |
+| `__len__`, `__iter__`, `__contains__`, `__getitem__` | `Inventario` (e `__len__` na `BaseCVE`) | O inventário funciona como uma coleção: `len(inventario)`, `for equipamento in inventario`, `65 in inventario` e `inventario[65]` |
+
+Os construtores alternativos `de_dict()` (métodos de classe ou estáticos)
+recriam os objetos a partir do arquivo. Operadores como `__add__` e `__lt__`
+ficaram de fora de propósito: somar dois inventários, ou dizer que um
+equipamento é "menor" que outro, não tem um significado único, e a ordem de
+cada lista (pela nota, pelo risco) é escolhida onde a lista é mostrada.
 
 ## O modelo de risco
 
@@ -921,7 +959,7 @@ conta acima, do maior para o menor:
 Na opção 14, a conta do servidor (E2), passo a passo:
 
 ```
-  SERVIDOR-01 - Servidor
+  [2] SERVIDOR-01 - Servidor
 
   Risco próprio  b = fator x (M v)
     CVSS  6,0  [2] Vulnerabilidade V2 do cenário (Aberta)
@@ -1298,7 +1336,8 @@ nem pelo DHS.
   alcança mais equipamentos que quem fica embaixo, e a árvore não volta.
 - **Tipo do equipamento é mudável**, mas um objeto não muda de classe:
   `Equipamento.converter_para()` cria outro objeto da subclasse certa, com o
-  mesmo id e as mesmas relações, e o `Inventario` o coloca no lugar.
+  mesmo id e as mesmas relações, e o `Inventario` o coloca no lugar. Os textos
+  passam como estão (`copiar_dados_de`), sem serem padronizados de novo.
 - **Tudo ou nada.** Atualizações (`atualizar`) validam tudo antes de gravar
   qualquer campo; um dado inválido não deixa o objeto pela metade.
 - **Exclusão em cascata ampliada.** Excluir um equipamento também remove as
@@ -1442,7 +1481,7 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 python testes.py
 ```
 
-São 100 testes, só com a biblioteca padrão: o programa inteiro rodando por
+São 106 testes, só com a biblioteca padrão: o programa inteiro rodando por
 dentro com o teclado simulado (do cadastro ao risco, incluindo o cenário de 3
 equipamentos), a árvore de dependências (cada equipamento uma vez, nenhuma
 ligação perdida, a ligação mais específica, o ciclo, uma cadeia de 1.100
@@ -1457,8 +1496,10 @@ norma), a recusa de bases inválidas
 (inclusive JSON fora da norma) e do sistema singular (com o posto e o teorema
 de Rouché-Capelli), os dois limites do número de condição e o posto que
 completa a regra, a conversão da base do Trabalho 1, o comportamento no
-container (inclusive `sair` e Ctrl+D), o modelo de risco sobre os arquivos de
-exemplo, a base de exemplo (fichas completas, números de série e de patrimônio
+container (inclusive `sair` e Ctrl+D), a orientação a objetos (setters que
+recusam dado inválido, id e relações que só mudam pelos métodos, `__str__` e o
+inventário como coleção), o modelo de risco sobre os arquivos de exemplo, a
+base de exemplo (fichas completas, números de série e de patrimônio
 fictícios, CVEs iguais às da base de CVEs) e os passos do
 [roteiro de demonstração](#roteiro-de-demonstração). O último teste roda o
 autoteste de cada módulo, com a saída em cp1252, a codificação que o Windows
@@ -1543,6 +1584,7 @@ estavam no código ganharam um teste, para não voltarem:
 | `"vetor": null` no arquivo era recusado | `null` vale como sem vetor | `test_vetor_no_arquivo_tem_de_conferir_com_a_nota` |
 | Nas sugestões da opção 16, `firmware` e `web` contavam como palavras da ficha: a câmera Hikvision, com sistema "Firmware", recebia antes as falhas de firmwares de outros fabricantes, e a da própria Hikvision vinha depois | `firmware` e `web` entraram nas palavras genéricas | `test_busca_sugestoes_e_nome_curto` |
 | Nas sugestões da opção 16, o nome do fabricante repetido no produto contava duas vezes: no roteador Cisco, falhas de produtos como `Cisco IP Phones` passavam à frente da falha do IOS XE já registrada nele | O nome do fabricante conta uma vez só, como fabricante | `test_fabricante_repetido_no_produto_conta_uma_vez` |
+| Na mudança de tipo (opção 4), os textos lidos do arquivo passavam de novo pela padronização: um responsável gravado como `NOC` virava `Noc` | Os textos são copiados como estão (`copiar_dados_de`) | `test_mudar_o_tipo_mantem_o_texto_do_arquivo` |
 | Com o usuário do container trocado para o UID 10001, o programa não gravava no volume criado pela versão anterior | Um `chown` único no volume, descrito em [Em container Docker](#em-container-docker) | Conferido à mão, no container |
 | A explicação da interação "Passiva" do CVSS dava como exemplo clicar num link, que a especificação do FIRST classifica como "Ativa" | Texto corrigido pela especificação | Revisão dos textos contra a especificação |
 
@@ -1555,7 +1597,7 @@ histórico mesmo quando não há conflito:
 
 | Prefixo | Uso | Exemplo neste repositório |
 | --- | --- | --- |
-| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves`, `feature/arvore-de-dependencias`, `feature/base-de-exemplo-completa` |
+| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves`, `feature/arvore-de-dependencias`, `feature/base-de-exemplo-completa`, `feature/encapsulamento-e-metodos-especiais` |
 | `fix/` | Correção de defeito | `fix/normas-oficiais` |
 | `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas`, `docs/instrucoes-de-execucao`, `docs/revisao-final` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
@@ -1666,7 +1708,7 @@ mais detalhe:
 | Opção 15 | M é 76 × 88, com posto 56 e núcleo de dimensão 32; 17 colunas nulas. As matrizes não cabem na tela, mas a verificação de `I − A`, sim |
 | O comando do cenário de 3 equipamentos (abaixo) e as opções 15, 13 e 14 | M, v, F, b e A na tela e os riscos efetivos 16, 24 e 18, a conta da [validação à mão](#validação-à-mão-cenário-de-3-equipamentos) |
 | Opção 3, item 7, `CVE-2019-0708` | Onde está uma falha quando ela sai no noticiário: `DPLAN-PC02` e `INTEL-SRV01` (abertas) e `DP4-PC01` (em tratamento) |
-| Opção 3, item 6, `MikroTik` | A busca pela ficha técnica: os três roteadores das delegacias |
+| Opção 3, item 6, `MikroTik` | A busca pela ficha técnica: os três roteadores das delegacias, com a ficha de cada um. Os dois no RouterOS 6.40.5 são os que ainda têm a falha do Winbox |
 | Opção 16, item 3, ID `3` | As CVEs exploradas que combinam com a ficha do roteador da sede (Cisco, IOS XE). A primeira, CVE-2023-20198, tem `*`: já está registrada nele. Para voltar ao menu, escolha uma e responda `n` |
 | Opção 16, item 1, `remote desktop` | A busca na base de CVEs, sem internet: o BlueKeep em primeiro |
 | Opção 12, ID `28`, e Enter | As duas árvores do `PERICIA-PC01`: quem depende dele e do que ele depende, com as frações. O Enter no fim não remove nada |
@@ -1674,7 +1716,9 @@ mais detalhe:
 
 Para as perguntas sobre o código, a tabela de
 [Requisitos do Trabalho 2](#requisitos-do-trabalho-2) diz onde está cada
-requisito, e a de [Estrutura](#estrutura), o que cada arquivo faz.
+requisito, a de [Estrutura](#estrutura), o que cada arquivo faz, e a seção
+[Orientação a objetos](#orientação-a-objetos), onde estão os pilares e os
+métodos especiais.
 
 Os dois cenários pequenos vêm com a imagem e rodam num container à parte,
 apagado quando o programa termina (`--rm`), sem mexer no `inventario`, que

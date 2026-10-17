@@ -278,6 +278,12 @@ class Vulnerabilidade:
             return NotImplemented
         return self.para_dict() == outro.para_dict()
 
+    def __str__(self):
+        """Texto para a tela: [3] Senha padrão (CVSS 9,8, crítica)."""
+        return (f"[{self.id}] {self.descricao} (CVSS "
+                f"{formatacao.numero_br(self.cvss)}, "
+                f"{self.gravidade.rotulo.lower()})")
+
     def __repr__(self):
         """Texto para depuração, como Vulnerabilidade(3, CVSS 7.5)."""
         cve = f"{self.cve}, " if self.cve is not None else ""
