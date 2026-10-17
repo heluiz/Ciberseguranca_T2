@@ -531,12 +531,21 @@ def mostrar_dimensoes(modelo):
                    LARGURA_EXPLICACAO + 4)
 
 
+# A barra usa o meio bloco de baixo (▄), e não o bloco cheio (█). O
+# bloco cheio ocupa a célula inteira do terminal, e a barra de uma
+# linha encostava na da linha seguinte: na tabela, que vem do maior
+# risco para o menor, as barras viravam uma escada só. O meio bloco
+# deixa vazia a metade de cima da célula e existe nas mesmas fontes do
+# console do Windows (Consolas, Lucida Console) que o bloco cheio.
+BLOCO_DA_BARRA = "▄"
+
+
 def barra(valor, maximo, largura=20):
     """Barra horizontal proporcional ao valor, de 0 a largura blocos."""
     if maximo <= 0:
         return ""
-    return "█" * max(1 if valor > 0 else 0,
-                     round(largura * valor / maximo))
+    return BLOCO_DA_BARRA * max(1 if valor > 0 else 0,
+                                round(largura * valor / maximo))
 
 
 def mostrar_relatorio_risco(itens, residuo):
