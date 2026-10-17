@@ -238,15 +238,23 @@ class TesteDoPrograma(unittest.TestCase):
 
         self.assertIn("estritamente diagonal dominante", saida)
         tabela = {}
+        barras = {}
         for linha in saida.splitlines():
             achado = re.match(r"\s+\d+\s+(\S+-01)\s.*?\s(\d+,\d\d)\s+"
-                              r"(\d+,\d\d)\s", linha)
+                              r"(\d+,\d\d)\s+(\S*)", linha)
             if achado:
                 tabela[achado.group(1)] = (achado.group(2),
                                            achado.group(3))
+                barras[achado.group(1)] = achado.group(4)
         self.assertEqual(tabela, {"ESTACAO-01": ("4,00", "16,00"),
                                   "SERVIDOR-01": ("15,00", "24,00"),
                                   "BANCO-01": ("12,00", "18,00")})
+        # A barra é proporcional ao risco efetivo (o maior, 24, tem 20
+        # blocos) e usa o meio bloco: com o bloco cheio (█), as barras
+        # de linhas seguidas encostavam no terminal e pareciam uma só.
+        self.assertEqual(barras, {"SERVIDOR-01": "▄" * 20,
+                                  "BANCO-01": "▄" * 15,
+                                  "ESTACAO-01": "▄" * 13})
 
         # O arquivo é um array de objetos, um por equipamento, com as
         # vulnerabilidades e as dependências dentro.

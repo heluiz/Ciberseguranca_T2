@@ -951,9 +951,9 @@ conta acima, do maior para o menor:
 
   ID  HOSTNAME     TIPO                 SOMA CVSS  FATOR  PRÓPRIO  EFETIVO
   ----------------------------------------------------------------------------------------------
-   2  SERVIDOR-01  Servidor                  10,0    1,5    15,00    24,00  ████████████████████
-   3  BANCO-01     Banco de dados             6,0    2,0    12,00    18,00  ███████████████
-   1  ESTACAO-01   Estação de trabalho        4,0    1,0     4,00    16,00  █████████████
+   2  SERVIDOR-01  Servidor                  10,0    1,5    15,00    24,00  ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   3  BANCO-01     Banco de dados             6,0    2,0    12,00    18,00  ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+   1  ESTACAO-01   Estação de trabalho        4,0    1,0     4,00    16,00  ▄▄▄▄▄▄▄▄▄▄▄▄▄
 ```
 
 Na opção 14, a conta do servidor (E2), passo a passo:
@@ -1598,7 +1598,7 @@ histórico mesmo quando não há conflito:
 | Prefixo | Uso | Exemplo neste repositório |
 | --- | --- | --- |
 | `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves`, `feature/arvore-de-dependencias`, `feature/base-de-exemplo-completa`, `feature/encapsulamento-e-metodos-especiais` |
-| `fix/` | Correção de defeito | `fix/normas-oficiais` |
+| `fix/` | Correção de defeito | `fix/normas-oficiais`, `fix/barras-do-risco` |
 | `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas`, `docs/instrucoes-de-execucao`, `docs/revisao-final` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
 
