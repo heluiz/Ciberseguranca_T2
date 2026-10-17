@@ -6,12 +6,22 @@
     "custodiante": "Suporte de Informática",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Servidor de arquivos da sede regional",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "PowerEdge T440",
+      "numero_serie": "EXDL0001",
+      "patrimonio": "1011001",
+      "sistema": "Windows Server 2016 Standard",
+      "versao": "1607 (14393)"
+    },
     "vulnerabilidades": [
       {
         "id": 1,
         "descricao": "Pasta pública com permissão de escrita para todos os usuários",
+        "cwe": "CWE-732",
         "origem": 5,
         "cvss": 7.5,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
         "situacao": 1
       },
       {
@@ -27,6 +37,16 @@
         "origem": 1,
         "cvss": 5.3,
         "situacao": 1
+      },
+      {
+        "id": 82,
+        "descricao": "Microsoft Windows Print Spooler Remote Code Execution Vulnerability",
+        "cve": "CVE-2021-34527",
+        "cwe": "CWE-269",
+        "origem": 2,
+        "cvss": 8.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+        "situacao": 3
       }
     ],
     "dependencias": [
@@ -55,6 +75,14 @@
     "custodiante": "Suporte de Informática",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Controlador de domínio da rede da 1ª DRPC",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "PowerEdge R640",
+      "numero_serie": "EXDL0002",
+      "patrimonio": "1011002",
+      "sistema": "Windows Server 2019 Standard",
+      "versao": "1809 (17763)"
+    },
     "vulnerabilidades": [
       {
         "id": 4,
@@ -66,6 +94,7 @@
       {
         "id": 5,
         "descricao": "Política de senhas aceitava senhas de 6 caracteres",
+        "cwe": "CWE-521",
         "origem": 3,
         "cvss": 5.3,
         "situacao": 3
@@ -97,6 +126,14 @@
     "custodiante": "Suporte de Informática",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Roteador de borda do link principal",
+    "ficha": {
+      "fabricante": "Cisco",
+      "modelo": "ISR 4331",
+      "numero_serie": "EXCS0003",
+      "patrimonio": "1011003",
+      "sistema": "IOS XE",
+      "versao": "17.9.4a"
+    },
     "vulnerabilidades": [
       {
         "id": 6,
@@ -108,8 +145,10 @@
       {
         "id": 7,
         "descricao": "Administração do roteador por Telnet, sem criptografia",
+        "cwe": "CWE-319",
         "origem": 4,
         "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
         "situacao": 3
       },
       {
@@ -118,6 +157,16 @@
         "origem": 1,
         "cvss": 7.5,
         "situacao": 1
+      },
+      {
+        "id": 84,
+        "descricao": "Cisco IOS XE Web UI Privilege Escalation Vulnerability",
+        "cve": "CVE-2023-20198",
+        "cwe": "CWE-420",
+        "origem": 2,
+        "cvss": 10.0,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+        "situacao": 3
       }
     ],
     "dependencias": [
@@ -138,13 +187,33 @@
     "custodiante": "Suporte de Informática",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Switch gerenciável do rack principal",
+    "ficha": {
+      "fabricante": "Cisco",
+      "modelo": "Catalyst 2960-48TT-L",
+      "numero_serie": "EXCS0004",
+      "patrimonio": "1011004",
+      "sistema": "IOS",
+      "versao": "15.0(2)SE11"
+    },
     "vulnerabilidades": [
       {
         "id": 9,
         "descricao": "Senha padrão de fábrica no painel de gerenciamento",
+        "cwe": "CWE-1392",
         "origem": 3,
         "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
         "situacao": 2
+      },
+      {
+        "id": 85,
+        "descricao": "Cisco IOS and IOS XE Software Smart Install Remote Code Execution Vulnerability",
+        "cve": "CVE-2018-0171",
+        "cwe": "CWE-20",
+        "origem": 2,
+        "cvss": 7.5,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+        "situacao": 1
       }
     ],
     "dependencias": [
@@ -161,6 +230,14 @@
     "custodiante": "Suporte de Informática",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Nobreak do rack de servidores",
+    "ficha": {
+      "fabricante": "APC",
+      "modelo": "Smart-UPS SMT3000RMI2U",
+      "numero_serie": "EXAP0005",
+      "patrimonio": "1011005",
+      "sistema": "NMC2 (placa de rede)",
+      "versao": "6.8.2"
+    },
     "vulnerabilidades": [
       {
         "id": 10,
@@ -179,10 +256,15 @@
     "custodiante": "Suporte de Informática",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Acesso ao REDS (Registro de Eventos de Defesa Social) pela rede da 1ª DRPC",
+    "ficha": {
+      "fabricante": "Estado de Minas Gerais",
+      "modelo": "REDS (sistema web)"
+    },
     "vulnerabilidades": [
       {
         "id": 11,
         "descricao": "Sessões do REDS abertas em estações sem bloqueio de tela",
+        "cwe": "CWE-613",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 1
@@ -213,6 +295,10 @@
     "custodiante": "Suporte de Informática",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Acesso ao PCNet, sistema de gerenciamento dos atos de polícia judiciária",
+    "ficha": {
+      "fabricante": "Polícia Civil de Minas Gerais",
+      "modelo": "PCNet (sistema web)"
+    },
     "vulnerabilidades": [
       {
         "id": 13,
@@ -224,6 +310,7 @@
       {
         "id": 14,
         "descricao": "Credencial do PCNet salva no navegador das estações do cartório",
+        "cwe": "CWE-522",
         "origem": 3,
         "cvss": 5.3,
         "situacao": 3
@@ -247,6 +334,10 @@
     "custodiante": "Suporte de Informática",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Acesso ao BNMP (Banco Nacional de Monitoramento de Prisões) para consulta de mandados",
+    "ficha": {
+      "fabricante": "Conselho Nacional de Justiça",
+      "modelo": "BNMP (sistema web)"
+    },
     "vulnerabilidades": [
       {
         "id": 15,
@@ -274,6 +365,10 @@
     "custodiante": "Suporte de Informática",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Acesso ao SIP pela rede da 1ª DRPC",
+    "ficha": {
+      "fabricante": "Estado de Minas Gerais",
+      "modelo": "SIP (sistema web)"
+    },
     "vulnerabilidades": [
       {
         "id": 16,
@@ -301,6 +396,12 @@
     "custodiante": "Suporte de Informática",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Banco de dados do controle de patrimônio",
+    "ficha": {
+      "fabricante": "Microsoft",
+      "modelo": "SQL Server 2016 Standard",
+      "sistema": "Windows Server 2016 Standard",
+      "versao": "1607 (14393)"
+    },
     "vulnerabilidades": [
       {
         "id": 17,
@@ -308,6 +409,16 @@
         "origem": 6,
         "cvss": 5.3,
         "situacao": 4
+      },
+      {
+        "id": 83,
+        "descricao": "Microsoft SQL Server Reporting Services Remote Code Execution Vulnerability",
+        "cve": "CVE-2020-0618",
+        "cwe": "CWE-502",
+        "origem": 2,
+        "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "situacao": 3
       }
     ],
     "dependencias": [
@@ -328,6 +439,14 @@
     "custodiante": "Setor Administrativo",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Estação da recepção da sede regional",
+    "ficha": {
+      "fabricante": "Positivo Tecnologia",
+      "modelo": "Master D610",
+      "numero_serie": "EXPS0011",
+      "patrimonio": "1011011",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 18,
@@ -355,12 +474,22 @@
     "custodiante": "Setor Administrativo",
     "lotacao": "1ª DRPC Uberlândia",
     "descricao": "Relógio de ponto biométrico da sede",
+    "ficha": {
+      "fabricante": "Control iD",
+      "modelo": "iDClass",
+      "numero_serie": "EXCI0012",
+      "patrimonio": "1011012",
+      "sistema": "Firmware",
+      "versao": "1.12.0"
+    },
     "vulnerabilidades": [
       {
         "id": 19,
         "descricao": "Relógio de ponto com senha padrão de fábrica",
+        "cwe": "CWE-1392",
         "origem": 3,
         "cvss": 5.3,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
         "situacao": 3
       }
     ],
@@ -382,6 +511,14 @@
     "custodiante": "Delegado Regional",
     "lotacao": "Gabinete do Regional",
     "descricao": "Estação do Delegado Regional",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 7010",
+      "numero_serie": "EXDL0013",
+      "patrimonio": "1011013",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 20,
@@ -409,10 +546,19 @@
     "custodiante": "Delegado Regional",
     "lotacao": "Gabinete do Regional",
     "descricao": "Notebook institucional do Delegado Regional",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "Latitude 5440",
+      "numero_serie": "EXDL0014",
+      "patrimonio": "1011014",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 21,
         "descricao": "Disco do notebook sem criptografia",
+        "cwe": "CWE-311",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 2
@@ -436,6 +582,14 @@
     "custodiante": "Secretaria do Gabinete",
     "lotacao": "Gabinete do Regional",
     "descricao": "Estação da secretaria do gabinete",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 7010",
+      "numero_serie": "EXDL0015",
+      "patrimonio": "1011015",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [],
     "dependencias": [
       {
@@ -455,10 +609,19 @@
     "custodiante": "Secretaria do Gabinete",
     "lotacao": "Gabinete do Regional",
     "descricao": "Impressora multifuncional do gabinete",
+    "ficha": {
+      "fabricante": "HP",
+      "modelo": "LaserJet Pro MFP M428fdw",
+      "numero_serie": "EXHP0016",
+      "patrimonio": "1011016",
+      "sistema": "Firmware",
+      "versao": "002_2310A"
+    },
     "vulnerabilidades": [
       {
         "id": 22,
         "descricao": "Impressora guarda cópias das digitalizações na memória interna",
+        "cwe": "CWE-212",
         "origem": 1,
         "cvss": 5.3,
         "situacao": 1
@@ -482,10 +645,19 @@
     "custodiante": "Delegado de Plantão",
     "lotacao": "Delegacia de Plantão",
     "descricao": "Estação do delegado de plantão",
+    "ficha": {
+      "fabricante": "Positivo Tecnologia",
+      "modelo": "Master D610",
+      "numero_serie": "EXPS0017",
+      "patrimonio": "1011017",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 23,
         "descricao": "Usuário do plantão com privilégio de administrador local",
+        "cwe": "CWE-250",
         "origem": 5,
         "cvss": 7.5,
         "situacao": 1
@@ -509,6 +681,14 @@
     "custodiante": "Escrivão de Plantão",
     "lotacao": "Delegacia de Plantão",
     "descricao": "Estação de lavratura de autos de prisão em flagrante",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 790",
+      "numero_serie": "EXDL0018",
+      "patrimonio": "1011018",
+      "sistema": "Windows 7 Professional",
+      "versao": "SP1 (7601)"
+    },
     "vulnerabilidades": [
       {
         "id": 24,
@@ -522,6 +702,16 @@
         "descricao": "Senha do administrador local igual em todas as estações do plantão",
         "origem": 3,
         "cvss": 7.5,
+        "situacao": 1
+      },
+      {
+        "id": 80,
+        "descricao": "Microsoft Remote Desktop Services Remote Code Execution Vulnerability",
+        "cve": "CVE-2019-0708",
+        "cwe": "CWE-416",
+        "origem": 2,
+        "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
         "situacao": 1
       }
     ],
@@ -543,6 +733,14 @@
     "custodiante": "Escrivão de Plantão",
     "lotacao": "Delegacia de Plantão",
     "descricao": "Estação de registro de ocorrências no REDS",
+    "ficha": {
+      "fabricante": "Positivo Tecnologia",
+      "modelo": "Master D610",
+      "numero_serie": "EXPS0019",
+      "patrimonio": "1011019",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 26,
@@ -574,6 +772,14 @@
     "custodiante": "Inspetor de Plantão",
     "lotacao": "Delegacia de Plantão",
     "descricao": "Estação da inspetoria de plantão",
+    "ficha": {
+      "fabricante": "Positivo Tecnologia",
+      "modelo": "Master D610",
+      "numero_serie": "EXPS0020",
+      "patrimonio": "1011020",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 27,
@@ -601,6 +807,14 @@
     "custodiante": "Escrivão de Plantão",
     "lotacao": "Delegacia de Plantão",
     "descricao": "Impressora de rede do plantão",
+    "ficha": {
+      "fabricante": "HP",
+      "modelo": "LaserJet Pro M404dn",
+      "numero_serie": "EXHP0021",
+      "patrimonio": "1011021",
+      "sistema": "Firmware",
+      "versao": "002_2014A"
+    },
     "vulnerabilidades": [
       {
         "id": 28,
@@ -612,8 +826,10 @@
       {
         "id": 29,
         "descricao": "Painel web da impressora sem senha",
+        "cwe": "CWE-306",
         "origem": 3,
         "cvss": 5.3,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
         "situacao": 1
       }
     ],
@@ -635,12 +851,22 @@
     "custodiante": "Inspetor de Plantão",
     "lotacao": "Delegacia de Plantão",
     "descricao": "Câmera IP da recepção do plantão",
+    "ficha": {
+      "fabricante": "Hikvision",
+      "modelo": "DS-2CD2043G0-I",
+      "numero_serie": "EXHK0022",
+      "patrimonio": "1011022",
+      "sistema": "Firmware",
+      "versao": "V5.7.3 build 220112"
+    },
     "vulnerabilidades": [
       {
         "id": 30,
         "descricao": "Câmera acessível pela rede de visitantes com senha padrão",
+        "cwe": "CWE-1392",
         "origem": 3,
         "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
         "situacao": 1
       },
       {
@@ -649,6 +875,16 @@
         "origem": 6,
         "cvss": 7.5,
         "situacao": 2
+      },
+      {
+        "id": 87,
+        "descricao": "Hikvision Improper Input Validation",
+        "cve": "CVE-2021-36260",
+        "cwe": "CWE-78",
+        "origem": 2,
+        "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "situacao": 3
       }
     ],
     "dependencias": [
@@ -669,6 +905,12 @@
     "custodiante": "Inspetor de Plantão",
     "lotacao": "Delegacia de Plantão",
     "descricao": "Nobreak das estações do plantão",
+    "ficha": {
+      "fabricante": "APC",
+      "modelo": "Back-UPS BR1500G-BR",
+      "numero_serie": "EXAP0023",
+      "patrimonio": "1011023"
+    },
     "vulnerabilidades": [
       {
         "id": 32,
@@ -696,6 +938,14 @@
     "custodiante": "Chefia do GAOP",
     "lotacao": "GAOP",
     "descricao": "Estação de planejamento de operações e consulta a mandados",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkCentre M70s Gen 3",
+      "numero_serie": "EXLN0024",
+      "patrimonio": "1011024",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 33,
@@ -707,6 +957,7 @@
       {
         "id": 34,
         "descricao": "Sessão do BNMP aberta sem bloqueio de tela",
+        "cwe": "CWE-613",
         "origem": 1,
         "cvss": 5.3,
         "situacao": 1
@@ -730,10 +981,19 @@
     "custodiante": "Equipe do GAOP",
     "lotacao": "GAOP",
     "descricao": "Notebook de apoio às operações de campo",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkPad E14 Gen 4",
+      "numero_serie": "EXLN0025",
+      "patrimonio": "1011025",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 35,
         "descricao": "Notebook de operações sem criptografia de disco",
+        "cwe": "CWE-311",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 2
@@ -757,6 +1017,14 @@
     "custodiante": "Equipe do GAOP",
     "lotacao": "GAOP",
     "descricao": "Impressora de rede do GAOP",
+    "ficha": {
+      "fabricante": "Brother",
+      "modelo": "HL-L5102DW",
+      "numero_serie": "EXBR0026",
+      "patrimonio": "1011026",
+      "sistema": "Firmware",
+      "versao": "1.30"
+    },
     "vulnerabilidades": [
       {
         "id": 36,
@@ -784,12 +1052,22 @@
     "custodiante": "Chefia do GAOP",
     "lotacao": "GAOP",
     "descricao": "Roteador 4G de apoio às operações",
+    "ficha": {
+      "fabricante": "TP-Link",
+      "modelo": "Archer MR600",
+      "numero_serie": "EXTP0027",
+      "patrimonio": "1011027",
+      "sistema": "Firmware",
+      "versao": "1.1.0 Build 210716"
+    },
     "vulnerabilidades": [
       {
         "id": 37,
         "descricao": "Gerenciamento remoto do roteador habilitado para a internet",
+        "cwe": "CWE-668",
         "origem": 4,
         "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
         "situacao": 2
       }
     ],
@@ -807,6 +1085,14 @@
     "custodiante": "Perito Criminal",
     "lotacao": "Perícia",
     "descricao": "Estação de elaboração de laudos",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "Precision 3660",
+      "numero_serie": "EXDL0028",
+      "patrimonio": "1011028",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 38,
@@ -838,10 +1124,19 @@
     "custodiante": "Perito Criminal",
     "lotacao": "Perícia",
     "descricao": "Notebook de campo da perícia",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "Latitude 5440",
+      "numero_serie": "EXDL0029",
+      "patrimonio": "1011029",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 39,
         "descricao": "Notebook de campo sem criptografia de disco",
+        "cwe": "CWE-311",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 3
@@ -865,12 +1160,21 @@
     "custodiante": "Chefia da Perícia",
     "lotacao": "Perícia",
     "descricao": "Servidor de imagens e fotografias periciais",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "PowerEdge R530",
+      "numero_serie": "EXDL0030",
+      "patrimonio": "1011030",
+      "sistema": "Windows Server 2012 R2 Standard",
+      "versao": "6.3 (9600)"
+    },
     "vulnerabilidades": [
       {
         "id": 40,
         "descricao": "Compartilhamento SMBv1 habilitado no servidor",
         "origem": 4,
         "cvss": 7.5,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
         "situacao": 2
       },
       {
@@ -879,6 +1183,16 @@
         "origem": 1,
         "cvss": 5.3,
         "situacao": 1
+      },
+      {
+        "id": 81,
+        "descricao": "Microsoft SMBv1 Remote Code Execution Vulnerability",
+        "cve": "CVE-2017-0144",
+        "cwe": "CWE-20",
+        "origem": 2,
+        "cvss": 8.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+        "situacao": 2
       }
     ],
     "dependencias": [
@@ -899,10 +1213,17 @@
     "custodiante": "Chefia da Perícia",
     "lotacao": "Perícia",
     "descricao": "Banco de dados de laudos e requisições",
+    "ficha": {
+      "fabricante": "Microsoft",
+      "modelo": "SQL Server 2017 Standard",
+      "sistema": "Windows Server 2016 Standard",
+      "versao": "1607 (14393)"
+    },
     "vulnerabilidades": [
       {
         "id": 42,
         "descricao": "Registro de acessos (log) desativado no banco de dados",
+        "cwe": "CWE-778",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 1
@@ -926,10 +1247,19 @@
     "custodiante": "Chefe da Inspetoria",
     "lotacao": "Inspetoria",
     "descricao": "Estação da inspetoria regional",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkCentre M70s Gen 3",
+      "numero_serie": "EXLN0032",
+      "patrimonio": "1011032",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 43,
         "descricao": "Usuário comum com privilégio de administrador",
+        "cwe": "CWE-250",
         "origem": 5,
         "cvss": 5.3,
         "situacao": 3
@@ -953,6 +1283,14 @@
     "custodiante": "Chefe da Inspetoria",
     "lotacao": "Inspetoria",
     "descricao": "Notebook de apoio às operações",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkPad E14 Gen 4",
+      "numero_serie": "EXLN0033",
+      "patrimonio": "1011033",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [],
     "dependencias": [
       {
@@ -972,12 +1310,22 @@
     "custodiante": "Chefe de Cartório",
     "lotacao": "Chefia de Cartório",
     "descricao": "Estação da chefia de cartório",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 3080",
+      "numero_serie": "EXDL0034",
+      "patrimonio": "1011034",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 44,
         "descricao": "Pasta de inquéritos digitalizados compartilhada sem restrição",
+        "cwe": "CWE-732",
         "origem": 5,
         "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
         "situacao": 2
       }
     ],
@@ -1003,12 +1351,22 @@
     "custodiante": "Chefe de Cartório",
     "lotacao": "Chefia de Cartório",
     "descricao": "Multifuncional de digitalização de inquéritos",
+    "ficha": {
+      "fabricante": "Brother",
+      "modelo": "MFC-L6902DW",
+      "numero_serie": "EXBR0035",
+      "patrimonio": "1011035",
+      "sistema": "Firmware",
+      "versao": "1.25"
+    },
     "vulnerabilidades": [
       {
         "id": 45,
         "descricao": "Digitalizações enviadas por e-mail sem criptografia",
+        "cwe": "CWE-319",
         "origem": 4,
         "cvss": 5.3,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
         "situacao": 1
       }
     ],
@@ -1030,12 +1388,20 @@
     "custodiante": "Chefe de Cartório",
     "lotacao": "Chefia de Cartório",
     "descricao": "Banco de dados de bens apreendidos",
+    "ficha": {
+      "fabricante": "PostgreSQL Global Development Group",
+      "modelo": "PostgreSQL 12",
+      "sistema": "Ubuntu Server 20.04 LTS",
+      "versao": "20.04.6"
+    },
     "vulnerabilidades": [
       {
         "id": 46,
         "descricao": "Banco de bens apreendidos com senha padrão do fabricante",
+        "cwe": "CWE-1392",
         "origem": 3,
         "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
         "situacao": 3
       },
       {
@@ -1060,6 +1426,14 @@
     "custodiante": "Cartório da 1ª DP",
     "lotacao": "1ª DP",
     "descricao": "Estação do cartório da 1ª DP",
+    "ficha": {
+      "fabricante": "Positivo Tecnologia",
+      "modelo": "Master D610",
+      "numero_serie": "EXPS0037",
+      "patrimonio": "1011037",
+      "sistema": "Windows 11 Pro",
+      "versao": "24H2 (26100)"
+    },
     "vulnerabilidades": [
       {
         "id": 48,
@@ -1091,6 +1465,14 @@
     "custodiante": "Inspetoria da 1ª DP",
     "lotacao": "1ª DP",
     "descricao": "Estação da inspetoria da 1ª DP",
+    "ficha": {
+      "fabricante": "Positivo Tecnologia",
+      "modelo": "Master D610",
+      "numero_serie": "EXPS0038",
+      "patrimonio": "1011038",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 49,
@@ -1122,13 +1504,32 @@
     "custodiante": "Delegado da 1ª DP",
     "lotacao": "1ª DP",
     "descricao": "Roteador do link da 1ª DP",
+    "ficha": {
+      "fabricante": "MikroTik",
+      "modelo": "hAP ac2",
+      "numero_serie": "EXMK0039",
+      "patrimonio": "1011039",
+      "sistema": "RouterOS",
+      "versao": "6.49.10"
+    },
     "vulnerabilidades": [
       {
         "id": 50,
         "descricao": "Senha do Wi-Fi nunca trocada desde a instalação",
+        "cwe": "CWE-262",
         "origem": 3,
         "cvss": 5.3,
         "situacao": 1
+      },
+      {
+        "id": 86,
+        "descricao": "MikroTik Router OS Directory Traversal Vulnerability",
+        "cve": "CVE-2018-14847",
+        "cwe": "CWE-22",
+        "origem": 2,
+        "cvss": 9.1,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
+        "situacao": 3
       }
     ],
     "dependencias": [
@@ -1145,6 +1546,14 @@
     "custodiante": "Cartório da 2ª DP",
     "lotacao": "2ª DP",
     "descricao": "Estação do cartório da 2ª DP",
+    "ficha": {
+      "fabricante": "HP",
+      "modelo": "ProDesk 400 G7",
+      "numero_serie": "EXHP0040",
+      "patrimonio": "1011040",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 51,
@@ -1176,6 +1585,14 @@
     "custodiante": "Inspetoria da 2ª DP",
     "lotacao": "2ª DP",
     "descricao": "Estação da inspetoria da 2ª DP",
+    "ficha": {
+      "fabricante": "HP",
+      "modelo": "ProDesk 400 G7",
+      "numero_serie": "EXHP0041",
+      "patrimonio": "1011041",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 52,
@@ -1207,6 +1624,14 @@
     "custodiante": "Cartório da 2ª DP",
     "lotacao": "2ª DP",
     "descricao": "Impressora de rede da 2ª DP",
+    "ficha": {
+      "fabricante": "HP",
+      "modelo": "LaserJet Pro M404dn",
+      "numero_serie": "EXHP0042",
+      "patrimonio": "1011042",
+      "sistema": "Firmware",
+      "versao": "002_2402A"
+    },
     "vulnerabilidades": [
       {
         "id": 28,
@@ -1234,10 +1659,19 @@
     "custodiante": "Cartório da 3ª DP",
     "lotacao": "3ª DP",
     "descricao": "Estação do cartório da 3ª DP",
+    "ficha": {
+      "fabricante": "HP",
+      "modelo": "ProDesk 400 G7",
+      "numero_serie": "EXHP0043",
+      "patrimonio": "1011043",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 53,
         "descricao": "Credencial do PCNet salva no navegador",
+        "cwe": "CWE-522",
         "origem": 3,
         "cvss": 5.3,
         "situacao": 1
@@ -1265,6 +1699,14 @@
     "custodiante": "Delegado da 3ª DP",
     "lotacao": "3ª DP",
     "descricao": "Roteador do link da 3ª DP",
+    "ficha": {
+      "fabricante": "MikroTik",
+      "modelo": "hAP ac2",
+      "numero_serie": "EXMK0044",
+      "patrimonio": "1011044",
+      "sistema": "RouterOS",
+      "versao": "6.40.5"
+    },
     "vulnerabilidades": [
       {
         "id": 6,
@@ -1276,8 +1718,20 @@
       {
         "id": 54,
         "descricao": "Administração do roteador por HTTP, sem criptografia",
+        "cwe": "CWE-319",
         "origem": 4,
         "cvss": 5.3,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+        "situacao": 1
+      },
+      {
+        "id": 86,
+        "descricao": "MikroTik Router OS Directory Traversal Vulnerability",
+        "cve": "CVE-2018-14847",
+        "cwe": "CWE-22",
+        "origem": 2,
+        "cvss": 9.1,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
         "situacao": 1
       }
     ],
@@ -1295,6 +1749,14 @@
     "custodiante": "Cartório da 4ª DP",
     "lotacao": "4ª DP",
     "descricao": "Estação do cartório da 4ª DP",
+    "ficha": {
+      "fabricante": "HP",
+      "modelo": "Compaq 6005 Pro",
+      "numero_serie": "EXHP0045",
+      "patrimonio": "1011045",
+      "sistema": "Windows 7 Professional",
+      "versao": "SP1 (7601)"
+    },
     "vulnerabilidades": [
       {
         "id": 24,
@@ -1302,6 +1764,16 @@
         "origem": 2,
         "cvss": 9.8,
         "situacao": 1
+      },
+      {
+        "id": 80,
+        "descricao": "Microsoft Remote Desktop Services Remote Code Execution Vulnerability",
+        "cve": "CVE-2019-0708",
+        "cwe": "CWE-416",
+        "origem": 2,
+        "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "situacao": 2
       }
     ],
     "dependencias": [
@@ -1326,6 +1798,14 @@
     "custodiante": "Inspetoria da 4ª DP",
     "lotacao": "4ª DP",
     "descricao": "Estação da inspetoria da 4ª DP",
+    "ficha": {
+      "fabricante": "HP",
+      "modelo": "ProDesk 400 G7",
+      "numero_serie": "EXHP0046",
+      "patrimonio": "1011046",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 55,
@@ -1357,6 +1837,13 @@
     "custodiante": "Cartório da 5ª DP",
     "lotacao": "5ª DP",
     "descricao": "Estação do cartório da 5ª DP",
+    "ficha": {
+      "fabricante": "Positivo Tecnologia",
+      "modelo": "Master D610",
+      "numero_serie": "EXPS0047",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 56,
@@ -1388,10 +1875,19 @@
     "custodiante": "Cartório da 5ª DP",
     "lotacao": "5ª DP",
     "descricao": "Impressora de rede da 5ª DP",
+    "ficha": {
+      "fabricante": "Samsung",
+      "modelo": "Xpress M4020ND",
+      "numero_serie": "EXSG0048",
+      "patrimonio": "1011048",
+      "sistema": "Firmware",
+      "versao": "V4.00.01.32"
+    },
     "vulnerabilidades": [
       {
         "id": 57,
         "descricao": "Painel web da impressora sem senha",
+        "cwe": "CWE-306",
         "origem": 3,
         "cvss": 3.1,
         "situacao": 1
@@ -1415,10 +1911,19 @@
     "custodiante": "Cartório da 6ª DP",
     "lotacao": "6ª DP",
     "descricao": "Estação do cartório da 6ª DP",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkCentre M70s Gen 3",
+      "numero_serie": "EXLN0049",
+      "patrimonio": "1011049",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 43,
         "descricao": "Usuário comum com privilégio de administrador",
+        "cwe": "CWE-250",
         "origem": 5,
         "cvss": 5.3,
         "situacao": 1
@@ -1446,6 +1951,14 @@
     "custodiante": "Inspetoria da 6ª DP",
     "lotacao": "6ª DP",
     "descricao": "Estação da inspetoria da 6ª DP",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkCentre M70s Gen 3",
+      "numero_serie": "EXLN0050",
+      "patrimonio": "1011050",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [],
     "dependencias": [
       {
@@ -1469,6 +1982,14 @@
     "custodiante": "Cartório da 7ª DP",
     "lotacao": "7ª DP",
     "descricao": "Estação do cartório da 7ª DP",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkCentre M70s Gen 3",
+      "numero_serie": "EXLN0051",
+      "patrimonio": "1011051",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 58,
@@ -1500,12 +2021,32 @@
     "custodiante": "Delegado da 7ª DP",
     "lotacao": "7ª DP",
     "descricao": "Roteador do link da 7ª DP",
+    "ficha": {
+      "fabricante": "MikroTik",
+      "modelo": "hAP ac2",
+      "numero_serie": "EXMK0052",
+      "patrimonio": "1011052",
+      "sistema": "RouterOS",
+      "versao": "6.40.5"
+    },
     "vulnerabilidades": [
       {
         "id": 59,
         "descricao": "Senha padrão de fábrica no roteador",
+        "cwe": "CWE-1392",
         "origem": 3,
         "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "situacao": 2
+      },
+      {
+        "id": 86,
+        "descricao": "MikroTik Router OS Directory Traversal Vulnerability",
+        "cve": "CVE-2018-14847",
+        "cwe": "CWE-22",
+        "origem": 2,
+        "cvss": 9.1,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
         "situacao": 2
       }
     ],
@@ -1523,6 +2064,14 @@
     "custodiante": "Cartório da 8ª DP",
     "lotacao": "8ª DP",
     "descricao": "Estação do cartório da 8ª DP",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 3080",
+      "numero_serie": "EXDL0053",
+      "patrimonio": "1011053",
+      "sistema": "Windows 11 Pro",
+      "versao": "24H2 (26100)"
+    },
     "vulnerabilidades": [
       {
         "id": 60,
@@ -1554,6 +2103,14 @@
     "custodiante": "Inspetoria da 8ª DP",
     "lotacao": "8ª DP",
     "descricao": "Estação da inspetoria da 8ª DP",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 3080",
+      "numero_serie": "EXDL0054",
+      "patrimonio": "1011054",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [],
     "dependencias": [
       {
@@ -1577,6 +2134,14 @@
     "custodiante": "Cartório da DAJEC",
     "lotacao": "DAJEC",
     "descricao": "Estação de lavratura de termos circunstanciados",
+    "ficha": {
+      "fabricante": "Positivo Tecnologia",
+      "modelo": "Master D610",
+      "numero_serie": "EXPS0055",
+      "patrimonio": "1011055",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 20,
@@ -1604,6 +2169,14 @@
     "custodiante": "Inspetoria da DAJEC",
     "lotacao": "DAJEC",
     "descricao": "Estação da inspetoria da DAJEC",
+    "ficha": {
+      "fabricante": "Positivo Tecnologia",
+      "modelo": "Master D610",
+      "numero_serie": "EXPS0056",
+      "patrimonio": "1011056",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [],
     "dependencias": [
       {
@@ -1623,10 +2196,19 @@
     "custodiante": "Delegada da DEAM",
     "lotacao": "DEAM",
     "descricao": "Estação da delegada titular da DEAM",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 7010",
+      "numero_serie": "EXDL0057",
+      "patrimonio": "1011057",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 61,
         "descricao": "Disco sem criptografia em estação com dados de vítimas",
+        "cwe": "CWE-311",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 2
@@ -1650,10 +2232,19 @@
     "custodiante": "Cartório da DEAM",
     "lotacao": "DEAM",
     "descricao": "Estação de registro de medidas protetivas",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 7010",
+      "numero_serie": "EXDL0058",
+      "patrimonio": "1011058",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 62,
         "descricao": "Pasta de medidas protetivas acessível por outros setores",
+        "cwe": "CWE-732",
         "origem": 5,
         "cvss": 9.8,
         "situacao": 1
@@ -1677,10 +2268,19 @@
     "custodiante": "Cartório da DEAM",
     "lotacao": "DEAM",
     "descricao": "Impressora de rede da DEAM",
+    "ficha": {
+      "fabricante": "Brother",
+      "modelo": "MFC-L5702DW",
+      "numero_serie": "EXBR0059",
+      "patrimonio": "1011059",
+      "sistema": "Firmware",
+      "versao": "1.18"
+    },
     "vulnerabilidades": [
       {
         "id": 63,
         "descricao": "Impressão sem liberação por senha em área de atendimento",
+        "cwe": "CWE-306",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 1
@@ -1704,6 +2304,14 @@
     "custodiante": "Cartório Rural",
     "lotacao": "Delegacia Rural",
     "descricao": "Estação do cartório da Delegacia Rural",
+    "ficha": {
+      "fabricante": "Positivo Tecnologia",
+      "modelo": "Master D610",
+      "numero_serie": "EXPS0060",
+      "patrimonio": "1011060",
+      "sistema": "Windows 11 Pro",
+      "versao": "24H2 (26100)"
+    },
     "vulnerabilidades": [
       {
         "id": 64,
@@ -1731,10 +2339,19 @@
     "custodiante": "Inspetoria Rural",
     "lotacao": "Delegacia Rural",
     "descricao": "Notebook de apoio às diligências em área rural",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkPad E14 Gen 4",
+      "numero_serie": "EXLN0061",
+      "patrimonio": "1011061",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 65,
         "descricao": "Notebook usado em redes públicas sem VPN",
+        "cwe": "CWE-319",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 1
@@ -1758,10 +2375,19 @@
     "custodiante": "Inspetoria Rural",
     "lotacao": "Delegacia Rural",
     "descricao": "Roteador 4G da base rural",
+    "ficha": {
+      "fabricante": "TP-Link",
+      "modelo": "Archer MR600",
+      "numero_serie": "EXTP0062",
+      "patrimonio": "1011062",
+      "sistema": "Firmware",
+      "versao": "1.0.0 Build 200619"
+    },
     "vulnerabilidades": [
       {
         "id": 66,
         "descricao": "Senha padrão de fábrica no roteador 4G",
+        "cwe": "CWE-1392",
         "origem": 3,
         "cvss": 7.5,
         "situacao": 3
@@ -1781,6 +2407,14 @@
     "custodiante": "Analista de Inteligência",
     "lotacao": "Inteligência",
     "descricao": "Estação de análise criminal",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "Precision 3660",
+      "numero_serie": "EXDL0063",
+      "patrimonio": "1011063",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 67,
@@ -1816,6 +2450,14 @@
     "custodiante": "Analista de Inteligência",
     "lotacao": "Inteligência",
     "descricao": "Notebook de apoio às operações de inteligência",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "Latitude 5440",
+      "numero_serie": "EXDL0064",
+      "patrimonio": "1011064",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 68,
@@ -1843,10 +2485,19 @@
     "custodiante": "Chefia da Inteligência",
     "lotacao": "Inteligência",
     "descricao": "Servidor de análise de vínculos",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "PowerEdge R430",
+      "numero_serie": "EXDL0065",
+      "patrimonio": "1011065",
+      "sistema": "Windows Server 2008 R2 Standard",
+      "versao": "SP1 (7601)"
+    },
     "vulnerabilidades": [
       {
         "id": 69,
         "descricao": "Acesso remoto (RDP) aberto para toda a rede interna",
+        "cwe": "CWE-668",
         "origem": 4,
         "cvss": 9.8,
         "situacao": 2
@@ -1854,9 +2505,20 @@
       {
         "id": 70,
         "descricao": "Contas de estagiários com acesso às pastas da Inteligência",
+        "cwe": "CWE-732",
         "origem": 5,
         "cvss": 9.8,
         "situacao": 3
+      },
+      {
+        "id": 80,
+        "descricao": "Microsoft Remote Desktop Services Remote Code Execution Vulnerability",
+        "cve": "CVE-2019-0708",
+        "cwe": "CWE-416",
+        "origem": 2,
+        "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "situacao": 1
       }
     ],
     "dependencias": [
@@ -1877,10 +2539,17 @@
     "custodiante": "Chefia da Inteligência",
     "lotacao": "Inteligência",
     "descricao": "Banco de dados de relatórios de inteligência",
+    "ficha": {
+      "fabricante": "Microsoft",
+      "modelo": "SQL Server 2019 Standard",
+      "sistema": "Windows Server 2019 Standard",
+      "versao": "1809 (17763)"
+    },
     "vulnerabilidades": [
       {
         "id": 71,
         "descricao": "Dados do banco sem criptografia em repouso",
+        "cwe": "CWE-311",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 1
@@ -1900,6 +2569,14 @@
     "custodiante": "Delegado Corregedor",
     "lotacao": "Corregedoria",
     "descricao": "Estação do delegado corregedor",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 7010",
+      "numero_serie": "EXDL0067",
+      "patrimonio": "1011067",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 20,
@@ -1931,10 +2608,17 @@
     "custodiante": "Cartório da Corregedoria",
     "lotacao": "Corregedoria",
     "descricao": "Banco de dados de procedimentos disciplinares",
+    "ficha": {
+      "fabricante": "Oracle",
+      "modelo": "MySQL Server 8.0",
+      "sistema": "Ubuntu Server 22.04 LTS",
+      "versao": "22.04.4"
+    },
     "vulnerabilidades": [
       {
         "id": 42,
         "descricao": "Registro de acessos (log) desativado no banco de dados",
+        "cwe": "CWE-778",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 2
@@ -1961,6 +2645,14 @@
     "custodiante": "Delegado de Homicídios",
     "lotacao": "Homicídios",
     "descricao": "Estação do delegado de homicídios",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkCentre M70s Gen 3",
+      "numero_serie": "EXLN0069",
+      "patrimonio": "1011069",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 73,
@@ -1988,6 +2680,14 @@
     "custodiante": "Cartório de Homicídios",
     "lotacao": "Homicídios",
     "descricao": "Estação do cartório de homicídios",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkCentre M70s Gen 3",
+      "numero_serie": "EXLN0070",
+      "patrimonio": "1011070",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 74,
@@ -2015,10 +2715,19 @@
     "custodiante": "Inspetoria de Homicídios",
     "lotacao": "Homicídios",
     "descricao": "Notebook de apoio aos locais de crime",
+    "ficha": {
+      "fabricante": "Lenovo",
+      "modelo": "ThinkPad E14 Gen 4",
+      "numero_serie": "EXLN0071",
+      "patrimonio": "1011071",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 75,
         "descricao": "Notebook de local de crime sem criptografia de disco",
+        "cwe": "CWE-311",
         "origem": 1,
         "cvss": 7.5,
         "situacao": 1
@@ -2042,12 +2751,30 @@
     "custodiante": "Delegado de Fraudes",
     "lotacao": "Fraudes e Defraudações",
     "descricao": "Estação de análise de documentos e extratos",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 7010",
+      "numero_serie": "EXDL0072",
+      "patrimonio": "1011072",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 76,
         "descricao": "E-mail sem filtro de anexos maliciosos",
         "origem": 2,
         "cvss": 7.5,
+        "situacao": 1
+      },
+      {
+        "id": 88,
+        "descricao": "RARLAB WinRAR Code Execution Vulnerability",
+        "cve": "CVE-2023-38831",
+        "cwe": "CWE-351",
+        "origem": 2,
+        "cvss": 7.8,
+        "vetor": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H",
         "situacao": 1
       }
     ],
@@ -2069,6 +2796,14 @@
     "custodiante": "Cartório de Fraudes",
     "lotacao": "Fraudes e Defraudações",
     "descricao": "Estação do cartório de fraudes",
+    "ficha": {
+      "fabricante": "Dell",
+      "modelo": "OptiPlex 7010",
+      "numero_serie": "EXDL0073",
+      "patrimonio": "1011073",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 18,
@@ -2076,6 +2811,16 @@
         "origem": 1,
         "cvss": 5.3,
         "situacao": 2
+      },
+      {
+        "id": 88,
+        "descricao": "RARLAB WinRAR Code Execution Vulnerability",
+        "cve": "CVE-2023-38831",
+        "cwe": "CWE-351",
+        "origem": 2,
+        "cvss": 7.8,
+        "vetor": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H",
+        "situacao": 3
       }
     ],
     "dependencias": [
@@ -2096,6 +2841,14 @@
     "custodiante": "Delegado da DEIFRVA",
     "lotacao": "DEIFRVA",
     "descricao": "Estação de consulta de veículos e chassis",
+    "ficha": {
+      "fabricante": "HP",
+      "modelo": "ProDesk 400 G7",
+      "numero_serie": "EXHP0074",
+      "patrimonio": "1011074",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 77,
@@ -2123,10 +2876,19 @@
     "custodiante": "Cartório da DEIFRVA",
     "lotacao": "DEIFRVA",
     "descricao": "Estação do cartório da DEIFRVA",
+    "ficha": {
+      "fabricante": "HP",
+      "modelo": "ProDesk 400 G7",
+      "numero_serie": "EXHP0075",
+      "patrimonio": "1011075",
+      "sistema": "Windows 11 Pro",
+      "versao": "25H2 (26200)"
+    },
     "vulnerabilidades": [
       {
         "id": 43,
         "descricao": "Usuário comum com privilégio de administrador",
+        "cwe": "CWE-250",
         "origem": 5,
         "cvss": 5.3,
         "situacao": 3
@@ -2150,12 +2912,22 @@
     "custodiante": "Inspetoria da DEIFRVA",
     "lotacao": "DEIFRVA",
     "descricao": "Câmera IP do pátio de veículos apreendidos",
+    "ficha": {
+      "fabricante": "Hikvision",
+      "modelo": "DS-2CD2043G0-I",
+      "numero_serie": "EXHK0076",
+      "patrimonio": "1011076",
+      "sistema": "Firmware",
+      "versao": "V5.5.0 build 170725"
+    },
     "vulnerabilidades": [
       {
         "id": 78,
         "descricao": "Câmera do pátio com senha padrão de fábrica",
+        "cwe": "CWE-1392",
         "origem": 3,
         "cvss": 7.5,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
         "situacao": 1
       },
       {
@@ -2164,6 +2936,16 @@
         "origem": 2,
         "cvss": 5.3,
         "situacao": 4
+      },
+      {
+        "id": 87,
+        "descricao": "Hikvision Improper Input Validation",
+        "cve": "CVE-2021-36260",
+        "cwe": "CWE-78",
+        "origem": 2,
+        "cvss": 9.8,
+        "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "situacao": 1
       }
     ],
     "dependencias": [

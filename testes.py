@@ -560,8 +560,8 @@ class TesteDoPrograma(unittest.TestCase):
         self.assertIn("Posto de M: 2; núcleo de M: dimensão 0", saida)
         self.assertIn("posto de I - A = 3 (de 3)", saida)
 
-    def test_matrizes_de_base_grande_mostram_so_a_verificacao(self):
-        """Base grande: a opção 15 não desenha M, mas verifica I - A."""
+    def copiar_exemplo(self):
+        """Põe a base de exemplo no lugar da base do teste."""
         os.makedirs(os.path.dirname(self.caminho))
         with open(os.path.join(PASTA, "dados_exemplo",
                                "inventario_exemplo.json"),
@@ -569,14 +569,51 @@ class TesteDoPrograma(unittest.TestCase):
             conteudo = origem.read()
         with open(self.caminho, "w", encoding="utf-8") as destino:
             destino.write(conteudo)
+
+    def test_matrizes_de_base_grande_mostram_so_a_verificacao(self):
+        """Base grande: a opção 15 não desenha M, mas verifica I - A."""
+        self.copiar_exemplo()
         saida = self.rodar(["15", "0"])
         self.assertIn("Grande demais para mostrar as matrizes", saida)
         self.assertIn("estritamente diagonal dominante", saida)
         self.assertIn("det(I - A) = 0,98", saida)
         # Teorema do núcleo e da imagem, na base de exemplo.
-        self.assertIn("Posto de M: 56; núcleo de M: dimensão 23 (56 + 23 = "
-                      "79 colunas)", saida)
-        self.assertIn("14 colunas de M são nulas", saida)
+        self.assertIn("Posto de M: 56; núcleo de M: dimensão 32 (56 + 32 = "
+                      "88 colunas)", saida)
+        self.assertIn("17 colunas de M são nulas", saida)
+
+    def test_roteiro_de_demonstracao_na_base_de_exemplo(self):
+        """Os passos do roteiro do README dão o que ele diz."""
+        self.copiar_exemplo()
+        self.base_cve = base_de_teste()
+        saida = self.rodar([
+            "13",
+            "3", "7", "CVE-2019-0708",
+            "3", "6", "MikroTik",
+            "16", "3", "3", "",
+            "14", "65",
+            # O BlueKeep (vulnerabilidade 80) corrigido no INTEL-SRV01:
+            # Enter mantém os dados do catálogo, 3 é "Corrigida".
+            "8", "65", "80", "", "", "", "", "", "3",
+            "14", "65",
+            "13",
+            "0"])
+        # Os três maiores riscos efetivos, na ordem.
+        self.assertRegex(saida, r"30  PERICIA-SRV01 .* 40,61 .*\n"
+                                r" +1  DRPC-SRV01 .* 40,01 .*\n"
+                                r" +65  INTEL-SRV01 .* 37,61 ")
+        self.assertIn("CVE-2019-0708 em 3 equipamento(s)", saida)
+        self.assertIn("3 equipamentos encontrados", saida)
+        for roteador in ("DP1-RT01", "DP3-RT01", "DP7-RT01"):
+            self.assertIn(roteador, saida)
+        self.assertIn("combinam com a ficha de DRPC-RT01 (cisco, ios)",
+                      saida)
+        self.assertRegex(saida, r"1\*\s+CVE-2023-20198")
+        self.assertIn("x = b + A x = 29,40 + 8,21 = 37,61", saida)
+        self.assertIn("x = b + A x = 14,70 + 8,21 = 22,91", saida)
+        # Quem depende do servidor herda a melhora: 0,2 x 14,70 = 2,94.
+        self.assertRegex(saida, r"63  INTEL-PC01 .* 28,85 ")
+        self.assertRegex(saida, r"63  INTEL-PC01 .* 25,91 ")
 
     # --- consultas do T1 pelo menu ------------------------------------
 
@@ -1227,8 +1264,32 @@ class TesteDaBaseCVE(unittest.TestCase):
         self.assertEqual([(r.cve, p) for r, p in base.sugestoes(ficha)],
                          [("CVE-2023-20198", ["cisco", "ios"]),
                           ("CVE-2024-20481", ["cisco"])])
+        # "Firmware" e "web" são genéricas: não trazem o IOS XE Web UI.
+        self.assertEqual(base.sugestoes(FichaTecnica(
+            {"modelo": "Painel web", "sistema": "Firmware"})), [])
         self.assertEqual(nome_curto(base.buscar_cve("CVE-2019-0708")),
                          "Remote Code Execution")
+
+    def test_fabricante_repetido_no_produto_conta_uma_vez(self):
+        """Um produto com Cisco no nome não passa à frente do IOS XE."""
+        base = BaseCVE([
+            registro_cve("CVE-2023-20198", "Cisco", "IOS XE Web UI",
+                         "Cisco IOS XE Web UI Privilege Escalation", 10.0,
+                         TOTAL_31),
+            registro_cve("CVE-2018-0158", "Cisco",
+                         "IOS Software and Cisco IOS XE Software",
+                         "Cisco IOS Internet Key Exchange Memory Leak"),
+            registro_cve("CVE-2020-3161", "Cisco", "Cisco IP Phones",
+                         "Cisco IP Phones Web Server Remote Code Execution",
+                         9.8, RDP_31)])
+        ficha = FichaTecnica({"fabricante": "Cisco", "modelo": "ISR 4331",
+                              "sistema": "IOS XE"})
+        # Os dois primeiros empatam (Cisco e IOS) e vão pela nota; o
+        # telefone combina só no fabricante, mesmo com Cisco no produto.
+        self.assertEqual([(r.cve, p) for r, p in base.sugestoes(ficha)],
+                         [("CVE-2023-20198", ["cisco", "ios"]),
+                          ("CVE-2018-0158", ["cisco", "ios"]),
+                          ("CVE-2020-3161", ["cisco"])])
 
 
 class TesteDoModelo(unittest.TestCase):
@@ -1572,6 +1633,73 @@ class TesteDoModelo(unittest.TestCase):
         dados = json.loads(bruto.decode("utf-8"),
                            parse_constant=recusar)  # NaN, Infinity
         self.assertEqual(dados[0]["hostname"], "PC-01")
+
+
+class TesteDaBaseDeExemplo(unittest.TestCase):
+    """A base de exemplo completa: fichas, CVEs, CWEs e vetores."""
+
+    @classmethod
+    def setUpClass(cls):
+        """Lê a base de exemplo uma vez para todos os testes."""
+        cls.inventario = ArquivoInventario(os.path.join(
+            PASTA, "dados_exemplo", "inventario_exemplo.json")).carregar()
+
+    def test_tamanho_da_base(self):
+        """76 equipamentos, 88 vulnerabilidades e 164 dependências."""
+        equipamentos = self.inventario.todos()
+        catalogo = self.inventario.vulnerabilidades()
+        self.assertEqual(len(equipamentos), 76)
+        self.assertEqual(len(catalogo), 88)
+        self.assertEqual(sum(len(e.vulnerabilidades) for e in equipamentos),
+                         103)
+        self.assertEqual(sum(len(e.dependencias) for e in equipamentos),
+                         164)
+        self.assertEqual([sum(1 for v in catalogo if getattr(v, campo))
+                          for campo in ("cve", "cwe", "vetor")],
+                         [9, 45, 23])
+
+    def test_fichas_completas_com_numeros_ficticios(self):
+        """Todos têm ficha; série e patrimônio seguem o padrão fictício.
+
+        Sistemas internos e bancos de dados são programas: não têm série
+        nem patrimônio. Nos físicos, a série é EX (de exemplo), duas
+        letras do fabricante e o id; o patrimônio, 1011000 mais o id.
+        """
+        programas = (TipoEquipamento.SISTEMA_INTERNO,
+                     TipoEquipamento.BANCO_DADOS)
+        for equipamento in self.inventario.todos():
+            ficha = equipamento.ficha
+            with self.subTest(equipamento.hostname):
+                self.assertTrue(ficha.fabricante and ficha.modelo)
+                if equipamento.tipo in programas:
+                    self.assertEqual((ficha.numero_serie, ficha.patrimonio),
+                                     (None, None))
+                    continue
+                self.assertRegex(ficha.numero_serie,
+                                 rf"^EX[A-Z]{{2}}{equipamento.id:04d}$")
+                if equipamento.hostname == "DP5-PC01":
+                    # A falha dela é justamente a falta da etiqueta.
+                    self.assertIsNone(ficha.patrimonio)
+                else:
+                    self.assertEqual(ficha.patrimonio,
+                                     str(1011000 + equipamento.id))
+
+    def test_cves_iguais_as_da_base_que_vem_com_o_programa(self):
+        """Cada CVE tem os dados da base, como se viesse da opção 16."""
+        with tempfile.TemporaryDirectory() as pasta:
+            base, _ = BaseCVE.carregar(os.path.join(pasta, "nao-existe.json"))
+        for vuln in self.inventario.vulnerabilidades():
+            if vuln.cve is None:
+                continue
+            registro = base.buscar_cve(vuln.cve)
+            with self.subTest(vuln.cve):
+                self.assertIsNotNone(registro)
+                self.assertEqual(
+                    (vuln.descricao, vuln.cvss, vuln.vetor, vuln.cwe,
+                     vuln.origem),
+                    (registro.nome, registro.cvss, registro.vetor,
+                     registro.cwes[0],
+                     OrigemVulnerabilidade.FALTA_ATUALIZACAO))
 
 
 class TesteDaArvore(unittest.TestCase):
