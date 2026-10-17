@@ -10,6 +10,28 @@ CVEs exploradas em ataques**, que funciona sem internet, e execução em
 FEELT/UFU, 2026/2. Continuação do Trabalho 1: os requisitos dele continuam
 valendo, e o programa foi reescrito em orientação a objetos.
 
+## Início rápido
+
+Com o Docker ligado (veja [O que instalar](#o-que-instalar)), na pasta do
+projeto:
+
+```
+docker compose up -d --build
+docker cp dados_exemplo/inventario_exemplo.json inventario:/app/dados/inventario.json
+docker restart inventario
+docker attach inventario
+```
+
+O primeiro comando constrói a imagem e liga o container, com as opções de
+segurança do `compose.yaml`; os dois seguintes põem a base de exemplo no volume
+dos dados e religam o programa, que lê a base ao abrir. No `docker attach`,
+tecle Enter para ver o menu; Ctrl+P e depois Ctrl+Q saem dele sem parar o
+programa. Se já existir um container `inventario`, criado antes com o
+`docker run`, apague-o primeiro com `docker rm -f inventario` (os dados ficam
+no volume). Sem Docker, com o Python, veja
+[Direto no computador](#direto-no-computador). O que mostrar na apresentação
+está no [Roteiro de demonstração](#roteiro-de-demonstração).
+
 ## Sumário
 
 - [Como executar](#como-executar)
@@ -103,8 +125,8 @@ atualizações do repositório depois, `git pull`.
 Requer Python 3.11 ou superior e duas bibliotecas: o NumPy, usado no modelo de
 risco, e a `cvss`, que calcula a nota CVSS a partir do vetor. O Python 3.10
 parou de receber correções de segurança em 1º de outubro de 2026, por isso não
-é mais indicado. Os testes passaram do Python 3.11 ao 3.15, com NumPy 2.4 e
-2.5; a imagem Docker usa o Python 3.14.
+é mais indicado. Os testes passaram do Python 3.11 ao 3.15, com o NumPy 1.26,
+o 2.4 e o 2.5; a imagem Docker usa o Python 3.14.
 
 As bibliotecas ficam num ambiente virtual (*venv*): a pasta `.venv`, dentro do
 projeto, com uma cópia própria delas, sem mexer no Python do sistema. No Linux
@@ -369,9 +391,56 @@ servidor.
 
 ## Como usar
 
-O menu numerado dá acesso a todas as operações. Depois de cada uma, o
-resultado fica na tela até o Enter. Além dos números, estas palavras valem em
-qualquer pergunta do programa:
+O menu numerado dá acesso a todas as operações:
+
+```
+==============================================================
+ Equipamentos
+   1 - Cadastrar equipamento
+   2 - Listar todos os equipamentos
+   3 - Buscar equipamento (por ID, hostname, responsável...)
+   4 - Atualizar equipamento
+   5 - Excluir equipamento (e o que depende dele)
+ Vulnerabilidades
+   6 - Cadastrar vulnerabilidade em um equipamento
+   7 - Ver vulnerabilidades de um equipamento
+   8 - Atualizar vulnerabilidade
+   9 - Excluir vulnerabilidade de um equipamento
+  10 - Vulnerabilidades pendentes (todas, da mais grave)
+ Dependências e risco
+  11 - Cadastrar dependência entre equipamentos
+  12 - Árvore de dependências de um equipamento (e remoção)
+  13 - Risco de todos os equipamentos (próprio e efetivo)
+  14 - Risco de um equipamento (passo a passo)
+  15 - Matrizes do modelo (M, v, F, A) e verificação de I - A
+ Base de CVEs exploradas
+  16 - Buscar falhas exploradas, sugestões e atualização
+   0 - Sair
+==============================================================
+  Em qualquer pergunta: voltar · sair · limpar · ajuda
+```
+
+| Opção | Faz |
+| --- | --- |
+| 1 | Cadastra um equipamento, com a ficha técnica se quiser (e, em seguida, suas vulnerabilidades iniciais) |
+| 2 | Lista todos os equipamentos |
+| 3 | Busca por ID, hostname, responsável, lotação, tipo, ficha técnica, CVE ou CWE |
+| 4 | Atualiza um equipamento e a ficha técnica dele (Enter mantém o valor atual); inclui mudar o tipo |
+| 5 | Exclui um equipamento, com os vínculos dele com as vulnerabilidades e as dependências que apontavam para ele |
+| 6 | Registra uma vulnerabilidade num equipamento: uma nova (com CVE e CWE, se houver) ou uma já existente no catálogo |
+| 7 | Mostra um equipamento e suas vulnerabilidades, da mais grave |
+| 8 | Atualiza uma vulnerabilidade (descrição, CVE, CWE, categoria, nota ou vetor CVSS) ou o status dela naquele equipamento |
+| 9 | Tira uma vulnerabilidade de um equipamento (cadastro errado ou duplicado) |
+| 10 | Lista as vulnerabilidades pendentes de todos os equipamentos, da mais grave |
+| 11 | Cadastra uma dependência entre dois equipamentos |
+| 12 | Mostra a árvore de dependências de um equipamento nos dois sentidos (quem depende dele e do que ele depende, direta e indiretamente) e permite remover uma dependência direta |
+| 13 | Mostra o risco próprio e o efetivo de **todos** os equipamentos |
+| 14 | Mostra, passo a passo, como o risco de **um** equipamento foi calculado |
+| 15 | Mostra M, v, M v, F, b e A (para poucos equipamentos), o posto de M e a dimensão do seu núcleo, e a verificação de I − A, com o determinante, o número de condição e o posto |
+| 16 | Busca na base de CVEs exploradas (por palavras, por fabricante e produto, ou pela ficha técnica de um equipamento), registra a CVE escolhida num equipamento e atualiza a base pela internet |
+
+Depois de cada operação, o resultado fica na tela até o Enter. Além dos
+números, estas palavras valem em qualquer pergunta do programa:
 
 | Comando | Efeito |
 | --- | --- |
@@ -483,25 +552,6 @@ Um trecho da tela do `calcular`:
   Nota:  9,3 (Crítica)
 ```
 
-| Opção | Faz |
-| --- | --- |
-| 1 | Cadastra um equipamento, com a ficha técnica se quiser (e, em seguida, suas vulnerabilidades iniciais) |
-| 2 | Lista todos os equipamentos |
-| 3 | Busca por ID, hostname, responsável, lotação, tipo, ficha técnica, CVE ou CWE |
-| 4 | Atualiza um equipamento e a ficha técnica dele (Enter mantém o valor atual); inclui mudar o tipo |
-| 5 | Exclui um equipamento, com tudo que dependia dele |
-| 6 | Registra uma vulnerabilidade num equipamento: uma nova (com CVE e CWE, se houver) ou uma já existente no catálogo |
-| 7 | Mostra um equipamento e suas vulnerabilidades, da mais grave |
-| 8 | Atualiza uma vulnerabilidade (descrição, CVE, CWE, categoria, nota ou vetor CVSS) ou o status dela naquele equipamento |
-| 9 | Tira uma vulnerabilidade de um equipamento (cadastro errado ou duplicado) |
-| 10 | Lista as vulnerabilidades pendentes de todos os equipamentos, da mais grave |
-| 11 | Cadastra uma dependência entre dois equipamentos |
-| 12 | Mostra a árvore de dependências de um equipamento nos dois sentidos (quem depende dele e do que ele depende, direta e indiretamente) e permite remover uma dependência direta |
-| 13 | Mostra o risco próprio e o efetivo de **todos** os equipamentos |
-| 14 | Mostra, passo a passo, como o risco de **um** equipamento foi calculado |
-| 15 | Mostra M, v, M v, F, b e A (para poucos equipamentos), o posto de M e a dimensão do seu núcleo, e a verificação de I − A, com o determinante, o número de condição e o posto |
-| 16 | Busca na base de CVEs exploradas (por palavras, por fabricante e produto, ou pela ficha técnica de um equipamento), registra a CVE escolhida num equipamento e atualiza a base pela internet |
-
 As cores precisam de um terminal que interprete códigos ANSI. Com a variável de
 ambiente `NO_COLOR` definida, o programa imprime texto puro.
 
@@ -514,13 +564,22 @@ ambiente `NO_COLOR` definida, o programa imprime texto puro.
 | 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker) e [No servidor do docente](#no-servidor-do-docente). |
 | 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu. A matriz A fica no mesmo JSON (campo `dependencias`), e o NumPy está declarado em `requirements.txt`, que o `Dockerfile` instala. Veja [o modelo de risco](#o-modelo-de-risco). |
 
-Os requisitos do Trabalho 1 (cadastro, busca por ID e por hostname,
-atualização, exclusão com cascata, vulnerabilidades com categoria, severidade e
-status, listagem por equipamento, validações e tratamento de erros) continuam
-atendidos: as opções 1 a 10 do T1 foram mantidas, com os mesmos números e
-funções, e com os mesmos comandos globais. O requisito do repositório com mais
-de duas branches e merges também continua valendo: veja
-[Fluxo de trabalho no Git](#fluxo-de-trabalho-no-git).
+Os requisitos do Trabalho 1 continuam valendo, como pede o enunciado. As
+opções 1 a 10 do menu foram mantidas, com os mesmos números, as mesmas funções
+e os mesmos comandos globais:
+
+| # (T1) | Requisito | Onde está |
+| --- | --- | --- |
+| 1 | Menu e tratamento de erros | `main.py` (menu e ações) e `entrada.py` (teclado e comandos globais): entrada inválida é explicada e perguntada de novo, sem derrubar o programa |
+| 2 | Tipos de ativo num `Enum`, com código inteiro | `classificacoes.py`: `TipoEquipamento`, de 1 a 7 |
+| 3 | Cadastro gravado em arquivo | `armazenamento.py`: o arquivo JSON do requisito 2 acima |
+| 4 | Busca por ID ou por hostname | Opção 3, itens 1 e 2 |
+| 5 | Atualização | Opções 4 (equipamento) e 8 (vulnerabilidade) |
+| 6 | Exclusão, com as vulnerabilidades do equipamento | Opção 5 (`Inventario.excluir_equipamento`): vão junto os vínculos com as vulnerabilidades e as dependências que apontavam para ele, e a vulnerabilidade que fica sem nenhum equipamento sai do catálogo |
+| 7 | Vulnerabilidades com severidade e status | Opção 6; a severidade vem da nota CVSS, e o status é o `Enum` `SituacaoTratamento` |
+| 8 | Visualização das vulnerabilidades | Opções 7 (de um equipamento) e 10 (as pendentes de todos) |
+| 9 | Uso de dicionários | O `Inventario` guarda equipamentos e vulnerabilidades em `dict`, pelo id; cada equipamento guarda as suas vulnerabilidades (id → status) e as dependências (id → fração) em `dict` |
+| 10 | Repositório Git com mais de duas branches e merge | Veja [Fluxo de trabalho no Git](#fluxo-de-trabalho-no-git) |
 
 ## Estrutura
 
@@ -813,9 +872,72 @@ python main.py
 Remove-Item Env:INVENTARIO_DADOS
 ```
 
-Use as opções 15 (matrizes), 13 (risco de todos) e 14 (passo a passo). Se
-alterar algo, o programa grava nesse arquivo: trabalhe numa cópia. O
-`python risco.py` repete essa conta e mais outras: compara a solução do NumPy
+No Docker, o cenário vem com a imagem e roda num container à parte, apagado
+ao sair (`--rm`):
+
+```
+docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_3_equipamentos.json inventario:1.0
+```
+
+Use as opções 15 (matrizes), 13 (risco de todos) e 14 (passo a passo). Direto
+no computador, o que for alterado é gravado nesse arquivo: trabalhe numa cópia.
+Na opção 15, as matrizes do cenário:
+
+```
+  M (linhas: equipamentos; colunas: vulnerabilidades):
+        V1   V2
+    E1  1    0
+    E2  1    1
+    E3  0    1
+
+  v (notas CVSS): V1=4,0  V2=6,0
+
+  M v (soma das notas de cada equipamento):  E1=4,0  E2=10,0  E3=6,0
+  F (fator de exposição do tipo):            E1=1,0  E2=1,5  E3=2,0
+  b = F (M v) (risco próprio):               E1=4,00  E2=15,00  E3=12,00
+
+  A (linha i: fração herdada de cada equipamento j):
+        E1     E2     E3
+    E1  0      0,5    0
+    E2  0      0      0,5
+    E3  0      0,25   0
+```
+
+Na opção 13, a verificação de `I − A` e os riscos efetivos 24, 18 e 16, os da
+conta acima, do maior para o menor:
+
+```
+  Verificação de I - A: I - A é estritamente diagonal dominante: a maior soma de linha de A é 0,5, menor que 1. Invertível.
+  det(I - A) = 0,875 · número de condição de I - A = 2,56 (aviso acima de 1e+08; recusa acima de 1/épsilon = 4,5e+15)
+  posto de I - A = 3 (de 3): posto cheio, então o sistema é possível e determinado
+
+  ID  HOSTNAME     TIPO                 SOMA CVSS  FATOR  PRÓPRIO  EFETIVO
+  ----------------------------------------------------------------------------------------------
+   2  SERVIDOR-01  Servidor                  10,0    1,5    15,00    24,00  ████████████████████
+   3  BANCO-01     Banco de dados             6,0    2,0    12,00    18,00  ███████████████
+   1  ESTACAO-01   Estação de trabalho        4,0    1,0     4,00    16,00  █████████████
+```
+
+Na opção 14, a conta do servidor (E2), passo a passo:
+
+```
+  SERVIDOR-01 - Servidor
+
+  Risco próprio  b = fator x (M v)
+    CVSS  6,0  [2] Vulnerabilidade V2 do cenário (Aberta)
+    CVSS  4,0  [1] Vulnerabilidade V1 do cenário (Aberta)
+    soma das notas que contam (M v) ... 10,0
+    fator de exposição (Servidor) ... 1,5
+    risco próprio b = 1,5 x 10,0 = 15,00
+
+  Risco herdado  A x  (fração x risco efetivo de quem se depende)
+       0,5 x    18,00  ([3] BANCO-01)  =      9,00
+    total herdado ............... 9,00
+
+  Risco efetivo  x = b + A x = 15,00 + 9,00 = 24,00
+```
+
+O `python risco.py` repete essa conta e mais outras: compara a solução do NumPy
 com a série de Neumann (`x = b + A b + A² b + ...`, que converge quando cada
 linha de A soma menos que 1) em 20 inventários aleatórios, e com uma solução em
 frações exatas nos que têm até 6 equipamentos.
@@ -1433,9 +1555,9 @@ histórico mesmo quando não há conflito:
 
 | Prefixo | Uso | Exemplo neste repositório |
 | --- | --- | --- |
-| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves`, `feature/arvore-de-dependencias` |
+| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves`, `feature/arvore-de-dependencias`, `feature/base-de-exemplo-completa` |
 | `fix/` | Correção de defeito | `fix/normas-oficiais` |
-| `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas` |
+| `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas`, `docs/instrucoes-de-execucao`, `docs/revisao-final` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
 
 `git log --graph --oneline --all` mostra as branches e os merges.
@@ -1516,36 +1638,55 @@ patrimônio e as CVEs, iguais às da base de CVEs que vem com o programa.
 
 ### Roteiro de demonstração
 
-Um roteiro para a apresentação, de uns 15 minutos, que passa pelos quatro
-requisitos do Trabalho 2 e pelo que o programa tem a mais. Antes, ponha a base
-de exemplo no volume, como acima, e ligue o container. Os números são os da
-base de exemplo sem alterações; um teste confere os principais
+A apresentação tem cinco minutos, com o programa rodando no seu computador, e
+mostra o que funciona com base nos requisitos do Trabalho 2. Antes, ponha a
+base de exemplo no volume, como acima, e ligue o container. Os números são os
+da base de exemplo sem alterações; um teste confere os principais
 (`test_roteiro_de_demonstracao_na_base_de_exemplo`).
 
-| # | O que fazer | O que mostrar |
-| --- | --- | --- |
-| 1 | `docker ps` | O container `inventario` no ar (`Up`) e saudável (`(healthy)`): requisito 3. No servidor do docente, o `Up` mostra há quanto tempo |
-| 2 | `docker attach inventario` e Enter | A tela de abertura e "Base carregada: 76 equipamento(s), 88 vulnerabilidade(s)." |
-| 3 | Opção 2 | Os 76 equipamentos, cada um um objeto da subclasse do seu tipo: requisito 1 |
-| 4 | Opção 7, ID `65` | O `INTEL-SRV01`: o tipo, com o fator de exposição da subclasse (1,5), a ficha técnica (Dell PowerEdge R430, Windows Server 2008 R2) e as três vulnerabilidades, uma delas o BlueKeep, aberto, com CVE, CWE e vetor |
-| 5 | Opção 3, item 7, `CVE-2019-0708` | Onde está uma falha quando ela sai no noticiário: `DPLAN-PC02` e `INTEL-SRV01` (abertas) e `DP4-PC01` (em tratamento) |
-| 6 | Opção 3, item 6, `MikroTik` | A busca pela ficha técnica: os três roteadores das delegacias |
-| 7 | Opção 16, item 3, ID `3` | As CVEs exploradas que combinam com a ficha do roteador da sede (Cisco, IOS XE). A primeira, CVE-2023-20198, tem `*`: já está registrada nele. Para voltar ao menu, escolha uma e responda `n` |
-| 8 | Opção 16, item 1, `remote desktop` | A busca na base de CVEs, sem internet: o BlueKeep em primeiro |
-| 9 | Opção 12, ID `28`, e Enter | As duas árvores do `PERICIA-PC01`: quem depende dele e do que ele depende, com as frações. O Enter no fim não remove nada |
-| 10 | Opção 13 | A verificação de `I − A` antes da conta (diagonal dominante, determinante 0,98, número de condição 7,98, posto 76) e o risco próprio e o efetivo de todos: no topo, `PERICIA-SRV01` (40,61), `DRPC-SRV01` (40,01) e `INTEL-SRV01` (37,61). Requisito 4 |
-| 11 | Opção 14, ID `65` | A conta do `INTEL-SRV01`: b = 1,5 × 19,6 = 29,40; herdado de quem ele depende, 8,21; x = 29,40 + 8,21 = 37,61 |
-| 12 | Opção 8, ID `65`, vulnerabilidade `80`, Enter cinco vezes e status `3` | O BlueKeep corrigido no `INTEL-SRV01` |
-| 13 | Opção 14, ID `65`; depois opção 13 | O risco efetivo do `INTEL-SRV01` cai de 37,61 para 22,91, e o da `INTEL-PC01`, que herda 0,2 dele, de 28,85 para 25,91 (0,2 × 14,70 = 2,94) |
-| 14 | Opção 15 | M é 76 × 88, com posto 56 e núcleo de dimensão 32; 17 colunas nulas. As matrizes não cabem na tela, mas a verificação de `I − A`, sim |
-| 15 | Ctrl+P e Ctrl+Q; depois `docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_3_equipamentos.json inventario:1.0` e opções 15 e 13 | O cenário de 3 equipamentos: M, v, F, b e A na tela, na opção 15, e os riscos efetivos 16, 24 e 18, na 13, a conta da [validação à mão](#validação-à-mão-cenário-de-3-equipamentos) |
-| 16 | O mesmo `docker run`, com `cenario_singular.json`, e opção 13 | A recusa: `I − A` não é invertível e, pelo teorema de Rouché-Capelli, o sistema não tem solução |
-| 17 | `dados_exemplo/inventario_exemplo.json`, no GitHub | O arquivo de dados: um array JSON de objetos, um por equipamento. Requisito 2 |
-| 18 | `python testes.py` e a aba Actions do GitHub | Os 100 testes e a verificação automática a cada push |
+**Em cinco minutos**, um passo para cada requisito, com o modelo de risco em
+mais detalhe:
 
-O passo 12 grava no volume. Para voltar à base de exemplo depois, copie-a de
-novo, como acima. Nos passos 15 e 16, o `--rm` apaga o container do cenário
-quando o programa termina (opção 0), e o `inventario` continua rodando.
+| # | O que fazer | O que mostrar | Requisito |
+| --- | --- | --- | --- |
+| 1 | `docker ps` | O container `inventario` no ar (`Up`) e saudável (`(healthy)`). No servidor do docente, o `Up` mostra há quanto tempo | 3 |
+| 2 | `docker attach inventario` e Enter | A tela de abertura e "Base carregada: 76 equipamento(s), 88 vulnerabilidade(s).", lida do arquivo JSON | 2 |
+| 3 | Opção 7, ID `65` | O `INTEL-SRV01`: um objeto da subclasse `Servidor`, com o fator de exposição dela (1,5), a ficha técnica (Dell PowerEdge R430, Windows Server 2008 R2) e as três vulnerabilidades, uma delas o BlueKeep, aberto | 1 |
+| 4 | Opção 13 | A verificação de `I − A` antes da conta (diagonal dominante, determinante 0,98, número de condição 7,98, posto 76) e o risco próprio e o efetivo de todos: no topo, `PERICIA-SRV01` (40,61), `DRPC-SRV01` (40,01) e `INTEL-SRV01` (37,61) | 4 |
+| 5 | Opção 14, ID `65` | A conta do `INTEL-SRV01`: b = 1,5 × 19,6 = 29,40; herdado de quem ele depende, 8,21; x = 29,40 + 8,21 = 37,61 | 4 |
+| 6 | Opção 8, ID `65`, vulnerabilidade `80`, Enter cinco vezes e status `3`; depois a opção 14, ID `65` | Com o BlueKeep corrigido, o risco efetivo do `INTEL-SRV01` cai de 37,61 para 22,91 | 4 |
+| 7 | Ctrl+P e Ctrl+Q; depois o comando do cenário singular (abaixo) e a opção 13 | A recusa: `I − A` não é invertível, o sistema não tem solução (teorema de Rouché-Capelli), e nada é calculado | 4 |
+| 8 | `dados_exemplo/inventario_exemplo.json`, aberto no editor | O arquivo de dados: um array JSON de objetos, um por equipamento, com as dependências (a matriz A) no mesmo arquivo | 2 |
+
+**Para as perguntas**, que vêm depois, sobre o código e o modelo de risco:
+
+| O que fazer | O que mostrar |
+| --- | --- |
+| Opção 13, depois do passo 6 | O risco efetivo da `INTEL-PC01`, que herda 0,2 do `INTEL-SRV01`, também cai: de 28,85 para 25,91 (0,2 × 14,70 = 2,94) |
+| Opção 15 | M é 76 × 88, com posto 56 e núcleo de dimensão 32; 17 colunas nulas. As matrizes não cabem na tela, mas a verificação de `I − A`, sim |
+| O comando do cenário de 3 equipamentos (abaixo) e as opções 15, 13 e 14 | M, v, F, b e A na tela e os riscos efetivos 16, 24 e 18, a conta da [validação à mão](#validação-à-mão-cenário-de-3-equipamentos) |
+| Opção 3, item 7, `CVE-2019-0708` | Onde está uma falha quando ela sai no noticiário: `DPLAN-PC02` e `INTEL-SRV01` (abertas) e `DP4-PC01` (em tratamento) |
+| Opção 3, item 6, `MikroTik` | A busca pela ficha técnica: os três roteadores das delegacias |
+| Opção 16, item 3, ID `3` | As CVEs exploradas que combinam com a ficha do roteador da sede (Cisco, IOS XE). A primeira, CVE-2023-20198, tem `*`: já está registrada nele. Para voltar ao menu, escolha uma e responda `n` |
+| Opção 16, item 1, `remote desktop` | A busca na base de CVEs, sem internet: o BlueKeep em primeiro |
+| Opção 12, ID `28`, e Enter | As duas árvores do `PERICIA-PC01`: quem depende dele e do que ele depende, com as frações. O Enter no fim não remove nada |
+| `python testes.py` e a aba Actions do GitHub | Os 100 testes e a verificação automática a cada push |
+
+Para as perguntas sobre o código, a tabela de
+[Requisitos do Trabalho 2](#requisitos-do-trabalho-2) diz onde está cada
+requisito, e a de [Estrutura](#estrutura), o que cada arquivo faz.
+
+Os dois cenários pequenos vêm com a imagem e rodam num container à parte,
+apagado quando o programa termina (`--rm`), sem mexer no `inventario`, que
+continua rodando:
+
+```
+docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_singular.json inventario:1.0
+docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_3_equipamentos.json inventario:1.0
+```
+
+O passo 6 grava no volume. Para voltar à base de exemplo depois, copie-a de
+novo, como acima.
 
 `dados_exemplo/cenario_3_equipamentos.json` é o cenário resolvido à mão em
 [Validação à mão](#validação-à-mão-cenário-de-3-equipamentos).
