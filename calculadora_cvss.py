@@ -394,6 +394,24 @@ def analisar_vetor(texto):
     return arrumado, round(float(calculo.base_score), 1)
 
 
+def opcoes_do_vetor(texto):
+    """Devolve (versão, [(métrica, opção)]) de cada métrica base.
+
+    As métricas e as opções são as das perguntas, com os nomes em
+    português: servem para explicar um vetor, como o de uma CVE da
+    base. Levanta ValueError se o vetor não servir (analisar_vetor).
+    """
+    arrumado, _ = analisar_vetor(texto)
+    versao = _versao_do_vetor(arrumado)
+    valores = dict(trecho.split(":") for trecho in arrumado.split("/")[1:])
+    pares = []
+    for metrica in _PERGUNTAS_DO_VETOR[versao]:
+        opcao = next(o for o in metrica.opcoes
+                     if o.codigo == valores[metrica.codigo])
+        pares.append((metrica, opcao))
+    return versao, pares
+
+
 # Teste: confere as notas com exemplos calculados na calculadora do
 # FIRST, sem ninguém digitar nada.
 if __name__ == "__main__":
@@ -450,6 +468,15 @@ if __name__ == "__main__":
             raise AssertionError(f"aceitou o vetor {ruim!r}")
         except ValueError as erro:
             print(f"Recusado: {erro}")
+
+    # As opções de cada métrica de um vetor, com os nomes em português.
+    versao_rdp, pares_rdp = opcoes_do_vetor(EXEMPLOS[0][0])
+    assert versao_rdp == "3.1" and len(pares_rdp) == 8
+    assert [(m.codigo, o.nome) for m, o in pares_rdp[:3]] == [
+        ("AV", "Rede"), ("AC", "Baixa"), ("PR", "Nenhum")]
+    assert opcoes_do_vetor(EXEMPLOS[3][0])[0] == "3.0"
+    assert len(opcoes_do_vetor(EXEMPLOS[4][0])[1]) == 11
+    print("Opções de um vetor: os nomes das métricas e das respostas.")
 
     # Cada pergunta tem um código diferente e opções diferentes, e
     # nenhuma métrica base está também na lista das que não são base.

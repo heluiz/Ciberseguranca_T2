@@ -50,12 +50,22 @@ condição abaixo de 1/ε (com muitos equipamentos, o arredondamento pode
 deixar o número de condição de uma matriz singular logo abaixo do
 limite).
 
+O plano de correção (ModeloRisco.plano_de_correcao) diz quanto cada
+correção reduz o risco total da rede, a soma dos riscos efetivos:
+
+      total = 1^T x = 1^T (I - A)^-1 b = w^T b,   com  (I - A)^T w = 1
+
+w_i é quanto um ponto de risco próprio no equipamento i soma ao total,
+contando o que os outros herdam dele. Corrigir a vulnerabilidade j no
+equipamento i tira F_i v_j de b_i, e o total cai w_i F_i v_j. Como o
+modelo é linear, as quedas de várias correções se somam.
+
 O módulo não lê do teclado nem grava em disco.
 """
 
 import math
 import sys
-from collections import namedtuple
+from collections import deque, namedtuple
 
 import numpy as np
 
@@ -105,6 +115,13 @@ FOLGA_DOMINANCIA = 1e-9
 # efetivo x.
 RiscoEquipamento = namedtuple(
     "RiscoEquipamento", "equipamento soma_cvss fator proprio efetivo")
+
+# Uma correção do plano: tirar a vulnerabilidade do equipamento. fator é
+# o fator de exposição do equipamento (F_i); peso, quanto um ponto de
+# risco próprio nele soma ao risco total (w_i); reducao, quanto o risco
+# total cai com a correção (w_i F_i v_j).
+CorrecaoSugerida = namedtuple(
+    "CorrecaoSugerida", "equipamento vulnerabilidade fator peso reducao")
 
 # O que a verificação de I - A concluiu. invertivel: I - A é tratada
 # como invertível (dominância, ou número de condição até 1/ε com posto
@@ -489,6 +506,97 @@ class ModeloRisco:
                               float(fracao) * efetivo))
         return itens
 
+    # ------------------------------------------------------------------
+    # Plano de correção
+    # ------------------------------------------------------------------
+
+    def risco_total(self):
+        """A soma dos riscos efetivos, 1^T x. Resolve se necessário."""
+        if self.x is None:
+            self.resolver()
+        return float(self.x.sum())
+
+    def pesos_no_total(self):
+        """Resolve (I - A)^T w = 1 e devolve w.
+
+        w_i é quanto um ponto de risco próprio no equipamento i soma ao
+        risco total, contando o que os outros herdam dele: pelo menos 1
+        (o próprio ponto). Só depois de I - A passar na verificação
+        (resolver): a transposta tem os mesmos números de condição e
+        posto. Levanta SistemaSingularError se algum peso ficar menor
+        que 1, o que só acontece com dependências em ciclo que repassam
+        mais risco do que recebem: aí corrigir uma falha poderia
+        aumentar o risco total, e o plano não tem sentido.
+        """
+        if self.x is None:
+            self.resolver()
+        n = len(self.b)
+        if n == 0:
+            return np.zeros(0)
+        transposta = (np.eye(n) - self.A).T
+        try:
+            w = np.linalg.solve(transposta, np.ones(n))
+        except np.linalg.LinAlgError as erro:
+            raise SistemaSingularError(
+                "I - A é singular: os pesos não têm solução única.") \
+                from erro
+        # As mesmas conferências da solução: substituída de volta, a
+        # conta tem de dar 1 em todas as linhas.
+        tolerancia = FOLGA_CONFERENCIA * max(1.0, float(np.abs(w).max()))
+        if not np.allclose(transposta @ w, 1.0, atol=tolerancia):
+            raise SistemaSingularError(
+                "Os pesos não conferem: a transposta de I - A vezes w não "
+                "dá 1, então o plano não é confiável.")
+        if np.any(w < 1 - FOLGA_SOLUCAO):
+            raise SistemaSingularError(
+                "Com estas dependências, corrigir uma falha poderia "
+                "aumentar o risco total: há um ciclo que repassa mais risco "
+                "do que recebe. Corrija as dependências (opção 12).")
+        return w
+
+    def plano_de_correcao(self):
+        """Devolve as correções possíveis, da que mais reduz o risco.
+
+        Cada vulnerabilidade que conta no risco (as corrigidas não
+        contam), em cada equipamento, é uma CorrecaoSugerida. Corrigi-la
+        tira F_i v_j do risco próprio b_i; como o risco total é w^T b,
+        ele cai w_i F_i v_j. A soma das quedas de todas as correções é o
+        risco total inteiro. No empate, vem antes o menor id de
+        equipamento e, depois, o de vulnerabilidade.
+        """
+        w = self.pesos_no_total()
+        itens = []
+        for i, equipamento in enumerate(self.equipamentos):
+            for j, vulnerabilidade in enumerate(self.vulnerabilidades):
+                if self.M[i, j]:
+                    itens.append(CorrecaoSugerida(
+                        equipamento, vulnerabilidade,
+                        float(self.fatores[i]), float(w[i]),
+                        float(w[i] * self.fatores[i] * self.v[j])))
+        itens.sort(key=lambda c: (-c.reducao, c.equipamento.id,
+                                  c.vulnerabilidade.id))
+        return itens
+
+    def herdam_de(self, id_equipamento):
+        """Os ids dos que herdam risco do equipamento, em ordem.
+
+        Herdam direta ou indiretamente: j herda de i se A[j][i] > 0, e
+        quem herda de j herda também de i. É uma busca em largura no
+        grafo das dependências, com uma fila: cada equipamento entra
+        nela uma vez, mesmo com ciclos.
+        """
+        inicio = self._linha[id_equipamento]
+        vistos = {inicio}
+        fila = deque([inicio])
+        while fila:
+            atual = fila.popleft()
+            for herdeiro in np.flatnonzero(self.A[:, atual]):
+                if herdeiro not in vistos:
+                    vistos.add(int(herdeiro))
+                    fila.append(int(herdeiro))
+        vistos.discard(inicio)
+        return sorted(self.equipamentos[j].id for j in vistos)
+
 
 # ----------------------------------------------------------------------
 # Teste: o cenário pequeno, resolvido à mão, e verificações do modelo.
@@ -614,6 +722,39 @@ if __name__ == "__main__":
     assert [(p[0].id, p[3]) for p in parcelas] == [(e2.id, 12.0)]
     assert modelo.risco_de(99) is None
 
+    # --- 1b. Plano de correção, à mão ---------------------------------
+    # (I - A)^T w = 1:
+    #   w1 = 1                        (ninguém herda da estação)
+    #   w2 = 1 + 0,5 w1 + 0,25 w3     (a estação e o banco herdam dele)
+    #   w3 = 1 + 0,5 w2               (o servidor herda do banco)
+    # => w2 = 1,5 + 0,25 (1 + 0,5 w2) => 0,875 w2 = 1,75
+    # => w2 = 2 e w3 = 2.
+    # Quedas: V2 no banco 2 x 2,0 x 6 = 24; V2 no servidor 2 x 1,5 x 6
+    # = 18; V1 no servidor 2 x 1,5 x 4 = 12; V1 na estação 1 x 1 x 4
+    # = 4.
+    assert np.allclose(modelo.pesos_no_total(), [1, 2, 2])
+    plano = modelo.plano_de_correcao()
+    assert [(c.equipamento.id, c.vulnerabilidade.id, round(c.reducao, 9))
+            for c in plano] == [(e3.id, v2.id, 24), (e2.id, v2.id, 18),
+                                (e2.id, v1.id, 12), (e1.id, v1.id, 4)], plano
+    # Corrigir tudo zera o risco: a soma das quedas é o total.
+    assert abs(sum(c.reducao for c in plano) - modelo.risco_total()) < 1e-9
+    # Cada queda confere com o sistema resolvido de novo, sem a falha.
+    for correcao in plano:
+        i = modelo.equipamentos.index(correcao.equipamento)
+        j = modelo.vulnerabilidades.index(correcao.vulnerabilidade)
+        sem_ela = modelo.M.copy()
+        sem_ela[i, j] = 0
+        x_novo = np.linalg.solve(np.eye(3) - modelo.A,
+                                 modelo.fatores * (sem_ela @ modelo.v))
+        assert abs(modelo.risco_total() - x_novo.sum()
+                   - correcao.reducao) < 1e-9
+    assert modelo.herdam_de(e2.id) == [e1.id, e3.id]
+    assert modelo.herdam_de(e3.id) == [e1.id, e2.id]   # via o servidor
+    assert modelo.herdam_de(e1.id) == []
+    print("Plano de correção: w = (1, 2, 2); quedas 24, 18, 12 e 4, que "
+          "somam o total 58.")
+
     # --- 2. Corrigir uma vulnerabilidade baixa o risco ----------------
     inv.alterar_situacao(e2.id, v2.id, SituacaoTratamento.CORRIGIDA)
     depois = ModeloRisco(inv)
@@ -737,6 +878,14 @@ if __name__ == "__main__":
     m_isolado = ModeloRisco(so_isolado)
     assert m_isolado.diagnosticar().utilizavel
     assert np.allclose(m_isolado.resolver(), [0, 0, 0, 7.5])
+    # O risco sai, mas o plano não: no ciclo, um ponto de risco próprio
+    # viraria menos de um ponto no total (peso menor que 1), e corrigir
+    # ali poderia aumentar o risco total.
+    try:
+        m_isolado.plano_de_correcao()
+        raise AssertionError("fez o plano com pesos sem sentido")
+    except SistemaSingularError as erro:
+        assert "aumentar o risco total" in str(erro), erro
 
     # Ciclo quase crítico (0,9999 nos dois sentidos): ainda dominante.
     quase = Inventario()
@@ -799,13 +948,18 @@ if __name__ == "__main__":
         for _ in range(5000):
             neumann = m.b + m.A @ neumann
         assert np.allclose(x, neumann, atol=1e-8), "Neumann discorda"
+        # Plano: pesos de pelo menos 1, e as quedas somam o risco total.
+        assert np.all(m.pesos_no_total() >= 1 - 1e-12)
+        assert abs(sum(c.reducao for c in m.plano_de_correcao())
+                   - x.sum()) < 1e-6, "as quedas não somam o total"
         if n <= 6:
             ex = exato(m.A, m.b)
             assert all(abs(float(e) - xi) < 1e-6
                        for e, xi in zip(ex, x, strict=True)), \
                 "frações exatas discordam"
     print("20 inventários aleatórios: solve = série de Neumann (e = frações "
-          "exatas nos de até 6 equipamentos).")
+          "exatas nos de até 6 equipamentos); as quedas do plano somam o "
+          "risco total.")
 
     # --- 6. solve x inversa: o erro que cada um deixa -----------------
     # Um ciclo de 30 equipamentos, cada um herdando quase tudo do

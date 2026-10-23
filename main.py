@@ -106,6 +106,9 @@ OPCOES_MENU = (
     ("Base de CVEs exploradas", (
         (16, "Buscar falhas exploradas, sugestões e atualização"),
     )),
+    ("Correções", (
+        (17, "Plano de correção (o que mais reduz o risco)"),
+    )),
     ("", ((0, "Sair"),)),
 )
 
@@ -152,6 +155,7 @@ class Aplicacao:
             14: self.risco_de_um,
             15: self.ver_matrizes,
             16: self.base_de_cves,
+            17: self.plano_de_correcao,
         }
 
     # ------------------------------------------------------------------
@@ -938,6 +942,51 @@ class Aplicacao:
         else:
             telas.mostrar_matrizes(modelo)
         telas.mostrar_diagnostico(modelo.diagnosticar())
+
+    def plano_de_correcao(self):
+        """Opção 17: as correções, da que mais reduz o risco total.
+
+        Depois da lista, o número de uma correção mostra por que ela
+        reduz o risco e, se a CVE estiver na base de CVEs exploradas, o
+        que a CISA manda fazer e o link do boletim.
+        """
+        print("\n" + cores.titulo("--- PLANO DE CORREÇÃO ---"))
+        modelo = self._montar_modelo()
+        if modelo is None:
+            return
+        try:
+            plano = modelo.plano_de_correcao()
+        except SistemaSingularError as erro:
+            self._erro(str(erro))
+            return
+        if not plano:
+            print("\n  " + cores.sucesso(
+                "Nenhuma vulnerabilidade conta no risco: não há o que "
+                "corrigir."))
+            return
+        base = self._base_de_cves()
+        registros = {}
+        for item in plano:
+            cve = item.vulnerabilidade.cve
+            if base is not None and cve is not None and cve not in registros:
+                registro = base.buscar_cve(cve)
+                if registro is not None:
+                    registros[cve] = registro
+        total = modelo.risco_total()
+        telas.mostrar_plano_de_correcao(plano, total, registros)
+        while True:
+            numero = ler_inteiro("\n  Número da correção, para ver como "
+                                 "fazer (Enter volta ao menu): ",
+                                 opcional=True)
+            if numero is None:
+                return
+            if not 1 <= numero <= len(plano):
+                self._erro(f"Digite um número de 1 a {len(plano)}.")
+                continue
+            item = plano[numero - 1]
+            telas.mostrar_correcao(
+                numero, item, total, modelo.herdam_de(item.equipamento.id),
+                registros.get(item.vulnerabilidade.cve))
 
     # ------------------------------------------------------------------
     # Base de CVEs exploradas (opção 16 e cadastro de vulnerabilidade)

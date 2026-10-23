@@ -28,6 +28,7 @@ from numpy.linalg import LinAlgError
 import arvore
 import base_cve
 import cores
+import explicacao_cve
 import main
 import telas
 from armazenamento import ArquivoInventario, BaseInvalidaError
@@ -63,29 +64,58 @@ TOTAL_31 = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"    # 10,0
 
 
 def registro_cve(cve, fabricante, produto, nome, cvss=None, vetor=None,
-                 cwes=(), ransomware=False, dia="2024-01-10"):
-    """Um RegistroCVE para a base dos testes."""
+                 cwes=(), ransomware=False, dia="2024-01-10", **extras):
+    """Um RegistroCVE para a base dos testes.
+
+    extras pode trazer acao, links e ssvc; sem eles, ficam os padrões.
+    """
     return RegistroCVE(
         cve=cve, fabricante=fabricante, produto=produto, nome=nome,
         descricao=f"{nome}. It allows remote attackers to run code.",
         cwes=tuple(cwes), adicionada=dia, prazo=dia, ransomware=ransomware,
-        cvss=cvss, vetor=vetor, fonte_nota=None if cvss is None else "CNA")
+        cvss=cvss, vetor=vetor, fonte_nota=None if cvss is None else "CNA",
+        **extras)
 
 
 def base_de_teste():
-    """Quatro CVEs: RDP, FortiOS e dois produtos Cisco (um sem nota)."""
+    """Quatro CVEs: RDP, FortiOS e dois produtos Cisco (um sem nota).
+
+    A do RDP e a do IOS XE trazem também a ação da CISA, os links e a
+    avaliação SSVC, como na base de verdade.
+    """
     return BaseCVE([
         registro_cve("CVE-2019-0708", "Microsoft", "Remote Desktop Services",
                      "Microsoft Remote Desktop Services Remote Code "
                      "Execution Vulnerability", 9.8, RDP_31, ["CWE-416"],
-                     ransomware=True, dia="2021-11-03"),
+                     ransomware=True, dia="2021-11-03",
+                     acao="Apply updates per vendor instructions.",
+                     links=("https://nvd.nist.gov/vuln/detail/CVE-2019-0708",),
+                     ssvc=base_cve.Ssvc("active", "yes", "total")),
+        # A ação desta não está na tabela de traduções e tem um
+        # endereço maior que a linha da tela (os dois inventados).
         registro_cve("CVE-2024-21762", "Fortinet", "FortiOS",
                      "Fortinet FortiOS Out-of-Bound Write Vulnerability",
-                     9.8, RDP_31, ["CWE-787"], dia="2024-02-09"),
+                     9.8, RDP_31, ["CWE-787"], dia="2024-02-09",
+                     acao="Apply mitigations per vendor instructions as they "
+                          "become available. Until then, see https://"
+                          "www.fortiguard.com/psirt/FG-IR-24-015-orientacao-"
+                          "de-teste-com-um-endereco-longo for guidance."),
         registro_cve("CVE-2023-20198", "Cisco", "IOS XE Web UI",
                      "Cisco IOS XE Web UI Privilege Escalation "
                      "Vulnerability", 10.0, TOTAL_31, ["CWE-420"],
-                     dia="2023-10-16"),
+                     dia="2023-10-16",
+                     acao="Verify that instances of Cisco IOS XE Web UI are "
+                          "in compliance with BOD 23-02 and apply "
+                          "mitigations per vendor instructions. For affected "
+                          "products (Cisco IOS XE Web UI exposed to the "
+                          "internet or to untrusted networks), follow vendor "
+                          "instructions to determine if a system may have "
+                          "been compromised and immediately report positive "
+                          "findings to CISA.",
+                     links=("https://www.cisco.com/c/en/us/support/docs/"
+                            "aviso.html",
+                            "https://nvd.nist.gov/vuln/detail/CVE-2023-20198"),
+                     ssvc=base_cve.Ssvc("active", "yes", "total")),
         registro_cve("CVE-2024-20481", "Cisco", "Adaptive Security Appliance",
                      "Cisco ASA Missing Release of Resource Vulnerability",
                      dia="2024-10-24"),
@@ -275,6 +305,117 @@ class TesteDoPrograma(unittest.TestCase):
                          ["EstacaoTrabalho", "Servidor", "BancoDados"])
         # A vulnerabilidade compartilhada volta como um só objeto.
         self.assertEqual(len(recarregado.vulnerabilidades()), 2)
+
+    def test_plano_de_correcao_pelo_menu(self):
+        """Opção 17: quedas 24, 18, 12 e 4, o acumulado e o detalhe."""
+        saida = self.rodar(self.CENARIO + ["17", "9", "1", "", "0"])
+        texto = " ".join(saida.split())
+        self.assertIn("Risco total da rede (soma dos riscos efetivos): "
+                      "58,00", texto)
+        linhas = [linha for linha in saida.splitlines()
+                  if re.match(r"\s+[1-4]\s+\d+,\d\d\s+\d+,\d%", linha)]
+        esperadas = [("24,00", "41,4%", "[3] BANCO-01"),
+                     ("18,00", "72,4%", "[2] SERVIDOR-01"),
+                     ("12,00", "93,1%", "[2] SERVIDOR-01"),
+                     ("4,00", "100,0%", "[1] ESTACAO-01")]
+        self.assertEqual(len(linhas), 4, linhas)
+        for linha, partes in zip(linhas, esperadas, strict=True):
+            for parte in partes:
+                self.assertIn(parte, linha)
+        self.assertIn("Digite um número de 1 a 4.", texto)
+        # O detalhe da primeira: a queda, o peso do banco e quem herda.
+        self.assertIn("Reduz o risco total em 24,00 (41,4% de 58,00). O "
+                      "risco próprio de BANCO-01 cai 2,0 x 6,0 = 12,00, e "
+                      "cada ponto de risco próprio nele pesa 2,00 no risco "
+                      "total, porque 2 equipamentos herdam risco dele", texto)
+        self.assertIn("Sem CVE, não há boletim oficial", texto)
+
+    def test_plano_sem_vulnerabilidade_e_com_sistema_singular(self):
+        """Opção 17 sem o que corrigir, e com I - A não invertível."""
+        saida = self.rodar(["1", "PC-01", "Fulano de Tal", "Cartório",
+                            "Estação", "1", "n", "n", "17", "0"])
+        self.assertIn("Nenhuma vulnerabilidade conta no risco", saida)
+        with open(os.path.join(PASTA, "dados_exemplo",
+                               "cenario_singular.json"),
+                  encoding="utf-8") as origem:
+            singular = origem.read()
+        os.makedirs(os.path.dirname(self.caminho), exist_ok=True)
+        with open(self.caminho, "w", encoding="utf-8") as destino:
+            destino.write(singular)
+        saida = self.rodar(["17", "0"])
+        self.assertIn("Nenhum risco efetivo foi calculado", saida)
+        self.assertNotIn("Risco total da rede", saida)
+
+    def test_plano_na_base_de_exemplo_marca_as_cves_exploradas(self):
+        """Opção 17 na base de exemplo: roteador primeiro, KEV marcado.
+
+        O BlueKeep, que está na base de CVEs dos testes, aparece com
+        "sim" na coluna KEV, e o detalhe mostra o que a CISA manda
+        fazer, em português, com o link.
+        """
+        self.copiar_exemplo()
+        self.base_cve = base_de_teste()
+        saida = self.rodar(["17", "1", "19", "", "0"])
+        # No detalhe da correção 1, a quebra de linha não corta o
+        # hostname no hífen ("DRPC-" numa linha e "RT01" na outra).
+        self.assertIn("pesa 18,24 no risco total", " ".join(saida.split()))
+        self.assertIn("DRPC-RT01 cai 1,2 x 7,5 = 9,00", saida)
+        self.assertNotRegex(saida, r"[A-Z0-9]-\n")
+        self.assertRegex(saida, r"\n +1 +164,12 +12,2% +\[6\] Firmware do "
+                                r"roteador desatualizado +7,5 +\[3\] "
+                                r"DRPC-RT01")
+        self.assertRegex(saida, r"\n +2 +164,12 +24,3% +\[8\] Rede Wi-Fi")
+        self.assertRegex(saida, r"\n +4 +56,34 +38,8% +\[9\] Senha padrão")
+        self.assertRegex(saida, r"\n +10 +27,79 +54,6% ")
+        # O "·" do SSVC nunca começa uma linha da tela.
+        self.assertNotRegex(saida, r"\n *·")
+        self.assertRegex(saida, r"\[80\] Microsoft Remote Desktop.* sim +"
+                                r"\[65\] INTEL-SRV01")
+        texto = " ".join(saida.split())
+        self.assertIn("Correção 19: [80] Microsoft Remote Desktop", texto)
+        self.assertIn("CWE-416 Uso de memória já liberada", texto)
+        self.assertIn("Avaliação da CISA (SSVC): explorada em ataques · "
+                      "ataque automatizável · controle total do sistema.",
+                      texto)
+        self.assertIn("Aplicar as atualizações conforme as instruções do "
+                      "fabricante.", texto)
+        self.assertIn("https://nvd.nist.gov/vuln/detail/CVE-2019-0708", texto)
+
+    def test_cve_em_portugues_na_opcao_16(self):
+        """A ficha da CVE explica em português e traz o boletim."""
+        self.base_cve = base_de_teste()
+        saida = self.rodar(["16", "1", "CVE-2023-20198", "1", "n", "0"])
+        texto = " ".join(saida.split())
+        for trecho in (
+                "CWE ........... CWE-420 Canal alternativo desprotegido",
+                "prazo da CISA (EUA): 16/10/2023",
+                "Como se ataca: pela rede, sem conta no sistema e sem ação "
+                "de outra pessoa.",
+                "Impacto: alto na confidencialidade, na integridade e na "
+                "disponibilidade. O ataque atinge também o que está sob "
+                "outra autoridade de segurança (escopo alterado).",
+                "explorada em ataques · ataque automatizável · controle "
+                "total do sistema",
+                "Verificar se as instalações do Cisco IOS XE Web UI cumprem "
+                "a BOD 23-02",
+                "Boletins e orientações indicados pela CISA: "
+                "https://www.cisco.com/c/en/us/support/docs/aviso.html",
+                "Na NVD (referências e versões afetadas): "
+                "https://nvd.nist.gov/vuln/detail/CVE-2023-20198",
+                "Descrição oficial, em inglês:"):
+            self.assertIn(trecho, texto)
+
+    def test_acao_fora_da_tabela_aparece_em_ingles(self):
+        """Ação sem tradução: o original, o aviso e o link inteiro."""
+        self.base_cve = base_de_teste()
+        saida = self.rodar(["16", "1", "CVE-2024-21762", "1", "n", "0"])
+        self.assertIn("Apply mitigations per vendor instructions as they "
+                      "become available.", " ".join(saida.split()))
+        self.assertIn("(texto da CISA, em inglês: ele não está na tabela de "
+                      "traduções)", saida)
+        # O endereço, maior que a linha, fica inteiro numa linha só.
+        self.assertIn("\n    https://www.fortiguard.com/psirt/FG-IR-24-015-"
+                      "orientacao-de-teste-com-um-endereco-longo\n", saida)
 
     def test_detalhe_do_risco_mostra_a_conta(self):
         """A opção 14 mostra b, a parcela herdada e x do servidor."""
@@ -622,11 +763,27 @@ class TesteDoPrograma(unittest.TestCase):
             "8", "65", "80", "", "", "", "", "", "3",
             "14", "65",
             "13",
+            # O plano, depois do passo 6, e o detalhe da correção 29.
+            "17", "29", "",
             "0"])
         # Os três maiores riscos efetivos, na ordem.
         self.assertRegex(saida, r"30  PERICIA-SRV01 .* 40,61 .*\n"
                                 r" +1  DRPC-SRV01 .* 40,01 .*\n"
                                 r" +65  INTEL-SRV01 .* 37,61 ")
+        # O plano: as duas falhas do roteador da sede, de nota 7,5, na
+        # frente; o BlueKeep, de nota 9,8, numa estação de que ninguém
+        # herda risco, só em 29º.
+        self.assertIn("Risco total da rede (soma dos riscos efetivos): "
+                      "1330,42", saida)
+        self.assertRegex(saida, r"\n +1 +164,12 +12,3% +\[6\] Firmware")
+        self.assertRegex(saida, r"\n +2 +164,12 +24,7% +\[8\] Rede Wi-Fi")
+        self.assertRegex(saida, r"\n +29 +9,80 +77,0% +\[80\] Microsoft "
+                                r"Remote Desktop.* sim +\[18\] DPLAN-PC02")
+        texto = " ".join(saida.split())
+        self.assertIn("pesa 1,00 no risco total, porque nenhum equipamento "
+                      "herda risco dele.", texto)
+        self.assertIn("Aplicar as atualizações conforme as instruções do "
+                      "fabricante.", texto)
         self.assertIn("CVE-2019-0708 em 3 equipamento(s)", saida)
         self.assertIn("3 equipamentos encontrados", saida)
         for roteador in ("DP1-RT01", "DP3-RT01", "DP7-RT01"):
@@ -1194,6 +1351,54 @@ class TesteDaBaseCVE(unittest.TestCase):
         with open(base_cve.ARQUIVO_INICIAL, encoding="utf-8") as arquivo:
             self.assertEqual(base.para_texto(), arquivo.read())
 
+    def test_base_inicial_tem_acao_links_e_ssvc(self):
+        """Toda CVE da base traz a ação, os links e a avaliação SSVC.
+
+        Quase todas as ações têm tradução (as que se repetem no
+        catálogo); a do IOS XE, que tem texto próprio, é uma delas.
+        """
+        base, _ = BaseCVE.carregar(
+            os.path.join(tempfile.gettempdir(), "nao-existe.json"))
+        registros = list(base.registros.values())
+        self.assertTrue(all(r.acao and r.links and r.ssvc
+                            for r in registros))
+        traduzidas = sum(explicacao_cve.acao_em_portugues(r.acao)[1]
+                         for r in registros)
+        self.assertGreater(traduzidas, 0.98 * len(registros))
+        cisco = base.buscar_cve("CVE-2023-20198")
+        self.assertTrue(explicacao_cve.acao_em_portugues(cisco.acao)[1])
+        self.assertEqual(cisco.ssvc, ("active", "yes", "total"))
+        boletins, nvd = explicacao_cve.separar_links(cisco.links)
+        self.assertTrue(boletins[0].startswith("https://www.cisco.com/"))
+        self.assertEqual(nvd,
+                         ["https://nvd.nist.gov/vuln/detail/CVE-2023-20198"])
+        # Os CWEs da base de exemplo têm nome em português.
+        with open(os.path.join(PASTA, "dados_exemplo",
+                               "inventario_exemplo.json"),
+                  encoding="utf-8") as arquivo:
+            exemplo = json.load(arquivo)
+        cwes = {v["cwe"] for e in exemplo for v in e["vulnerabilidades"]
+                if v.get("cwe")}
+        self.assertTrue(cwes <= explicacao_cve.NOMES_CWE.keys(),
+                        cwes - explicacao_cve.NOMES_CWE.keys())
+
+    def test_base_atualizada_antiga_continua_valendo(self):
+        """Uma base atualizada antes da ação e do SSVC ainda é lida."""
+        base = base_de_teste()
+        antiga = json.loads(base.para_texto())
+        for item in antiga["cves"]:
+            for campo in base_cve.CAMPOS_NOVOS:
+                del item[campo]
+        antiga["publicado"] = "2099-01-01"       # mais nova que a inicial
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = os.path.join(pasta, "base_cve.json")
+            with open(caminho, "w", encoding="utf-8") as arquivo:
+                json.dump(antiga, arquivo)
+            lida, aviso = BaseCVE.carregar(caminho)
+        self.assertEqual((lida.origem, aviso), ("atualizada", ""))
+        rdp = lida.buscar_cve("CVE-2019-0708")
+        self.assertEqual((rdp.acao, rdp.links, rdp.ssvc), (None, (), None))
+
     def test_nota_do_registro_oficial(self):
         """A 3.1 vem antes da 4.0, o CNA antes do ADP; E:P sai."""
         v40 = ("CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/"
@@ -1337,6 +1542,69 @@ class TesteDoModelo(unittest.TestCase):
                          [4.0, 15.0, 12.0])
         self.assertEqual([round(i.efetivo, 9) for i in modelo.relatorio()],
                          [16.0, 24.0, 18.0])
+
+    def test_plano_de_correcao_no_cenario_de_validacao(self):
+        """Pesos (1, 2, 2) e quedas 24, 18, 12 e 4, somando o total."""
+        modelo = ModeloRisco(self.carregar("cenario_3_equipamentos.json"))
+        self.assertEqual([round(w, 9) for w in modelo.pesos_no_total()],
+                         [1.0, 2.0, 2.0])
+        plano = modelo.plano_de_correcao()
+        self.assertEqual(
+            [(c.equipamento.hostname, c.vulnerabilidade.id,
+              round(c.reducao, 9)) for c in plano],
+            [("BANCO-01", 2, 24.0), ("SERVIDOR-01", 2, 18.0),
+             ("SERVIDOR-01", 1, 12.0), ("ESTACAO-01", 1, 4.0)])
+        self.assertAlmostEqual(sum(c.reducao for c in plano),
+                               modelo.risco_total(), places=9)
+        self.assertEqual(modelo.herdam_de(3), [1, 2])   # o banco
+
+    def test_plano_de_correcao_na_base_de_exemplo(self):
+        """O roteador da sede vem antes da senha padrão de nota maior.
+
+        Cada queda do topo confere com a correção feita de verdade:
+        marcada como corrigida no inventário, o risco total cai
+        exatamente aquilo.
+        """
+        inventario = self.carregar("inventario_exemplo.json")
+        modelo = ModeloRisco(inventario)
+        plano = modelo.plano_de_correcao()
+        self.assertEqual(
+            [(c.equipamento.hostname, c.vulnerabilidade.id,
+              round(c.reducao, 2)) for c in plano[:5]],
+            [("DRPC-RT01", 6, 164.12), ("DRPC-RT01", 8, 164.12),
+             ("DRPC-SRV02", 4, 137.94), ("DRPC-SW01", 9, 56.34),
+             ("DRPC-SW01", 85, 43.12)])
+        self.assertEqual((plano[0].vulnerabilidade.cvss,
+                          plano[3].vulnerabilidade.cvss), (7.5, 9.8))
+        total = modelo.risco_total()
+        self.assertEqual(round(total, 2), 1348.06)
+        self.assertAlmostEqual(sum(c.reducao for c in plano), total,
+                               places=6)
+        # O que o README diz: 78 correções, as dez primeiras tiram 54,6%
+        # do risco, o roteador pesa 18,24 e o BlueKeep do INTEL-SRV01
+        # (nota 9,8, peso 1,2) vem só em 19º.
+        self.assertEqual(len(plano), 78)
+        self.assertEqual(
+            round(100 * sum(c.reducao for c in plano[:10]) / total, 1), 54.6)
+        self.assertEqual(round(plano[0].peso, 2), 18.24)
+        self.assertEqual((plano[18].equipamento.hostname,
+                          plano[18].vulnerabilidade.cve,
+                          round(plano[18].peso, 9),
+                          round(plano[18].reducao, 2)),
+                         ("INTEL-SRV01", "CVE-2019-0708", 1.2, 17.64))
+        self.assertEqual(len(modelo.herdam_de(3)), 73)
+        for correcao in plano[:5]:
+            situacao = correcao.equipamento.vulnerabilidades[
+                correcao.vulnerabilidade.id]
+            inventario.alterar_situacao(correcao.equipamento.id,
+                                        correcao.vulnerabilidade.id,
+                                        SituacaoTratamento.CORRIGIDA)
+            depois = ModeloRisco(inventario).risco_total()
+            inventario.alterar_situacao(correcao.equipamento.id,
+                                        correcao.vulnerabilidade.id,
+                                        situacao)
+            self.assertAlmostEqual(total - depois, correcao.reducao,
+                                   places=9)
 
     def test_cenario_singular_e_recusado_pelo_modelo(self):
         """cenario_singular.json carrega, mas não se resolve."""
@@ -2004,7 +2272,7 @@ class TesteDosAutotestes(unittest.TestCase):
                        "calculadora_cvss", "vulnerabilidades",
                        "ficha_tecnica", "equipamentos", "inventario",
                        "armazenamento", "risco", "arvore", "base_cve",
-                       "atualizacao_cve"):
+                       "atualizacao_cve", "explicacao_cve"):
             with self.subTest(modulo=modulo):
                 resultado = subprocess.run(
                     [sys.executable, os.path.join(PASTA, modulo + ".py")],
