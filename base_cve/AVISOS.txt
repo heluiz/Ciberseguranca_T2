@@ -10,7 +10,10 @@ do vetor CVSS, só as métricas base.
 ---------------------------------------------------------
 
 O que vem dele: as CVEs, o fabricante, o produto, o nome, a descrição,
-os CWEs, a data de entrada no catálogo, o prazo e o uso em ransomware.
+os CWEs, a data de entrada no catálogo, o prazo, o uso em ransomware, a
+ação exigida (requiredAction) e os links das notas (notes). A ação fica
+na base em inglês, como no catálogo: a tradução é feita pelo programa,
+na hora de mostrar, por uma tabela própria (explicacao_cve.py).
 
 Fonte:   https://www.cisa.gov/known-exploited-vulnerabilities-catalog
 Espelho: https://github.com/cisagov/kev-data (da própria CISA)
@@ -28,15 +31,20 @@ Licença, nas palavras da CISA
 
 Este programa não é endossado pela CISA nem pelo DHS.
 
-2. Registros de CVE do CVE Program (nota CVSS, vetor e CWE)
------------------------------------------------------------
+2. Registros de CVE do CVE Program (nota CVSS, vetor, CWE e SSVC)
+-----------------------------------------------------------------
 
 O que vem deles: o vetor CVSS (de onde o programa calcula a nota), a
-fonte da nota (o CNA ou um ADP, como o da CISA) e o CWE, quando o
-catálogo KEV não traz.
+fonte da nota (o CNA ou um ADP, como o da CISA), o CWE, quando o
+catálogo KEV não traz, e a avaliação SSVC (exploração, automatizável e
+impacto técnico), que a CISA põe no registro como ADP.
 
 Fonte: https://github.com/CVEProject/cvelistV5 e
        https://cveawg.mitre.org/api/cve/
+
+O que a CISA acrescenta aos registros como ADP, inclusive o SSVC, ela
+também publica sob a licença Creative Commons 0 1.0, no repositório
+https://github.com/cisagov/vulnrichment.
 
 Copyright (c) The MITRE Corporation. CVE(R) is a registered trademark
 of The MITRE Corporation.

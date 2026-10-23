@@ -2,9 +2,10 @@
 
 Programa de linha de comando em Python para cadastro, consulta, atualização e
 remoção (CRUD) de equipamentos de TI e das vulnerabilidades que os afetam, com
-**cálculo do risco de cada equipamento por álgebra linear**, uma **base das
-CVEs exploradas em ataques**, que funciona sem internet, e execução em
-**container Docker**.
+**cálculo do risco de cada equipamento por álgebra linear**, um **plano de
+correção** que diz o que mais reduz o risco da rede, uma **base das CVEs
+exploradas em ataques**, explicadas em português e que funciona sem internet,
+e execução em **container Docker**.
 
 2ª atividade avaliativa (sprints 3, 4 e 5) do Bacharelado em Cibersegurança —
 FEELT/UFU, 2026/2. Continuação do Trabalho 1: os requisitos dele continuam
@@ -416,6 +417,8 @@ O menu numerado dá acesso a todas as operações:
   15 - Matrizes do modelo (M, v, F, A) e verificação de I - A
  Base de CVEs exploradas
   16 - Buscar falhas exploradas, sugestões e atualização
+ Correções
+  17 - Plano de correção (o que mais reduz o risco)
    0 - Sair
 ==============================================================
   Em qualquer pergunta: voltar · sair · limpar · ajuda
@@ -438,7 +441,8 @@ O menu numerado dá acesso a todas as operações:
 | 13 | Mostra o risco próprio e o efetivo de **todos** os equipamentos |
 | 14 | Mostra, passo a passo, como o risco de **um** equipamento foi calculado |
 | 15 | Mostra M, v, M v, F, b e A (para poucos equipamentos), o posto de M e a dimensão do seu núcleo, e a verificação de I − A, com o determinante, o número de condição e o posto |
-| 16 | Busca na base de CVEs exploradas (por palavras, por fabricante e produto, ou pela ficha técnica de um equipamento), registra a CVE escolhida num equipamento e atualiza a base pela internet |
+| 16 | Busca na base de CVEs exploradas (por palavras, por fabricante e produto, ou pela ficha técnica de um equipamento), explica a CVE escolhida em português, com o que a CISA manda fazer, registra a CVE num equipamento e atualiza a base pela internet |
+| 17 | Lista as correções, da que mais reduz o risco total da rede para a que menos reduz, e mostra a conta e o que fazer em cada uma |
 
 Depois de cada operação, o resultado fica na tela até o Enter. Além dos
 números, estas palavras valem em qualquer pergunta do programa:
@@ -481,9 +485,23 @@ vem com o programa e funciona sem internet. Ela busca por palavras, como
 `remote desktop` ou `fortinet vpn` (em inglês, como o catálogo), ou pelo
 número da CVE; navega por fabricante e produto; sugere, pela ficha técnica de
 um equipamento, as CVEs do fabricante e do produto dele; e atualiza a base
-pela internet. Qualquer CVE mostrada pode ser registrada num equipamento, com
-os dados da base. Os detalhes estão em
-[Base de CVEs exploradas](#base-de-cves-exploradas).
+pela internet. Cada CVE aparece com uma explicação em português, montada a
+partir dos dados (como se ataca, o impacto, o tipo de falha e a avaliação da
+CISA), e com o que a CISA manda fazer, com os links do boletim. Qualquer CVE
+mostrada pode ser registrada num equipamento, com os dados da base. Os
+detalhes estão em [Base de CVEs exploradas](#base-de-cves-exploradas).
+
+**A opção 17** monta o plano de correção: as falhas que ainda contam no risco
+(abertas, em tratamento ou aceitas), em cada equipamento, da correção que mais
+reduz o risco total da rede (a soma dos riscos efetivos) para a que menos
+reduz, com a redução acumulada. A conta usa
+o modelo de risco inteiro, inclusive quem herda risco de cada equipamento: na
+base de exemplo, uma falha de nota 7,5 no roteador da sede, de que 73
+equipamentos herdam risco, vale mais que o BlueKeep, de nota 9,8, num servidor
+de que só uma estação depende. A coluna KEV marca as CVEs exploradas em
+ataques. Digitando o número de uma correção, o programa mostra a conta dela e
+o que fazer: numa CVE da base, a explicação em português e a ação da CISA,
+com os links. A conta está em [Plano de correção](#plano-de-correção).
 
 **A opção 12** mostra a árvore de dependências de um equipamento nos dois
 sentidos: quem depende dele (quem herda parte do risco dele), direta e
@@ -564,7 +582,7 @@ ambiente `NO_COLOR` definida, o programa imprime texto puro.
 | 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. A classe "equipamentos" do enunciado é a `Equipamento`, no módulo `equipamentos.py`: o nome segue a convenção da PEP 8 para classes (CapWords) e está no singular, porque cada objeto é *um* equipamento. Cada equipamento tem uma `FichaTecnica` (`ficha_tecnica.py`), com fabricante, modelo, série, patrimônio, sistema e versão: composição. Os dados ficam protegidos por propriedades que conferem cada valor; veja [Orientação a objetos](#orientação-a-objetos). |
 | 2 | Armazenamento em JSON formado por um array de objetos | 20% | `armazenamento.py` grava o que `Inventario.para_dict()` monta: um array JSON na raiz, um objeto por equipamento. Veja [o formato](#formato-do-arquivo-de-dados). |
 | 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker) e [No servidor do docente](#no-servidor-do-docente). |
-| 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu. A matriz A fica no mesmo JSON (campo `dependencias`), e o NumPy está declarado em `requirements.txt`, que o `Dockerfile` instala. Veja [o modelo de risco](#o-modelo-de-risco). |
+| 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu, e a 17, que usa o mesmo modelo para ordenar as correções. A matriz A fica no mesmo JSON (campo `dependencias`), e o NumPy está declarado em `requirements.txt`, que o `Dockerfile` instala. Veja [o modelo de risco](#o-modelo-de-risco). |
 
 Os requisitos do Trabalho 1 continuam valendo, como pede o enunciado. As
 opções 1 a 10 do menu foram mantidas, com os mesmos números, as mesmas funções
@@ -592,12 +610,13 @@ e os mesmos comandos globais:
 | `ficha_tecnica.py` | Classe `FichaTecnica`: fabricante, modelo, número de série, patrimônio, sistema e versão de um equipamento, todos opcionais |
 | `vulnerabilidades.py` | Classe `Vulnerabilidade`: entrada do catálogo (descrição, CVE e CWE opcionais, origem, nota CVSS) |
 | `inventario.py` | Classe `Inventario`: o conjunto dos equipamentos e das vulnerabilidades e as regras entre eles (hostname e patrimônio únicos, CVE única no catálogo, cascata, dependências, buscas) |
-| `risco.py` | Classe `ModeloRisco`: monta M, v, A e b, verifica a invertibilidade (com o posto e o teorema de Rouché-Capelli), resolve o sistema e confere a solução |
+| `risco.py` | Classe `ModeloRisco`: monta M, v, A e b, verifica a invertibilidade (com o posto e o teorema de Rouché-Capelli), resolve o sistema e confere a solução; monta também o plano de correção, com o quanto cada correção reduz o risco total |
 | `arvore.py` | A árvore de dependências de um equipamento (opção 12), nos dois sentidos: cada equipamento aparece uma vez, sob a ligação mais específica, com as outras ligações no item e os iguais agrupados |
 | `armazenamento.py` | Classe `ArquivoInventario`: lê e grava o JSON, com gravação atômica |
 | `migracao.py` | Converte uma base do Trabalho 1 para o formato novo |
 | `base_cve.py` | Classe `BaseCVE`: a base das CVEs exploradas, com a busca por palavras, a navegação por fabricante e produto, as sugestões pela ficha técnica e a leitura e a gravação do arquivo da base |
 | `atualizacao_cve.py` | A atualização da base de CVEs: baixa o catálogo KEV e os registros oficiais das CVEs, escolhe a nota e confere tudo. É o único módulo que usa a rede |
+| `explicacao_cve.py` | A explicação de uma CVE em português, montada a partir dos dados: o vetor CVSS em frases, o nome do tipo de falha (CWE), a ação da CISA traduzida por uma tabela e a avaliação SSVC |
 | `calculadora_cvss.py` | As perguntas do CVSS (versões 3.1 e 4.0) com as explicações em português; monta o vetor e confere um vetor digitado |
 | `pergunta_cvss.py` | A pergunta da nota CVSS no cadastro e na atualização da vulnerabilidade: o número, o vetor colado ou o `calcular`, uma pergunta do CVSS de cada vez |
 | `classificacoes.py` | Enums: tipo do equipamento; origem, severidade e status da vulnerabilidade |
@@ -980,6 +999,114 @@ com a série de Neumann (`x = b + A b + A² b + ...`, que converge quando cada
 linha de A soma menos que 1) em 20 inventários aleatórios, e com uma solução em
 frações exatas nos que têm até 6 equipamentos.
 
+### Plano de correção
+
+A opção 17 responde à pergunta que vem depois do risco: o que corrigir
+primeiro? O risco total da rede é a soma dos riscos efetivos de todos os
+equipamentos, `1ᵀ x`, com **1** o vetor só de uns. Corrigir a falha *j* no
+equipamento *i* zera `M[i][j]`, e o risco próprio de *i* cai `F_i · v_j` (o
+fator do tipo vezes a nota). Mas a queda não para aí: quem herda risco de *i*
+também cai, e quem herda desses também. Para ter a queda do total de todas as
+correções de uma vez, o programa resolve outro sistema, com a transposta de
+`I − A`:
+
+```
+(I − A)ᵀ w = 1
+```
+
+Como `x = (I − A)⁻¹ b`, o total é `1ᵀ (I − A)⁻¹ b = wᵀ b`: o componente *w_i*
+diz quanto o total sobe a cada ponto de risco próprio no equipamento *i*. O
+mesmo sistema, escrito de outro jeito, é `w = 1 + Aᵀ w`, ou seja,
+`w_i = 1 + Σ_k A[k][i] w_k`: o peso de um equipamento é 1 (o risco dele mesmo)
+mais a fração que cada equipamento *k* herda dele, vezes o peso de *k*. Quem
+não repassa risco a ninguém tem peso 1. A queda de uma correção é
+
+```
+redução = w_i · F_i · v_j
+```
+
+O modelo é linear, então as reduções se somam: corrigir tudo zera o risco
+total, e a soma das reduções do plano dá exatamente o total. Por isso a coluna
+ACUMULADO é exata, e não uma estimativa. A matriz `I − A` e a sua transposta
+têm o mesmo determinante e os mesmos valores singulares, então a verificação
+de invertibilidade da opção 13 vale também aqui. Com a regra do cadastro (cada
+linha de A soma menos que 1), todo peso é pelo menos 1, e corrigir nunca piora
+o risco. Num arquivo editado à mão, um ciclo que repassa mais risco do que
+recebe pode dar um peso menor que 1: aí corrigir uma falha poderia aumentar o
+risco total, e o plano é recusado, com a explicação.
+
+No cenário da [validação à mão](#validação-à-mão-cenário-de-3-equipamentos),
+quem herda de cada equipamento é a coluna dele em A:
+
+```
+w1 = 1                          (ninguém herda da estação)
+w2 = 1 + 0,5 w1 + 0,25 w3       (a estação herda 0,5 do servidor; o banco, 0,25)
+w3 = 1 + 0,5 w2                 (o servidor herda 0,5 do banco)
+```
+
+Substituindo *w3* em *w2*: `w2 = 1,75 + 0,125 w2`, logo **w2 = 2** e
+**w3 = 2**. O peso 2 do banco se confere pela propagação: 1 ponto a mais no
+risco próprio dele aumenta o risco efetivo dele em 1,14 (1/0,875: ele herda do
+servidor, que herda dele), o do servidor em 0,57 e o da estação em 0,29; no
+total, 2. As reduções:
+
+| Correção | w | F | v | Redução |
+| --- | --- | --- | --- | --- |
+| V2 no banco (E3) | 2 | 2,0 | 6,0 | 24 |
+| V2 no servidor (E2) | 2 | 1,5 | 6,0 | 18 |
+| V1 no servidor (E2) | 2 | 1,5 | 4,0 | 12 |
+| V1 na estação (E1) | 1 | 1,0 | 4,0 | 4 |
+| **Soma** | | | | **58** = 16 + 24 + 18 |
+
+Conferindo a primeira: sem a V2 no banco, `b = (4, 15, 0)`, e o sistema dá
+`x ≈ (12,57; 17,14; 4,29)`, de total 34. Caiu 24, como a conta previu. Na
+opção 17:
+
+```
+  Risco total da rede (soma dos riscos efetivos): 58,00
+
+  #  REDUZ  ACUMULADO  VULNERABILIDADE                    CVSS  KEV  EQUIPAMENTO
+  ----------------------------------------------------------------------------------
+  1  24,00      41,4%  [2] Vulnerabilidade V2 do cenário   6,0       [3] BANCO-01
+  2  18,00      72,4%  [2] Vulnerabilidade V2 do cenário   6,0       [2] SERVIDOR-01
+  3  12,00      93,1%  [1] Vulnerabilidade V1 do cenário   4,0       [2] SERVIDOR-01
+  4   4,00     100,0%  [1] Vulnerabilidade V1 do cenário   4,0       [1] ESTACAO-01
+
+  Número da correção, para ver como fazer (Enter volta ao menu): 1
+
+  Correção 1: [2] Vulnerabilidade V2 do cenário
+  Equipamento ... [3] BANCO-01 - Banco de dados
+  Status ........ Aberta
+  Nota CVSS ..... 6,0 (Média)
+
+  Reduz o risco total em 24,00 (41,4% de 58,00). O risco próprio de BANCO-01
+  cai 2,0 x 6,0 = 12,00, e cada ponto de risco próprio nele pesa 2,00 no
+  risco total, porque 2 equipamentos herdam risco dele, direta ou
+  indiretamente.
+```
+
+Numa falha com CVE da base de CVEs exploradas, o detalhe traz também a
+explicação da CVE em português e o que a CISA manda fazer, com os links (veja
+[A explicação em português](#a-explicação-em-português)).
+
+Na base de exemplo, o risco total é 1348,06, e o plano tem 78 correções; as
+dez primeiras tiram 54,6% do risco. As duas primeiras são falhas de nota 7,5
+no roteador da sede (`DRPC-RT01`), com 164,12 cada: 73 equipamentos herdam
+risco dele, direta ou indiretamente, e o peso dele é 18,24. A senha padrão do
+switch, de nota 9,8, vem em 4º (56,34), e o BlueKeep do `INTEL-SRV01`, também
+de nota 9,8, só em 19º (17,64), porque apenas a estação `INTEL-PC01` herda dele
+(peso 1,2). Pela nota CVSS, o BlueKeep viria antes das falhas do roteador; pelo
+modelo, corrigir uma delas reduz o risco mais de nove vezes mais.
+
+No código, `ModeloRisco.pesos_no_total()` resolve o sistema de *w* com
+`numpy.linalg.solve`, confere a solução com `allclose` e recusa pesos menores
+que 1; `plano_de_correcao()` monta uma correção para cada 1 de M e ordena da
+maior redução para a menor; e `herdam_de()` acha, por uma busca em largura no
+grafo das dependências, quem herda risco de um equipamento, direta ou
+indiretamente, o número que o detalhe mostra. O `python risco.py` confere cada
+redução resolvendo de novo o sistema com a falha corrigida, e que as reduções
+somam o total, no cenário e em inventários aleatórios.
+
 ## Formato do arquivo de dados
 
 Um **array JSON de objetos**: um objeto por equipamento, com as suas
@@ -1081,8 +1208,18 @@ de verdade**: o catálogo KEV (*Known Exploited Vulnerabilities*) da CISA, a
 agência de cibersegurança dos Estados Unidos. Uma falha entra no KEV quando
 cumpre três condições: tem número de CVE, há prova confiável de que está sendo
 explorada em ataques e existe uma correção clara, em geral a atualização do
-fabricante. Pela diretiva BOD 22-01, os órgãos federais dos EUA têm prazo para
-corrigir cada uma; aqui, o prazo é só informação.
+fabricante.
+
+Os órgãos civis do governo federal dos EUA têm prazo para corrigir cada uma, e
+o catálogo traz esse prazo. A diretiva BOD 22-01, que criou o catálogo em
+2021, foi revogada em 10/06/2026 pela BOD 26-04, que define o prazo pelo
+risco, com quatro perguntas: o equipamento fica exposto na internet? A falha
+está no KEV? O ataque pode ser automatizado? O atacante ganha controle total?
+O prazo vai de 3 dias, no caso mais grave, a 60 dias, ou até a próxima
+atualização do sistema, quando nenhuma resposta é sim. No catálogo, quase
+todas as CVEs que entraram desde abril de 2026 têm prazo de 3 ou 14 dias; de
+2022 até o começo de 2026, o prazo era em geral de três semanas. Aqui, o
+prazo é só informação.
 
 O KEV completa o que a nota CVSS não diz. A nota mede a gravidade de uma
 falha, e não se alguém a explora (veja
@@ -1096,14 +1233,16 @@ exploradas, que são as primeiras a corrigir.
 | CVE, fabricante, produto, nome e descrição (em inglês) | Catálogo KEV |
 | Data de entrada no catálogo e prazo da CISA | Catálogo KEV |
 | Uso em campanhas de ransomware | Catálogo KEV |
+| O que fazer: a ação exigida pela CISA e os links das notas (o boletim do fabricante, orientações da CISA e a página da NVD) | Catálogo KEV |
 | CWE | Catálogo KEV; se ele não traz, o registro oficial da CVE |
 | Nota e vetor CVSS, e quem deu a nota | Registro oficial da CVE, publicado pelo CVE Program |
+| Avaliação SSVC da CISA: a falha é explorada? O ataque pode ser automatizado? O atacante ganha controle total? | Registro oficial da CVE, na parte que a CISA completa (o programa Vulnrichment) |
 
-A base que vem com o programa é a do catálogo de 13/10/2026: 1.741 CVEs de
-288 fabricantes, todas com nota CVSS (1.609 na versão 3.1, 74 na 4.0 e 58 na
-3.0), 1.632 com CWE e 361 usadas em campanhas de ransomware. O arquivo tem
-menos de 1 MB e é lido em menos de um segundo, na primeira vez que a base é
-usada.
+A base que vem com o programa é a do catálogo de 16/10/2026: 1.748 CVEs de
+289 fabricantes, todas com nota CVSS (1.613 na versão 3.1, 77 na 4.0 e 58 na
+3.0), com a ação exigida pela CISA, com links e com a avaliação SSVC; 1.639
+têm CWE, e 361 foram usadas em campanhas de ransomware. O arquivo tem cerca de
+1,6 MB e é lido em menos de um segundo, na primeira vez que a base é usada.
 
 ### A nota CVSS
 
@@ -1119,17 +1258,18 @@ completam os registros de outros). O programa escolhe nesta ordem:
    mesma falha;
 2. na mesma versão, a do CNA antes da dos ADPs.
 
-Na base que vem com o programa, 749 notas são do CNA, 990 do ADP da CISA e 2
+Na base que vem com o programa, 756 notas são do CNA, 990 do ADP da CISA e 2
 de outro ADP.
 
 A nota não é copiada do registro: o programa a calcula do vetor, pela fórmula
 oficial, com a mesma calculadora das outras vulnerabilidades, e guarda o vetor
 junto. Antes, tira do vetor as métricas que não são base (as temporais, como
-`E:F/RL:O/RC:C`, que 253 vetores traziam). Isso importa: em 21 registros, a
+`E:F/RL:O/RC:C`, que 257 vetores traziam). Isso importa: em 22 registros, a
 nota declarada não é a que o vetor dá. Em 18, o CNA publicou como nota base a
-nota temporal, que desconta, por exemplo, a correção já disponível; nos outros
-3, a nota declarada difere da fórmula em 0,1. Calculada, toda nota da base é a
-nota base, a mesma que o modelo de risco usa nas outras vulnerabilidades.
+nota temporal, que desconta, por exemplo, a correção já disponível; em 1, a
+nota declarada não é nem a base nem a temporal do vetor; nos outros 3, ela
+difere da fórmula em 0,1. Calculada, toda nota da base é a nota base, a mesma
+que o modelo de risco usa nas outras vulnerabilidades.
 
 ### Buscar, navegar e sugerir
 
@@ -1183,12 +1323,85 @@ Um trecho da tela, numa busca:
   Produto ....... Remote Desktop Services
   Nota CVSS ..... 9,8 (Crítica) (dada por CISA-ADP)
   Vetor CVSS .... CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
-  CWE ........... CWE-416
-  No catálogo ... desde 03/11/2021
+  CWE ........... CWE-416 Uso de memória já liberada (use after free)
+  No catálogo ... desde 03/11/2021; prazo da CISA (EUA): 03/05/2022
   Usada em campanhas de ransomware, segundo a CISA.
   ...
   Registrar esta CVE num equipamento? (s/N):
 ```
+
+### A explicação em português
+
+O nome, a descrição e a ação que a CISA exige vêm em inglês, como nas fontes
+oficiais. Um tradutor automático poderia errar justamente no que importa:
+"apply mitigations ... or discontinue use of the product" não é o mesmo que
+"apply updates". Por isso a ficha de cada CVE traz uma explicação montada a
+partir dos dados que têm significado fixo (`explicacao_cve.py`):
+
+| Parte | De onde vem | Como vira português |
+| --- | --- | --- |
+| Como se ataca | Vetor CVSS: de onde (AV), com que conta (PR), com a ajuda de quem (UI), a complexidade (AC) e, na versão 4.0, os requisitos de ataque (AT) | Uma frase, com os termos que a calculadora do programa já usa, como "pela rede, sem conta no sistema e sem ação de outra pessoa" |
+| Impacto | Vetor CVSS: confidencialidade, integridade e disponibilidade; o escopo, na 3.x, ou os outros sistemas, na 4.0 | Agrupado por nível, como "alto na disponibilidade; nenhum na confidencialidade e na integridade" |
+| Tipo de falha | CWE | Um nome em português para os 30 tipos mais comuns do KEV e os da base de exemplo, que somam 78% das ocorrências; os outros ficam só com o número |
+| Avaliação da CISA | SSVC | Os três pontos em português, com uma legenda para "automatizável" e "controle total" |
+| O que fazer | A ação exigida pela CISA | Uma tabela com os 17 textos que se repetem no catálogo e cobrem 98,7% das CVEs; um texto fora dela aparece em inglês, com aviso |
+| Links | As notas do catálogo | Separados em boletins (do fabricante ou da CISA) e na página da NVD, que reúne as referências e as versões afetadas |
+
+O SSVC (*Stakeholder-Specific Vulnerability Categorization*) é o método com
+que a CISA avalia a urgência de uma falha. Três pontos dele vêm no registro
+oficial de cada CVE: a exploração (nenhuma, prova de conceito pública ou em
+ataques), se o ataque é automatizável (sim ou não) e o impacto técnico
+(controle parcial ou total do sistema). Os dois últimos são duas das quatro
+perguntas com que a BOD 26-04 define o prazo de correção.
+
+A tabela da ação compara os textos sem as diferenças que o catálogo tem entre
+CVEs com a mesma ação, como o ponto final, as aspas ou "outlines" no lugar de
+"outlined". A descrição oficial vem no fim, em inglês, como no catálogo. A
+ficha de uma CVE, na opção 16:
+
+```
+  CVE-2023-20198 - Cisco IOS XE Web UI Privilege Escalation Vulnerability
+  Fabricante .... Cisco
+  Produto ....... IOS XE Web UI
+  Nota CVSS ..... 10,0 (Crítica) (dada pelo CNA, quem publicou a CVE)
+  Vetor CVSS .... CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H
+  CWE ........... CWE-420 Canal alternativo desprotegido
+  No catálogo ... desde 16/10/2023; prazo da CISA (EUA): 20/10/2023
+
+  Em português (montado a partir dos dados)
+    Como se ataca: pela rede, sem conta no sistema e sem ação de outra
+    pessoa.
+    Impacto: alto na confidencialidade, na integridade e na
+    disponibilidade. O ataque atinge também o que está sob outra
+    autoridade de segurança (escopo alterado).
+    Avaliação da CISA (SSVC): explorada em ataques · ataque
+    automatizável · controle total do sistema.
+    Automatizável: o ataque pode ser feito em massa, sem intervenção
+    humana, do reconhecimento à exploração. Controle total: o atacante
+    passa a controlar o sistema ou a ver todas as informações dele.
+
+  O que fazer, segundo a CISA
+    Verificar se as instalações do Cisco IOS XE Web UI cumprem a BOD 23-02
+    e aplicar as mitigações conforme as instruções do fabricante. Nos
+    produtos afetados (Cisco IOS XE Web UI exposto à internet ou a redes
+    não confiáveis), seguir as instruções do fabricante para verificar se
+    o sistema pode ter sido comprometido e informar imediatamente à CISA o
+    que for encontrado.
+    Boletins e orientações indicados pela CISA:
+      https://www.cisco.com/c/en/us/support/docs/ios-nx-os-software/ios-xe-dublin-17121/221128-software-fix-availability-for-cisco-ios.html
+    Na NVD (referências e versões afetadas):
+      https://nvd.nist.gov/vuln/detail/CVE-2023-20198
+
+  Descrição oficial, em inglês:
+    Cisco IOS XE Web UI contains a privilege escalation vulnerability in
+    the web user interface that could allow a remote, unauthenticated
+    attacker to create an account with privilege level 15 access. The
+    attacker can then use that account to gain control of the affected
+    device.
+```
+
+O mesmo aparece no detalhe de uma correção da opção 17, quando a falha tem uma
+CVE da base.
 
 ### Registrar uma CVE da base
 
@@ -1209,12 +1422,13 @@ programa a mostra e oferece usar os dados dela.
 A atualização precisa de internet e só acontece quando o usuário pede:
 
 1. baixa o catálogo KEV mais novo (quase 2 MB), do espelho que a CISA mantém
-   no GitHub ou, se ele falhar, do site da CISA;
-2. as CVEs que já estavam na base continuam com a nota que tinham; para as
-   novas, baixa o registro oficial, do repositório do CVE Program no GitHub
-   ou, se ele falhar, da API oficial. São no máximo 300 por atualização, das
-   mais recentes para as mais antigas; as que sobrarem, ou que não tiverem
-   nota, ficam para a próxima;
+   no GitHub ou, se ele falhar, do site da CISA. Dele vêm os dados de todas as
+   CVEs, inclusive a ação exigida e os links, que assim ficam sempre em dia;
+2. as CVEs que já estavam na base continuam com a nota e a avaliação SSVC que
+   tinham; para as novas, baixa o registro oficial, do repositório do CVE
+   Program no GitHub ou, se ele falhar, da API oficial. São no máximo 300 por
+   atualização, das mais recentes para as mais antigas; as que sobrarem, ou
+   que não tiverem nota, ficam para a próxima;
 3. grava a base nova em `dados/base_cve.json`, junto com o inventário. O
    arquivo que vem com o programa, `base_cve/kev.json`, não muda.
 
@@ -1228,7 +1442,7 @@ editado à mão:
 | --- | --- |
 | Só sites oficiais, por HTTPS | Os endereços são fixos, no código (`atualizacao_cve.py`). Um redirecionamento não pode sair do HTTPS, e o certificado do site é conferido, como o Python faz por padrão |
 | Limites | No máximo 30 MB pelo catálogo e 10 MB por registro (o maior registro real tem 2,3 MB), e 30 segundos de espera por resposta |
-| Tudo conferido | JSON pela RFC 8259 (sem `NaN` e sem o mesmo nome duas vezes num objeto) e cada campo no formato: CVE, datas, tamanho dos textos, caracteres de controle e a nota, que tem de conferir com o vetor |
+| Tudo conferido | JSON pela RFC 8259 (sem `NaN` e sem o mesmo nome duas vezes num objeto) e cada campo no formato: CVE, datas, tamanho dos textos, caracteres de controle e a nota, que tem de conferir com o vetor. Um link das notas sem HTTPS ou com caractere que não cabe numa URL fica de fora (e ficam no máximo 10 por CVE), e uma avaliação SSVC com valor fora dos previstos é ignorada |
 | Nada pela metade | A base nova vai para um arquivo temporário, que depois substitui o definitivo (`os.replace`). Se qualquer coisa falhar, o programa diz o motivo e continua com a base que tinha |
 | Nada do inventário sai | Os pedidos levam só o endereço do catálogo, números de CVEs públicas e o nome do programa (no cabeçalho `User-Agent`): nada sobre os equipamentos, as fichas ou as vulnerabilidades cadastradas |
 
@@ -1258,21 +1472,23 @@ no Git, mostra só as linhas das CVEs que mudaram.
 ```json
 {
   "fonte": "Catálogo KEV da CISA (CC0 1.0) e registros do CVE Program (Termos de Uso do CVE): veja base_cve/AVISOS.txt",
-  "catalogo": "2026.10.13",
-  "publicado": "2026-10-13",
-  "montado_em": "2026-10-14",
-  "quantas": 1741,
+  "catalogo": "2026.10.16",
+  "publicado": "2026-10-16",
+  "montado_em": "2026-10-20",
+  "quantas": 1748,
   "cves": [
     ...
-    {"cve": "CVE-2019-0708", "fabricante": "Microsoft", "produto": "Remote Desktop Services", "nome": "Microsoft Remote Desktop Services Remote Code Execution Vulnerability", "descricao": "Microsoft Remote Desktop Services, formerly known as Terminal Service, contains an unspecified vulnerability ...", "cwes": ["CWE-416"], "adicionada": "2021-11-03", "prazo": "2022-05-03", "ransomware": true, "cvss": 9.8, "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "fonte_nota": "CISA-ADP"},
+    {"cve": "CVE-2019-0708", "fabricante": "Microsoft", "produto": "Remote Desktop Services", "nome": "Microsoft Remote Desktop Services Remote Code Execution Vulnerability", "descricao": "Microsoft Remote Desktop Services, formerly known as Terminal Service, contains an unspecified vulnerability ...", "cwes": ["CWE-416"], "adicionada": "2021-11-03", "prazo": "2022-05-03", "ransomware": true, "cvss": 9.8, "vetor": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "fonte_nota": "CISA-ADP", "acao": "Apply updates per vendor instructions.", "links": ["https://nvd.nist.gov/vuln/detail/CVE-2019-0708"], "ssvc": {"exploracao": "active", "automatizavel": "yes", "impacto": "total"}},
     ...
   ]
 }
 ```
 
 A leitura confere o arquivo inteiro, como a do inventário: os campos, o número
-de cada CVE, as datas, os textos, a nota contra o vetor e se `quantas` bate
-com a lista. Um arquivo com qualquer problema é recusado inteiro.
+de cada CVE, as datas, os textos, os links, o SSVC, a nota contra o vetor e se
+`quantas` bate com a lista. Um arquivo com qualquer problema é recusado
+inteiro. Os campos `acao`, `links` e `ssvc` entraram depois: uma base gravada
+por uma versão anterior do programa, sem eles, continua valendo.
 
 Para pôr uma base mais nova no repositório, atualize pela opção 16 e copie
 `dados/base_cve.json` por cima de `base_cve/kev.json`: o formato é o mesmo.
@@ -1283,8 +1499,10 @@ A CISA distribui o catálogo KEV sob a licença Creative Commons 0 1.0, de
 domínio público. Os registros de CVE seguem os
 [Termos de Uso do CVE](https://www.cve.org/Legal/TermsOfUse), que pedem que
 toda cópia leve o aviso de copyright da MITRE e a licença: os dois estão em
-`base_cve/AVISOS.txt`, ao lado da base. O programa não é endossado pela CISA
-nem pelo DHS.
+`base_cve/AVISOS.txt`, ao lado da base. A avaliação SSVC vem da parte do
+registro que a CISA completa, cujos dados ela também publica sob a CC0 1.0, no
+repositório [Vulnrichment](https://github.com/cisagov/vulnrichment). O
+programa não é endossado pela CISA nem pelo DHS.
 
 ## Decisões de projeto
 
@@ -1326,6 +1544,16 @@ nem pelo DHS.
   módulo que a usa. O código mais exposto fica num lugar só, fácil de revisar,
   e a atualização é testada sem internet: a função que abre os endereços é um
   parâmetro (`abrir`), e os testes passam uma que responde sozinha.
+- **O plano ordena pela queda do risco total, e não pela nota.** A nota CVSS
+  mede a falha sozinha; o modelo de risco sabe também onde ela está (o fator
+  do tipo) e quem depende do equipamento (a matriz A). Por isso a pergunta "o
+  que corrigir primeiro?" é respondida com o mesmo modelo que dá o risco, e as
+  reduções somam o total, o que deixa a conta conferível.
+- **A explicação em português vem dos dados, e não de um tradutor.** O vetor
+  CVSS, o CWE, a ação da CISA e o SSVC têm significado fixo, e cada um vira
+  português por uma regra ou uma tabela que se pode conferir. Um tradutor
+  automático precisaria da internet e poderia errar justamente no que
+  importa. O texto livre, a descrição, fica em inglês, como no original.
 - **Árvore sem repetição.** As dependências formam um grafo, e não uma
   árvore: um equipamento depende de vários, e há ciclos. Repetir cada um sob
   cada equipamento de que ele depende faria a árvore do nobreak da base de
@@ -1373,7 +1601,9 @@ nem pelo DHS.
   internet na atualização da base de CVEs, depois de o usuário confirmar, para
   baixar dados públicos por HTTPS, de endereços fixos, com limites de tamanho e
   de tempo. O que chega é conferido como um arquivo editado à mão, e nada do
-  inventário é enviado. Veja [Atualizar](#atualizar-item-4).
+  inventário é enviado. Veja [Atualizar](#atualizar-item-4). Os links dos
+  boletins são só mostrados: o programa não abre nenhum, e quem usa decide se
+  copia o endereço para o navegador.
 - **Entrada tratada como suspeita.** O que vem do teclado e do arquivo é
   validado (tipos, faixas, hostname pelas RFC 952, 1123 e 1035, caracteres
   de controle recusados). Um arquivo adulterado é recusado, sem ser sobrescrito.
@@ -1417,7 +1647,8 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 | [NumPy](https://numpy.org/doc/stable/reference/generated/numpy.linalg.solve.html) | Álgebra linear | `linalg.solve` resolve o sistema sem inverter a matriz, e `allclose` confere a solução; `linalg.cond` decide a invertibilidade; `linalg.matrix_rank` dá o posto (Rouché-Capelli); `linalg.det` só informa; `LinAlgError` é tratado. |
 | [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259) e [módulo json](https://docs.python.org/3/library/json.html) | Formato do arquivo | Array JSON na raiz, UTF-8 sem BOM, sem `NaN` nem `Infinity`, nomes únicos em cada objeto. Veja [o formato](#formato-do-arquivo-de-dados). A base de CVEs e o que a atualização baixa são lidos com as mesmas regras. |
 | [CVSS v3.1](https://www.first.org/cvss/v3.1/specification-document) e [v4.0](https://www.first.org/cvss/v4.0/specification-document) | Nota e severidade | Escala qualitativa oficial (igual nas duas versões) e nota com uma casa decimal. A nota pode vir do vetor (versões 4.0, 3.1 e 3.0), pela fórmula oficial, com as perguntas das métricas base explicadas a partir da especificação. Desvios: 0,0 (*Nenhuma*) não é aceita, e o vetor é aceito fora de ordem e em minúsculas, mas gravado na forma oficial. As notas da base de CVEs também saem do vetor, só com as métricas base. |
-| [Catálogo KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) e [BOD 22-01](https://www.cisa.gov/binding-operational-directive-22-01), da CISA | CVEs exploradas | Os critérios e os campos do catálogo, com a licença CC0 1.0. O prazo de cada CVE é o da diretiva, que vale para os órgãos federais dos EUA: aqui, é só informação. Veja [Base de CVEs exploradas](#base-de-cves-exploradas). |
+| [Catálogo KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog), [BOD 26-04](https://www.cisa.gov/news-events/directives/bod-26-04-prioritizing-security-updates-based-risk) e [BOD 22-01](https://www.cisa.gov/news-events/directives/bod-22-01-reducing-significant-risk-known-exploited-vulnerabilities-revoked) (revogada), da CISA | CVEs exploradas | Os critérios e os campos do catálogo, com a licença CC0 1.0, inclusive a ação exigida e os links das notas. O prazo de cada CVE é o do catálogo, que segue as diretivas e vale para os órgãos federais dos EUA (desde 10/06/2026, a BOD 26-04, que revogou a BOD 22-01): aqui, é só informação. Veja [Base de CVEs exploradas](#base-de-cves-exploradas). |
+| [SSVC](https://github.com/cisagov/vulnrichment), no registro da CVE (programa Vulnrichment, da CISA) | Avaliação de cada CVE | Os três pontos que a CISA publica no registro (exploração, automatizável e impacto técnico), lidos com os valores previstos e mostrados em português. Veja [A explicação em português](#a-explicação-em-português). |
 | [Registros de CVE](https://github.com/CVEProject/cvelistV5) (formato CVE JSON 5) e [Termos de Uso do CVE](https://www.cve.org/Legal/TermsOfUse) | Nota, vetor e CWE de cada CVE | A nota do contêiner do CNA ou de um ADP, calculada do vetor só com as métricas base; o aviso de copyright e a licença vão em `base_cve/AVISOS.txt`, como os termos pedem. |
 | [RFC 952](https://www.rfc-editor.org/rfc/rfc952), [1123](https://www.rfc-editor.org/rfc/rfc1123) e [1035](https://www.rfc-editor.org/rfc/rfc1035) | Hostname | Veja [Limitações conhecidas](#limitações-conhecidas). |
 | [LGPD](https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm) (Lei 13.709/2018) | Dados pessoais | Art. 6º, III (necessidade); art. 6º, VII e art. 46 (segurança). Veja [Segurança e LGPD](#segurança-e-lgpd). |
@@ -1458,16 +1689,28 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
   cada falha afeta; isso exigiria as listas de produtos e versões da NVD (as
   CPEs). Cada sugestão precisa ser conferida no boletim do fabricante.
 - **Nomes e descrições em inglês**, como no catálogo oficial, e por isso a
-  busca também é em inglês.
-- **A nota de uma CVE que já está na base não é baixada de novo**, para a
-  atualização ser rápida: se o registro oficial mudar a nota depois, a base
-  continua com a anterior. A atualização também não muda o que já foi
+  busca também é em inglês. A explicação em português cobre só o que tem
+  significado fixo: o vetor, o CWE (com nome em português em 78% das
+  ocorrências; os outros tipos ficam só com o número), o SSVC e a ação da
+  CISA, traduzida em 98,7% das CVEs da base; nas outras 23, a ação aparece em
+  inglês, com aviso.
+- **Boletim do fabricante só em parte das CVEs.** Os links vêm das notas do
+  catálogo: 55,7% das CVEs da base têm um link além da página da NVD; nas
+  outras, é a página da NVD que leva às referências e aos boletins.
+- **A nota de uma CVE que já está na base não é baixada de novo**, nem a
+  avaliação SSVC, para a atualização ser rápida: se o registro oficial mudar
+  depois, a base continua com a anterior (a ação e os links, que vêm do
+  catálogo, mudam junto com ele). A atualização também não muda o que já foi
   cadastrado: uma vulnerabilidade registrada a partir da base guarda os dados
   daquele momento.
 - **Estar no KEV não muda a conta do risco.** O modelo usa só a nota CVSS: uma
-  falha explorada pesa o mesmo que outra, de mesma nota, que ninguém explora. A
-  base serve para achar e cadastrar as falhas; corrigir primeiro as do KEV fica
-  a cargo de quem usa o programa.
+  falha explorada pesa o mesmo que outra, de mesma nota, que ninguém explora.
+  O plano de correção (opção 17) marca as do KEV, mas ordena só pela queda do
+  risco; dar prioridade a elas fica a cargo de quem usa o programa.
+- **O plano não conhece o custo das correções.** Ele ordena pela queda do
+  risco, e não pelo esforço: trocar uma senha padrão leva minutos, e trocar um
+  servidor sem suporte pode levar meses. A ordem é uma sugestão, e a decisão
+  fica com quem usa o programa.
 - **O hostname é um nome simples, sem domínio** (sem pontos): de 1 a 63
   caracteres, só letras sem acento, números e hífen, sem hífen nas pontas,
   pelas RFC 952, 1123 e 1035, como no Trabalho 1. Duas escolhas do projeto: um
@@ -1481,18 +1724,24 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 python testes.py
 ```
 
-São 106 testes, só com a biblioteca padrão: o programa inteiro rodando por
+São 115 testes, só com a biblioteca padrão: o programa inteiro rodando por
 dentro com o teclado simulado (do cadastro ao risco, incluindo o cenário de 3
-equipamentos), a árvore de dependências (cada equipamento uma vez, nenhuma
-ligação perdida, a ligação mais específica, o ciclo, uma cadeia de 1.100
-equipamentos e as 80 colunas da tela), a nota CVSS pelo vetor e pelas
+equipamentos), o plano de correção (os pesos e as reduções do cenário, os da
+conta à mão, e, na base de exemplo, cada redução do topo conferida corrigindo
+a falha de verdade), a árvore de dependências (cada equipamento uma vez,
+nenhuma ligação perdida, a ligação mais específica, o ciclo, uma cadeia de
+1.100 equipamentos e as 80 colunas da tela), a nota CVSS pelo vetor e pelas
 perguntas do `calcular`, a CVE e
 o CWE (formato, CVE única no catálogo, busca, atualização), a ficha técnica
 (cadastro, patrimônio único, busca, atualização), a base de CVEs exploradas
 (busca, navegação, sugestões, cadastro com os dados da base, escolha da nota,
-qual base vale e a atualização com downloads simulados, sem internet: catálogo
-novo, falta de internet, resposta grande demais, sem HTTPS e JSON fora da
-norma), a recusa de bases inválidas
+qual base vale, a ação, os links e o SSVC, a base sem eles, de uma versão
+anterior, e a atualização com downloads simulados, sem internet: catálogo
+novo, falta de internet, resposta grande demais, sem HTTPS, JSON fora da norma
+e links e SSVC fora do formato), a explicação em português (o vetor em frases,
+o nome do CWE, a ação traduzida ou, fora da tabela, em inglês, com aviso, e a
+tela, que não parte um hostname no hífen nem um endereço longo), a recusa de
+bases inválidas
 (inclusive JSON fora da norma) e do sistema singular (com o posto e o teorema
 de Rouché-Capelli), os dois limites do número de condição e o posto que
 completa a regra, a conversão da base do Trabalho 1, o comportamento no
@@ -1576,7 +1825,7 @@ estavam no código ganharam um teste, para não voltarem:
 | Uma matriz singular cujo número de condição o arredondamento deixava logo abaixo de 1/ε passava pela verificação, e o `solve` terminava a opção com "Erro inesperado" (achado num teste com 6.000 matrizes singulares) | O posto completa a regra do número de condição, e um pivô zero no `solve` vira recusa, com explicação | `test_posto_menor_que_n_recusa_abaixo_de_1_sobre_eps` e `test_pivo_zero_no_solve_e_recusado` |
 | No Windows, o autoteste do `risco.py` terminava com `UnicodeEncodeError` quando a saída ia para outro programa, como no `python testes.py`: a mensagem do limite do número de condição tinha a letra grega ε, que não existe na codificação cp1252 | As mensagens escrevem "épsilon" por extenso, e os autotestes rodam com a saída em cp1252 em qualquer sistema, para o defeito aparecer também no Linux do GitHub | `test_autotestes_dos_modulos` |
 | A base de CVEs atualizada valia sempre mais que a que vem com o programa: depois de uma versão nova do programa, com uma base mais nova, o programa continuaria com a atualização antiga | Vale a mais nova das duas, pela data do catálogo | `test_vale_a_base_mais_nova` |
-| Uma CVE do catálogo (CVE-2024-20481, do Cisco ASA) ficava sem nota: o registro oficial dela tem 2,3 MB, porque lista centenas de versões afetadas, e passava do limite de 2 MB por download | O limite subiu para 10 MB | Conferido na montagem da base: as 1.741 CVEs têm nota |
+| Uma CVE do catálogo (CVE-2024-20481, do Cisco ASA) ficava sem nota: o registro oficial dela tem 2,3 MB, porque lista centenas de versões afetadas, e passava do limite de 2 MB por download | O limite subiu para 10 MB | Conferido na montagem da base: todas as CVEs têm nota |
 | Na opção 8, digitar a nota que a vulnerabilidade já tinha apagava o vetor CVSS dela | A mesma nota (e a mesma categoria) não conta como mudança, e o vetor continua | `test_atualizar_com_os_mesmos_valores_nao_muda_nada` |
 | No fim do `calcular`, o Enter em "Usar esta nota?" descartava as 11 respostas | O Enter aceita a nota | `test_calcular_a_nota_respondendo_as_perguntas` |
 | `limpar` numa pergunta do `calcular` apagava a pergunta da tela | A pergunta é desenhada de novo | `test_letra_anterior_e_cancelar_nas_perguntas` |
@@ -1587,6 +1836,7 @@ estavam no código ganharam um teste, para não voltarem:
 | Na mudança de tipo (opção 4), os textos lidos do arquivo passavam de novo pela padronização: um responsável gravado como `NOC` virava `Noc` | Os textos são copiados como estão (`copiar_dados_de`) | `test_mudar_o_tipo_mantem_o_texto_do_arquivo` |
 | Com o usuário do container trocado para o UID 10001, o programa não gravava no volume criado pela versão anterior | Um `chown` único no volume, descrito em [Em container Docker](#em-container-docker) | Conferido à mão, no container |
 | A explicação da interação "Passiva" do CVSS dava como exemplo clicar num link, que a especificação do FIRST classifica como "Ativa" | Texto corrigido pela especificação | Revisão dos textos contra a especificação |
+| No detalhe de uma correção (opção 17), a quebra de linha cortava o hostname no hífen: `DRPC-` no fim de uma linha e `RT01` no começo da outra; o `·` da avaliação SSVC podia começar uma linha; e, numa ação da CISA sem tradução, um endereço maior que a linha era partido no meio, o que estragava a cópia | A quebra não parte uma palavra, nem no hífen nem num endereço longo, e o `·` fica ligado à palavra de antes | `test_plano_na_base_de_exemplo_marca_as_cves_exploradas` e `test_acao_fora_da_tabela_aparece_em_ingles` |
 
 ## Fluxo de trabalho no Git
 
@@ -1597,7 +1847,7 @@ histórico mesmo quando não há conflito:
 
 | Prefixo | Uso | Exemplo neste repositório |
 | --- | --- | --- |
-| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves`, `feature/arvore-de-dependencias`, `feature/base-de-exemplo-completa`, `feature/encapsulamento-e-metodos-especiais` |
+| `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves`, `feature/arvore-de-dependencias`, `feature/base-de-exemplo-completa`, `feature/encapsulamento-e-metodos-especiais`, `feature/plano-de-correcao-e-cve-em-portugues` |
 | `fix/` | Correção de defeito | `fix/normas-oficiais`, `fix/barras-do-risco` |
 | `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas`, `docs/instrucoes-de-execucao`, `docs/revisao-final` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
@@ -1712,7 +1962,8 @@ mais detalhe:
 | Opção 16, item 3, ID `3` | As CVEs exploradas que combinam com a ficha do roteador da sede (Cisco, IOS XE). A primeira, CVE-2023-20198, tem `*`: já está registrada nele. Para voltar ao menu, escolha uma e responda `n` |
 | Opção 16, item 1, `remote desktop` | A busca na base de CVEs, sem internet: o BlueKeep em primeiro |
 | Opção 12, ID `28`, e Enter | As duas árvores do `PERICIA-PC01`: quem depende dele e do que ele depende, com as frações. O Enter no fim não remove nada |
-| `python testes.py` e a aba Actions do GitHub | Os 100 testes e a verificação automática a cada push |
+| Opção 17, depois do passo 6; depois `29` e Enter | O plano de correção: na frente, as duas falhas de nota 7,5 do roteador da sede (164,12 cada; juntas, 24,7% do risco total de 1330,42), porque 73 equipamentos herdam risco dele; o BlueKeep, de nota 9,8, só em 29º, na `DPLAN-PC02` (9,80), porque ninguém herda risco dela. O `29` mostra a conta, a CVE explicada em português e o que a CISA manda fazer |
+| `python testes.py` e a aba Actions do GitHub | Os 115 testes e a verificação automática a cada push |
 
 Para as perguntas sobre o código, a tabela de
 [Requisitos do Trabalho 2](#requisitos-do-trabalho-2) diz onde está cada

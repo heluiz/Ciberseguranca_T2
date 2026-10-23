@@ -8,6 +8,7 @@ modelo de risco) e cuida de alinhamento, cores e números com vírgula.
 import textwrap
 
 import cores
+import explicacao_cve
 import formatacao
 from arvore import QUEM_DEPENDE
 from base_cve import nome_curto
@@ -242,7 +243,12 @@ def mostrar_registros_cve(registros, inicio, marcadas=()):
 
 
 def mostrar_registro_cve(registro):
-    """Mostra uma CVE da base com tudo o que ela tem."""
+    """Mostra uma CVE da base com tudo o que ela tem.
+
+    Depois dos dados vêm a explicação em português, montada a partir
+    deles (explicacao_cve.py), e o que fazer, segundo a CISA. A
+    descrição oficial, em inglês, fica por último.
+    """
     print(f"\n  {cores.titulo(registro.cve)} - {registro.nome}")
     print(f"  Fabricante .... {registro.fabricante}")
     print(f"  Produto ....... {registro.produto}")
@@ -260,17 +266,64 @@ def mostrar_registro_cve(registro):
         print(f"  Nota CVSS ..... {cores.gravidade(nota, nivel)}"
               + cores.discreto(f" (dada {fonte})"))
         print(f"  Vetor CVSS .... {registro.vetor}")
-    cwes = ", ".join(registro.cwes) or cores.discreto("não informado")
-    print(f"  CWE ........... {cwes}")
+    if not registro.cwes:
+        print(f"  CWE ........... {cores.discreto('não informado')}")
+    for posicao, cwe in enumerate(registro.cwes):
+        rotulo = "CWE ..........." if posicao == 0 else " " * 15
+        print(f"  {rotulo} {explicacao_cve.cwe_com_nome(cwe)}")
     print(f"  No catálogo ... desde "
-          f"{formatacao.data_br(registro.adicionada)}")
+          f"{formatacao.data_br(registro.adicionada)}; prazo da CISA "
+          f"(EUA): {formatacao.data_br(registro.prazo)}")
     if registro.ransomware:
         print("  " + cores.aviso("Usada em campanhas de ransomware, segundo "
                                  "a CISA."))
-    print()
-    _paragrafo(registro.descricao, "  ", LARGURA_EXPLICACAO + 4)
-    print("  " + cores.discreto("(Descrição em inglês, como no catálogo "
-                                "oficial.)"))
+    _explicacao_em_portugues(registro.vetor, registro.ssvc)
+    _como_corrigir(registro)
+    print("\n  " + cores.discreto("Descrição oficial, em inglês:"))
+    _paragrafo(registro.descricao, "    ")
+
+
+def _explicacao_em_portugues(vetor, ssvc):
+    """Imprime como se ataca e o que se perde (do vetor) e o SSVC."""
+    linhas = explicacao_cve.explicar_vetor(vetor) if vetor else []
+    if ssvc is not None:
+        # O "·" fica grudado na palavra de antes: a linha nunca começa
+        # com ele.
+        texto = explicacao_cve.ssvc_em_portugues(ssvc).replace(
+            " · ", _JUNTO + "· ")
+        linhas.append(("Avaliação da CISA (SSVC)", texto + "."))
+    if not linhas:
+        return
+    print("\n  " + cores.titulo("Em português")
+          + cores.discreto(" (montado a partir dos dados)"))
+    for rotulo, frase in linhas:
+        _paragrafo(f"{rotulo}: {frase}", "    ")
+    if ssvc is not None:
+        _paragrafo(explicacao_cve.LEGENDA_SSVC, "    ",
+                   pintar=cores.discreto)
+
+
+def _como_corrigir(registro):
+    """Imprime a ação que a CISA exige, em português, e os links."""
+    if registro.acao is None and not registro.links:
+        return
+    print("\n  " + cores.titulo("O que fazer, segundo a CISA"))
+    if registro.acao is not None:
+        texto, traduzido = explicacao_cve.acao_em_portugues(registro.acao)
+        _paragrafo(texto, "    ")
+        if not traduzido:
+            print("    " + cores.discreto("(texto da CISA, em inglês: ele "
+                                          "não está na tabela de "
+                                          "traduções)"))
+    boletins, nvd = explicacao_cve.separar_links(registro.links)
+    if boletins:
+        print("    Boletins e orientações indicados pela CISA:")
+        for link in boletins:
+            print(f"      {link}")
+    if nvd:
+        print("    Na NVD (referências e versões afetadas):")
+        for link in nvd:
+            print(f"      {link}")
 
 
 def mostrar_nomes_numerados(itens, inicio):
@@ -580,6 +633,93 @@ def mostrar_relatorio_risco(itens, residuo):
     print("  Para ver como um deles foi calculado, use a opção 14.")
 
 
+def mostrar_plano_de_correcao(plano, total, exploradas):
+    """Mostra as correções, da que mais reduz o risco total.
+
+    plano é o que ModeloRisco.plano_de_correcao() devolve; total, o
+    risco total (a soma dos riscos efetivos); exploradas, as CVEs do
+    plano que estão na base de CVEs exploradas, marcadas na coluna KEV.
+    O acumulado é exato: o modelo é linear, e as quedas se somam.
+    """
+    print(f"\n  Risco total da rede (soma dos riscos efetivos): "
+          f"{numero_br(total, 2)}")
+    linhas, acumulado = [], 0.0
+    for numero, item in enumerate(plano, 1):
+        acumulado += item.reducao
+        vuln = item.vulnerabilidade
+        linhas.append((str(numero), numero_br(item.reducao, 2),
+                       numero_br(100 * acumulado / total, 1) + "%",
+                       f"[{vuln.id}] {vuln.descricao}", numero_br(vuln.cvss),
+                       "sim" if vuln.cve in exploradas else "",
+                       f"[{item.equipamento.id}] {item.equipamento.hostname}"))
+    imprimir_tabela(
+        ("#", "REDUZ", "ACUMULADO", "VULNERABILIDADE", "CVSS", "KEV",
+         "EQUIPAMENTO"),
+        (3, 8, 9, 40, 4, 3, 24),
+        (True, True, True, False, True, False, False), linhas)
+    print("\n  " + cores.discreto(
+        "REDUZ = quanto o risco total cai com a correção · ACUMULADO = a "
+        "queda das correções até ela"))
+    print("  " + cores.discreto(
+        "KEV = CVE explorada em ataques, segundo a base de CVEs exploradas"))
+    print("  " + cores.discreto(
+        "A conta: REDUZ = w x F x v, com o peso w de (I - A)^T w = 1, o "
+        "fator F do tipo e a nota v"))
+
+
+def mostrar_correcao(numero, item, total, herdeiros, registro):
+    """Mostra uma correção do plano: por que ela reduz e como fazer.
+
+    herdeiros são os ids dos equipamentos que herdam risco do
+    equipamento (ModeloRisco.herdam_de); registro, o RegistroCVE da
+    vulnerabilidade na base de CVEs exploradas, ou None.
+    """
+    equipamento, vuln = item.equipamento, item.vulnerabilidade
+    situacao = equipamento.vulnerabilidades[vuln.id]
+    print(f"\n  {cores.titulo(f'Correção {numero}')}: [{vuln.id}] "
+          f"{vuln.descricao}")
+    print(f"  Equipamento ... {equipamento}")
+    print(f"  Status ........ {cores.situacao(situacao.rotulo, situacao)}")
+    print(f"  Nota CVSS ..... {numero_br(vuln.cvss)} "
+          f"({vuln.gravidade.rotulo})")
+    if vuln.cve is not None:
+        print(f"  CVE ........... {vuln.cve}")
+    if vuln.cwe is not None:
+        print(f"  CWE ........... {explicacao_cve.cwe_com_nome(vuln.cwe)}")
+
+    if not herdeiros:
+        motivo = "porque nenhum equipamento herda risco dele"
+    elif len(herdeiros) == 1:
+        motivo = "porque 1 equipamento herda risco dele"
+    else:
+        motivo = (f"porque {len(herdeiros)} equipamentos herdam risco dele, "
+                  f"direta ou indiretamente")
+    print()
+    _paragrafo(
+        f"Reduz o risco total em {numero_br(item.reducao, 2)} "
+        f"({numero_br(100 * item.reducao / total, 1)}% de "
+        f"{numero_br(total, 2)}). O risco próprio de {equipamento.hostname} "
+        f"cai {numero_br(item.fator)} x {numero_br(vuln.cvss)} = "
+        f"{numero_br(item.fator * vuln.cvss, 2)}, e cada ponto de risco "
+        f"próprio nele pesa {numero_br(item.peso, 2)} no risco total, "
+        f"{motivo}.", "  ", LARGURA_EXPLICACAO + 4)
+
+    vetor = vuln.vetor or (registro.vetor if registro else None)
+    _explicacao_em_portugues(vetor, registro.ssvc if registro else None)
+    if registro is not None:
+        _como_corrigir(registro)
+        return
+    if vuln.cve is not None:
+        aviso = (f"A {vuln.cve} não está na base de CVEs exploradas: não há "
+                 f"ação nem boletim indicados pela CISA. Procure o boletim "
+                 f"do fabricante.")
+    else:
+        aviso = ("Sem CVE, não há boletim oficial: a correção depende do "
+                 "caso, como trocar uma senha ou mudar uma configuração.")
+    print()
+    _paragrafo(aviso, "  ", LARGURA_EXPLICACAO + 4, cores.discreto)
+
+
 def mostrar_detalhe_risco(item, vulnerabilidades, parcelas):
     """Mostra como o risco de um equipamento foi calculado.
 
@@ -638,9 +778,14 @@ def _paragrafo(texto, recuo, largura=LARGURA_EXPLICACAO, pintar=None):
     """Imprime o texto quebrado em linhas, todas com o mesmo recuo.
 
     pintar, se dado, é a função de cores.py aplicada a cada linha (a
-    quebra é feita antes, sobre o texto puro).
+    quebra é feita antes, sobre o texto puro). A quebra nunca parte uma
+    palavra: nem no hífen, como um hostname (DRPC-RT01) ou uma CVE, nem
+    um endereço maior que a linha, que fica inteiro para ser copiado. E
+    não separa o que está ligado por _JUNTO.
     """
-    for linha in textwrap.wrap(texto, largura):
+    for linha in textwrap.wrap(texto, largura, break_on_hyphens=False,
+                               break_long_words=False):
+        linha = linha.replace(_JUNTO, " ")
         print(f"{recuo}{pintar(linha) if pintar else linha}")
 
 

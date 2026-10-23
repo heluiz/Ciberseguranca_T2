@@ -3,9 +3,11 @@
 A base vem do catálogo KEV (Known Exploited Vulnerabilities) da CISA,
 a agência de cibersegurança dos Estados Unidos: as CVEs que ela
 confirmou exploradas de verdade, com fabricante, produto, nome,
-descrição, CWE e a data em que entraram no catálogo. O KEV não traz a
-nota CVSS: ela e o vetor (e o CWE, quando o KEV não tem) vêm do
-registro oficial de cada CVE, publicado pelo CVE Program.
+descrição, CWE, a data em que entraram no catálogo, a ação que a CISA
+exige e os links das notas (o boletim e a NVD). O KEV não traz a nota
+CVSS: ela e o vetor (e o CWE, quando o KEV não tem) vêm do registro
+oficial de cada CVE, publicado pelo CVE Program, de onde vem também a
+avaliação SSVC da CISA.
 
 São dois arquivos:
 
@@ -54,15 +56,40 @@ FONTE = ("Catálogo KEV da CISA (CC0 1.0) e registros do CVE Program "
 # em campanha de ransomware. cvss, vetor e fonte_nota podem ser None:
 # fonte_nota diz quem deu a nota, o CNA (quem publicou a CVE, em geral
 # o fabricante) ou um ADP, como a CISA, que completa os registros.
+# acao é a ação que a CISA exige, em inglês (ou None); links, uma tupla
+# com os endereços HTTPS das notas do catálogo; ssvc, a avaliação SSVC
+# do registro oficial (ou None). Os três vieram depois: um arquivo sem
+# eles continua valendo, com os valores padrão.
 RegistroCVE = namedtuple(
     "RegistroCVE",
     "cve fabricante produto nome descricao cwes adicionada prazo "
-    "ransomware cvss vetor fonte_nota")
+    "ransomware cvss vetor fonte_nota acao links ssvc",
+    defaults=(None, (), None))
+CAMPOS_NOVOS = frozenset({"acao", "links", "ssvc"})
+
+# A avaliação SSVC (Stakeholder-Specific Vulnerability Categorization)
+# que a CISA põe no registro oficial da CVE: se a falha é explorada
+# (none, poc ou active), se o ataque pode ser automatizado (no ou yes)
+# e o controle que o atacante ganha (partial ou total). Os valores são
+# os do registro, em inglês; a tradução fica em explicacao_cve.py.
+Ssvc = namedtuple("Ssvc", "exploracao automatizavel impacto")
+VALORES_SSVC = {"exploracao": ("none", "poc", "active"),
+                "automatizavel": ("no", "yes"),
+                "impacto": ("partial", "total")}
 
 # Tamanho máximo de cada texto, em caracteres: uns três vezes o maior
 # do catálogo.
 TAMANHOS = {"fabricante": 100, "produto": 300, "nome": 300,
-            "descricao": 2000, "fonte_nota": 40}
+            "descricao": 2000, "fonte_nota": 40, "acao": 3000,
+            "link": 500}
+# Links por CVE: o catálogo chega a uns cinco.
+MAXIMO_DE_LINKS = 10
+# Um link aceito: HTTPS, com só os caracteres que um endereço pode ter
+# (RFC 3986). Espaço, aspas, sinais de menor e maior e caracteres de
+# controle ficam de fora: o link só é mostrado, nunca aberto, mas um
+# caractere de controle poderia mexer no terminal.
+_LINK = re.compile(r"https://[A-Za-z0-9.-]+(:[0-9]{1,5})?"
+                   r"([/?#][A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]*)?")
 
 # Caracteres do catálogo trocados por equivalentes simples: hífens e
 # espaços especiais, que a codificação do Windows (cp1252) não tem, e o
@@ -164,6 +191,41 @@ def conferir_cwes(lista, campo):
     return tuple(achados)
 
 
+def conferir_link(valor, campo):
+    """Confere um link: HTTPS, até TAMANHOS["link"] caracteres."""
+    if (not isinstance(valor, str) or len(valor) > TAMANHOS["link"]
+            or not _LINK.fullmatch(valor)):
+        raise ValueError(f"{campo}: o link deveria ser um endereço HTTPS "
+                         f"sem espaços, veio {valor!r}")
+    return valor
+
+
+def conferir_links(lista, campo):
+    """Os links da lista, conferidos e sem repetir, numa tupla."""
+    validacao.exigir_lista(lista, campo)
+    if len(lista) > MAXIMO_DE_LINKS:
+        raise ValueError(f"{campo}: mais de {MAXIMO_DE_LINKS} links")
+    links = tuple(conferir_link(link, campo) for link in lista)
+    if len(set(links)) != len(links):
+        raise ValueError(f"{campo}: link repetido")
+    return links
+
+
+def conferir_ssvc(dados, campo):
+    """Confere a avaliação SSVC lida e devolve o Ssvc (ou None)."""
+    if dados is None:
+        return None
+    validacao.exigir_objeto(dados, campo)
+    if set(dados) != set(VALORES_SSVC):
+        raise ValueError(f"{campo}: os campos deveriam ser "
+                         f"{', '.join(VALORES_SSVC)}")
+    for chave, validos in VALORES_SSVC.items():
+        if dados[chave] not in validos:
+            raise ValueError(f"{campo}: {chave} deveria ser "
+                             f"{' ou '.join(validos)}, veio {dados[chave]!r}")
+    return Ssvc(**dados)
+
+
 def _nota(cvss, vetor, fonte, campo):
     """Confere a nota, o vetor e quem deu a nota; devolve os três.
 
@@ -187,7 +249,8 @@ def _nota(cvss, vetor, fonte, campo):
 def _registro_de_dict(dados, campo):
     """Confere uma CVE lida do arquivo e devolve o RegistroCVE."""
     validacao.exigir_objeto(dados, campo)
-    if set(dados) != set(RegistroCVE._fields):
+    todos = set(RegistroCVE._fields)
+    if not todos - CAMPOS_NOVOS <= set(dados) <= todos:
         raise ValueError(f"{campo}: os campos deveriam ser "
                          f"{', '.join(RegistroCVE._fields)}")
     cve = validar_cve(dados["cve"])
@@ -206,7 +269,11 @@ def _registro_de_dict(dados, campo):
         adicionada=conferir_data(dados["adicionada"], f"{campo}: adicionada"),
         prazo=conferir_data(dados["prazo"], f"{campo}: prazo"),
         ransomware=dados["ransomware"],
-        cvss=nota, vetor=vetor, fonte_nota=fonte)
+        cvss=nota, vetor=vetor, fonte_nota=fonte,
+        acao=conferir_texto(dados.get("acao"), "acao", campo,
+                            obrigatorio=False),
+        links=conferir_links(dados.get("links", []), f"{campo}: links"),
+        ssvc=conferir_ssvc(dados.get("ssvc"), f"{campo}: ssvc"))
 
 
 def _recusar_constante(nome):
@@ -397,7 +464,9 @@ class BaseCVE:
         for nome, valor in cabecalho.items():
             linhas.append(f"  {json.dumps(nome)}: "
                           f"{json.dumps(valor, ensure_ascii=False)},")
-        cves = [json.dumps(dict(r._asdict(), cwes=list(r.cwes)),
+        cves = [json.dumps(dict(r._asdict(), cwes=list(r.cwes),
+                                links=list(r.links),
+                                ssvc=r.ssvc._asdict() if r.ssvc else None),
                            ensure_ascii=False, allow_nan=False)
                 for r in sorted(self.registros.values(),
                                 key=_numero_da_cve)]
@@ -546,7 +615,13 @@ if __name__ == "__main__":
         registro_de_teste("CVE-2019-0708", "Microsoft",
                           "Remote Desktop Services",
                           "Microsoft Remote Desktop Services Remote Code "
-                          "Execution Vulnerability", "2021-11-03", 9.8),
+                          "Execution Vulnerability", "2021-11-03",
+                          9.8)._replace(
+            acao="Apply updates per vendor instructions.",
+            links=("https://msrc.microsoft.com/update-guide/vulnerability/"
+                   "CVE-2019-0708",
+                   "https://nvd.nist.gov/vuln/detail/CVE-2019-0708"),
+            ssvc=Ssvc("active", "yes", "total")),
         registro_de_teste("CVE-2024-21762", "Fortinet", "FortiOS",
                           "Fortinet FortiOS Out-of-Bound Write "
                           "Vulnerability", "2024-02-09", 9.8),
@@ -616,21 +691,49 @@ if __name__ == "__main__":
         print("Arquivo: ida e volta igual; atualizada ruim ou mais velha, "
               "vale a inicial.")
 
-    # --- o que a leitura recusa ---------------------------------------
+    # --- campos novos: ação, links e SSVC -----------------------------
     texto_bom = base.para_texto()
-    for estrago, motivo in (
-            (texto_bom.replace('"cvss": 9.8', '"cvss": NaN', 1), "NaN"),
-            (texto_bom.replace('"quantas": 3', '"quantas": 4'), "quantas"),
-            (texto_bom.replace('"cvss": 9.8', '"cvss": 7.0', 1), "vetor"),
-            (texto_bom.replace("CVE-2019-0708", "CVE-19-708"), "CVE"),
-            (texto_bom.replace('"fonte"', '"fonte": 1, "fonte"'), "duas")):
+    lida = BaseCVE.de_texto(texto_bom)
+    assert lida.registros == base.registros
+    bluekeep_teste = lida.buscar_cve("CVE-2019-0708")
+    assert bluekeep_teste.ssvc == Ssvc("active", "yes", "total")
+    assert len(bluekeep_teste.links) == 2
+    # Um arquivo de antes, sem os três campos, continua valendo.
+    antigo = json.loads(texto_bom)
+    for item in antigo["cves"]:
+        for chave in CAMPOS_NOVOS:
+            del item[chave]
+    sem_campos = BaseCVE.de_texto(json.dumps(antigo))
+    rdp_antigo = sem_campos.buscar_cve("CVE-2019-0708")
+    assert (rdp_antigo.acao, rdp_antigo.links, rdp_antigo.ssvc) == (
+        None, (), None)
+    print("Ação, links e SSVC: ida e volta iguais; arquivo sem eles, aceito.")
+
+    # --- o que a leitura recusa ---------------------------------------
+    estragos = (
+        (texto_bom.replace('"cvss": 9.8', '"cvss": NaN', 1), "NaN"),
+        (texto_bom.replace('"quantas": 3', '"quantas": 4'), "quantas"),
+        (texto_bom.replace('"cvss": 9.8', '"cvss": 7.0', 1), "vetor"),
+        (texto_bom.replace("CVE-2019-0708", "CVE-19-708"), "CVE"),
+        (texto_bom.replace('"fonte"', '"fonte": 1, "fonte"'), "duas"),
+        (texto_bom.replace("https://msrc", "http://msrc"), "sem HTTPS"),
+        (texto_bom.replace("/CVE-2019-0708\", \"https://nvd",
+                           "/CVE 2019\", \"https://nvd"), "espaço"),
+        (texto_bom.replace('"active"', '"talvez"'), "SSVC"),
+        (texto_bom.replace('"ssvc": {', '"ssvc": {"extra": 1, ', 1),
+         "SSVC a mais"),
+        (texto_bom.replace('"ransomware"', '"campo_novo": 1, "ransomware"',
+                           1), "campo desconhecido"))
+    for estrago, motivo in estragos:
+        assert estrago != texto_bom, motivo
         try:
             BaseCVE.de_texto(estrago)
             raise AssertionError(f"aceitou base com {motivo}")
         except ValueError:
             pass
     print("Recusados: NaN, contagem errada, nota contra o vetor, CVE fora "
-          "do formato e nome repetido.")
+          "do formato, nome repetido, link sem HTTPS ou com espaço, SSVC "
+          "fora dos valores e campo desconhecido.")
 
     # --- a base que vem com o programa --------------------------------
     real, aviso = BaseCVE.carregar(os.path.join(tempfile.gettempdir(),
