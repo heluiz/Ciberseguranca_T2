@@ -276,74 +276,268 @@ docker run --rm --user root -v inventario-dados:/app/dados inventario:1.0 chown 
 ### No servidor do docente
 
 O requisito 3 pede o container funcionando por no mínimo 24 horas num servidor
-disponibilizado pelo docente. O caminho mais comum é entrar no servidor por
-SSH e rodar lá os mesmos comandos do Docker. O servidor precisa ter o Docker,
-o Git e acesso à internet, para construir a imagem, e o seu usuário precisa
-ter permissão para usar o Docker. O endereço e o usuário vêm do docente.
+disponibilizado pelo docente. O servidor é um Linux compartilhado pela turma:
+cada aluno tem um usuário próprio, com `sudo`, e entra por SSH para rodar lá os
+mesmos comandos do Docker. O docente informa o endereço, o usuário e a senha
+inicial. O endereço é da rede interna da universidade: só dá para entrar de
+dentro dela, no campus, ou por uma VPN que chegue até ela.
 
-**1. Entrar no servidor e conferir o Docker.**
+Os comandos abaixo usam `usuario` e `endereco-do-servidor` no lugar dos dados
+reais, que ficam fora deste repositório público, e o sufixo `heluiz` nos nomes
+da imagem, do container e do volume. Quem repetir os passos troca o sufixo pelo
+próprio nome: num servidor compartilhado, nomes iguais aos de um colega dão
+conflito ou misturam os dados dos dois.
+
+**Antes de começar.**
+
+- Leve para o servidor a versão final, já na `main` do GitHub e com a
+  verificação automática verde: mudar o código depois obriga a recriar o
+  container, e a contagem das 24 horas recomeça.
+- Ligue o container com folga antes do prazo de entrega, para dar tempo de
+  recomeçar se algo zerar a contagem.
+- Como só dá para entrar no servidor de dentro da rede da universidade, um
+  jeito prático é ligar o container num dia de aula e juntar as provas no dia
+  seguinte, mais de 24 horas depois. O registro de hora em hora do passo 9 é
+  feito pelo próprio servidor, sem ninguém conectado.
+
+**1. Primeiro acesso e troca da senha.** No PowerShell (no Linux e no macOS, no
+terminal):
 
 ```
 ssh usuario@endereco-do-servidor
-docker version
 ```
 
-Se o `docker version` responder `permission denied`, o seu usuário não está
-no grupo `docker`: use `sudo` antes de cada comando `docker` ou peça ao
-docente para incluí-lo.
+Na primeira conexão, o SSH mostra a impressão digital (*fingerprint*) da chave
+do servidor e pergunta se deve confiar nela; se o docente tiver divulgado a
+impressão digital, compare as duas antes de responder `yes`. A senha não
+aparece enquanto é digitada. Já no servidor, troque a senha inicial e saia:
 
-**2. Baixar o código e construir a imagem.**
+```
+passwd
+exit
+```
+
+A senha nova vale para entrar e para o `sudo`. Num servidor em que os usuários
+têm `sudo`, quem descobre a senha de alguém administra a máquina em nome dele.
+
+**2. Chave SSH e atalho, no seu computador.** Com a chave, o SSH entra sem
+pedir senha, e o `docker context` (no fim desta seção) passa a funcionar,
+porque ele não aceita senha. No PowerShell, veja primeiro se você já tem uma
+chave:
+
+```
+Test-Path $env:USERPROFILE\.ssh\id_ed25519.pub
+```
+
+Se a resposta for `True`, use a chave que já existe e pule o `ssh-keygen`:
+gerar outra por cima apaga a atual, e o que dependia dela (o acesso ao GitHub
+por SSH, por exemplo) para de funcionar. Se for `False`, crie a chave; o Enter
+aceita o lugar padrão, e a frase-senha é opcional (com ela, o SSH a pede a cada
+conexão):
+
+```
+ssh-keygen -t ed25519 -C "seu-email"
+```
+
+Copie a parte pública da chave para o servidor. É a última vez que a senha é
+pedida:
+
+```
+type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh usuario@endereco-do-servidor "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+```
+
+Por fim, crie o atalho `ufu` no arquivo de configuração do SSH. Troque o
+endereço e o usuário e cole o bloco inteiro no PowerShell:
+
+```
+@'
+Host ufu
+    HostName endereco-do-servidor
+    User usuario
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    ServerAliveInterval 60
+'@ | Add-Content $env:USERPROFILE\.ssh\config
+```
+
+O arquivo se chama só `config`, sem extensão; pelo Bloco de Notas, é fácil ele
+virar `config.txt`, que o SSH não lê. `IdentitiesOnly yes` faz o SSH oferecer
+só essa chave (o servidor recusa a conexão depois de algumas chaves erradas), e
+`ServerAliveInterval 60` mantém a conexão viva quando ela fica parada, como no
+`docker attach`. Confira: `ssh ufu` tem de entrar sem pedir senha. Daqui em
+diante, os comandos usam o atalho.
+
+No Linux e no macOS, os passos são os mesmos, com o `ssh-copy-id` no lugar do
+`type ... | ssh ...` (`ssh-copy-id usuario@endereco-do-servidor`) e o bloco
+`Host ufu` no arquivo `~/.ssh/config`.
+
+**3. Conhecer o servidor.** Entre com `ssh ufu` e confira o que ele tem:
+
+```
+whoami; hostname; uname -m        # usuário, nome e processador
+sudo -l                           # "(ALL : ALL) ALL": você tem sudo
+git --version
+docker version                    # tem de mostrar Client e Server
+systemctl is-enabled docker       # "enabled": o Docker liga com o servidor
+groups                            # o grupo docker tem de aparecer
+df -h ~ /var/lib/docker           # espaço livre; a imagem ocupa uns 250 MB
+docker ps -a                      # containers que já existem no servidor
+git ls-remote https://github.com/heluiz/Ciberseguranca_T2.git HEAD
+```
+
+- Se o `docker version` responder `permission denied`, falta o grupo `docker`.
+  Com o `sudo`, inclua o seu usuário nele e entre de novo:
+  `sudo usermod -aG docker $USER`, depois `exit` e `ssh ufu`. O grupo `docker`
+  dá, na prática, poder de administrador; aqui, quem já tem `sudo` não ganha
+  nada além do que já tinha.
+- Se faltar o `docker` ou o `git`, combine com o docente antes de instalar: o
+  servidor é de todos.
+- O `git ls-remote` tem de mostrar um código e a palavra `HEAD` (o commit mais
+  recente da `main`). Se ele terminar em erro, o servidor não sai para a
+  internet: veja *Servidor sem acesso à internet*, no fim desta seção.
+
+**4. Baixar o código e construir a imagem.**
 
 ```
 git clone https://github.com/heluiz/Ciberseguranca_T2.git
 cd Ciberseguranca_T2
-docker build -t inventario:1.0 .
-docker volume create inventario-dados
+git log -1 --oneline
+docker build -t inventario-heluiz:1.0 .
+docker volume create inventario-heluiz-dados
 ```
 
-Se o repositório estiver privado, o `git clone` pede login: no lugar da senha,
-use um token de acesso pessoal do GitHub.
+O `git log` mostra o commit que vai rodar; anote-o, porque ele identifica a
+versão avaliada. Se a pasta já existir, de uma tentativa anterior, entre nela e
+use `git pull` no lugar do `git clone`. Se o repositório estiver privado, o
+`git clone` pede login: no lugar da senha, use um token de acesso pessoal do
+GitHub, sem gravá-lo no servidor.
 
-**3. Pôr a base de exemplo, se quiser, antes de ligar o container.**
-
-```
-docker create --name semente -v inventario-dados:/app/dados inventario:1.0
-docker cp dados_exemplo/inventario_exemplo.json semente:/app/dados/inventario.json
-docker rm semente
-```
-
-**4. Ligar o container.**
+**5. Pôr a base de exemplo, antes de ligar o container.** No servidor, use só a
+base de exemplo, que é fictícia: lá, os outros usuários com `sudo` também
+alcançam o container e os dados (veja [Segurança e LGPD](#segurança-e-lgpd)).
 
 ```
-docker run -dit --name inventario --restart unless-stopped \
+docker create --name semente-heluiz -v inventario-heluiz-dados:/app/dados inventario-heluiz:1.0
+docker cp dados_exemplo/inventario_exemplo.json semente-heluiz:/app/dados/inventario.json
+docker rm semente-heluiz
+```
+
+**6. Ligar o container.**
+
+```
+docker run -dit --name inventario-heluiz --restart unless-stopped \
   --read-only --security-opt no-new-privileges \
-  -v inventario-dados:/app/dados inventario:1.0
+  -v inventario-heluiz-dados:/app/dados inventario-heluiz:1.0
 ```
 
-**5. Conferir e sair.** O `docker ps` mostra `Up` e, depois de um minuto,
-`(healthy)`. Para usar o menu, `docker attach inventario` e Enter; para sair
-dele sem parar o programa, Ctrl+P e depois Ctrl+Q. Depois, `exit` fecha a
-conexão SSH, e o container continua rodando no servidor.
+As opções são as de [Em container Docker](#em-container-docker). O programa
+não abre nenhuma porta de rede, por isso não há nada a liberar no firewall.
 
-Durante as 24 horas:
+**7. Conferir e sair.**
 
-- **Não mexa no container.** `docker restart`, `docker stop` e `docker start`,
-  a troca da imagem e um `sair` confirmado no menu fazem a contagem recomeçar.
-  Por isso a base de exemplo entra antes do `docker run` (passo 3), e a versão
-  do programa fica congelada: atualizá-la exige recriar o container. Um
-  reinício do próprio servidor também zera a contagem, embora o Docker religue
-  o container sozinho.
-- **Servidor compartilhado.** Se outros alunos usam o mesmo servidor, troque
-  os nomes da imagem, do container e do volume por nomes seus em todos os
-  comandos, por exemplo `inventario-heluiz:1.0`, `inventario-heluiz` e
-  `inventario-heluiz-dados`. Com os mesmos nomes, o `docker run` de um aluno
-  dá conflito com o do outro, o `docker build` de um troca a imagem do outro,
-  e dois containers com o mesmo volume misturam os dados. O `compose.yaml` usa
-  nomes fixos; nesse caso, use o `docker run`.
-- **Para comprovar o tempo no ar**, o `docker ps` mostra `Up 24 hours` (ou
-  mais), `docker inspect -f '{{.State.StartedAt}}' inventario` mostra quando o
-  programa ligou e `docker inspect -f '{{.RestartCount}}' inventario` mostra
-  quantas vezes o Docker precisou religá-lo.
+```
+docker ps --filter name=inventario-heluiz
+```
+
+O `STATUS` mostra `Up` e, depois de um minuto, `(healthy)`. Para ver o menu,
+`docker attach inventario-heluiz` e Enter; para sair dele sem parar o programa,
+Ctrl+P e depois Ctrl+Q, no PowerShell ou no Windows Terminal (no terminal do VS
+Code, o Ctrl+P não chega ao Docker). Por fim, `exit` fecha a conexão, e o
+container continua rodando. O `docker attach` não é preciso para provar as 24
+horas: o `docker ps` e o `docker inspect` bastam.
+
+**8. Durante as 24 horas, não mexer no container.** A contagem recomeça com
+`docker restart`, `docker stop` e `docker start`; com um `sair` confirmado no
+menu, ou a opção 0; com a recriação do container (`docker rm` e outro
+`docker run`, que é o jeito de trocar a imagem); e com um reinício do servidor,
+embora o Docker religue o container sozinho. Construir a imagem de novo não
+afeta o container que está rodando, que continua com a imagem com que foi
+criado. Na apresentação, se for mostrar o container do servidor, entre com
+`docker attach` e saia com Ctrl+P e Ctrl+Q, nunca pela opção 0.
+
+**9. Guardar as provas.** Do seu computador, sem entrar no servidor, este
+comando mostra o estado do container e o acrescenta a um arquivo:
+
+```
+ssh ufu "date; docker ps --filter name=inventario-heluiz; docker inspect -f 'Ligado em {{.State.StartedAt}} (UTC) | religado {{.RestartCount}} vez(es) | {{.State.Health.Status}}' inventario-heluiz" | Tee-Object -Append -FilePath $HOME\evidencias_24h.txt
+```
+
+No Linux e no macOS, troque o fim por `| tee -a ~/evidencias_24h.txt`. Rode o
+comando logo depois de ligar o container e de novo depois de 24 horas. Na
+segunda vez, o `docker ps` tem de mostrar `Up 24 hours` ou mais, o horário de
+ligação tem de ser o mesmo da primeira e o religamento tem de continuar em 0. O
+horário do `docker inspect` está em UTC, três horas à frente do de Brasília. Um
+print da tela com o `docker ps` também serve de prova.
+
+Para ter ainda um registro de hora em hora, feito pelo próprio servidor, sem
+ninguém conectado, agende a conferência no `cron` do seu usuário, colando o
+bloco inteiro no servidor:
+
+```
+(crontab -l 2>/dev/null; cat <<'EOF'
+0 * * * * echo "$(date -Is) $(docker ps -a --filter name=inventario-heluiz --format '{{.Status}}' 2>&1)" >> $HOME/uptime_inventario.log
+EOF
+) | crontab -
+crontab -l
+```
+
+A cada hora cheia, o arquivo `uptime_inventario.log` ganha uma linha como
+`2026-11-20T15:00:01-03:00 Up 5 hours (healthy)`. Do seu computador,
+`ssh ufu cat uptime_inventario.log` mostra o registro, e
+`scp ufu:uptime_inventario.log .` traz uma cópia.
+
+**10. Cuidados num servidor compartilhado.**
+
+- **Não reinicie o servidor**, nem para testar o religamento: isso derruba o
+  container de todos e zera a contagem deles. Para ver o
+  `--restart unless-stopped` funcionando, reinicie o Docker Desktop no seu
+  computador e confira com `docker ps` que o container voltou sozinho.
+- **Não mexa no firewall (`ufw`), nos serviços (`systemctl`) nem na
+  configuração do SSH ou do Docker**: um erro ali pode deixar a turma inteira,
+  você inclusive, sem acesso.
+- **Nunca rode `docker system prune`, `docker image prune` ou
+  `docker volume prune`.** Eles agem sobre o Docker do servidor inteiro e
+  apagam o que estiver parado ou sem uso, seja de quem for. Apague só o que é
+  seu, pelo nome.
+- **Não use o `compose.yaml` no servidor**: ele usa nomes fixos (`inventario` e
+  `inventario-dados`), que podem ser os de um colega.
+- **Não deixe senhas nem tokens em arquivos do servidor**, nem pelo
+  `git config credential.helper store`: quem tem `sudo` lê qualquer arquivo.
+- **Não instale nem atualize pacotes do sistema** sem combinar com o docente.
+
+**11. Atualizar o programa**, só depois das 24 horas ou se a contagem já tiver
+sido perdida. Uma etiqueta nova a cada versão evita imagens sem nome ocupando
+espaço:
+
+```
+cd ~/Ciberseguranca_T2
+git pull
+docker build -t inventario-heluiz:1.1 .
+docker rm -f inventario-heluiz
+docker run -dit --name inventario-heluiz --restart unless-stopped \
+  --read-only --security-opt no-new-privileges \
+  -v inventario-heluiz-dados:/app/dados inventario-heluiz:1.1
+docker rmi inventario-heluiz:1.0
+```
+
+Os dados continuam no volume, e a contagem das 24 horas recomeça.
+
+**12. Depois da avaliação**, quando o docente não precisar mais do container,
+guarde uma cópia dos dados e libere o espaço do servidor:
+
+```
+docker cp inventario-heluiz:/app/dados/inventario.json ~/inventario_servidor.json
+docker rm -f inventario-heluiz
+docker rmi inventario-heluiz:1.0
+docker volume rm inventario-heluiz-dados
+crontab -r
+```
+
+O `docker rmi` vai com a etiqueta em uso (`docker image ls inventario-heluiz`
+mostra qual é), e o `crontab -r` apaga o agendamento do passo 9. Do seu
+computador, `scp ufu:inventario_servidor.json ufu:uptime_inventario.log .`
+traz as cópias; depois, no servidor, `rm -rf ~/Ciberseguranca_T2` apaga o
+código.
 
 Dois outros caminhos:
 
@@ -351,30 +545,33 @@ Dois outros caminhos:
 leve-a pronta, num arquivo, junto com a base de exemplo:
 
 ```
-docker save -o inventario.tar inventario:1.0
-scp inventario.tar dados_exemplo/inventario_exemplo.json usuario@endereco-do-servidor:
+docker build -t inventario-heluiz:1.0 .
+docker save -o inventario-heluiz.tar inventario-heluiz:1.0
+scp inventario-heluiz.tar dados_exemplo/inventario_exemplo.json ufu:
 ```
 
-No servidor, `docker load -i inventario.tar` carrega a imagem; depois, siga os
-passos 3 e 4, com `inventario_exemplo.json` no lugar de
+No servidor, `docker load -i inventario-heluiz.tar` carrega a imagem, e
+`docker volume create inventario-heluiz-dados` cria o volume; depois, siga os
+passos 5 e 6, com `inventario_exemplo.json` no lugar de
 `dados_exemplo/inventario_exemplo.json`. O processador do servidor precisa ser
-do mesmo tipo do seu (em geral, x86-64).
+do mesmo tipo do seu: nos PCs comuns, o `uname -m` do passo 3 mostra `x86_64`.
 
 **Comandar o servidor do seu computador.** O Docker do seu computador pode
-mandar os comandos para o Docker do servidor, por SSH, com um *contexto*:
+mandar os comandos para o Docker do servidor, por SSH, com um *contexto* que
+usa o atalho e a chave do passo 2:
 
 ```
-docker context create servidor --docker "host=ssh://usuario@endereco-do-servidor"
-docker --context servidor build -t inventario:1.0 .
-docker --context servidor ps
+docker context create ufu --docker "host=ssh://ufu"
+docker --context ufu ps
+docker --context ufu build -t inventario-heluiz:1.0 .
 ```
 
-O `build` envia a pasta do projeto para o servidor, e os outros comandos desta
-seção (`volume`, `create`, `cp`, `run`, `attach`) funcionam do mesmo jeito,
-com `--context servidor`. Esse caminho exige login por chave SSH, porque o
-Docker não aceita senha: `ssh-keygen` cria a chave, e o conteúdo do arquivo
-`.pub` que ele gera vai para o `~/.ssh/authorized_keys` do seu usuário no
-servidor.
+O `build` envia a pasta do projeto do seu computador, inclusive mudanças que
+ainda não estão no GitHub. Os outros comandos desta seção (`volume`, `create`,
+`cp`, `run`, `attach`) funcionam do mesmo jeito, com `--context ufu`; no
+PowerShell, o `docker run` vai numa linha só, sem as barras invertidas. O
+contexto exige a chave SSH e o seu usuário no grupo `docker` do servidor: o
+Docker não aceita senha nem usa o `sudo`.
 
 ### Problemas comuns
 
@@ -390,6 +587,10 @@ servidor.
 | `Este programa é interativo e precisa de um terminal`, no `docker logs inventario` | O `docker run` foi feito sem `-it` | `docker rm -f inventario` e o `docker run` de novo, com `-dit` |
 | Ctrl+P, Ctrl+Q não sai do `docker attach` | No terminal do VS Code, o Ctrl+P abre a busca de arquivos | Faça o `docker attach` no PowerShell ou no Windows Terminal |
 | `A base não foi atualizada (raw.githubusercontent.com: ...; www.cisa.gov: ...)`, na opção 16 | Sem internet, ou a rede bloqueia esses sites (um proxy ou firewall) | Nada muda: o programa continua com a base que tinha. Tente de novo mais tarde ou em outra rede; num servidor sem internet, a base que vem com o programa continua valendo |
+| `ssh: connect to host ... port 22: Connection timed out` | O computador está fora da rede interna da universidade, onde fica o servidor do docente | Conecte-se à rede do campus (ou a uma VPN que chegue até ela) e tente de novo |
+| `Permission denied (publickey,password)`, no `ssh` | Usuário ou senha errados; com o atalho `ufu`, também pode ser a chave, que ainda não está no servidor | Confira o usuário (maiúsculas e minúsculas contam) e a senha; refaça a cópia da chave, no passo 2 de [No servidor do docente](#no-servidor-do-docente) |
+| `WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!` | A chave do servidor não é mais a da primeira conexão: ou o servidor foi reinstalado, ou alguém se pôs no meio da conexão (ataque *man-in-the-middle*) | Não continue: pergunte ao docente se o servidor mudou. Só depois, `ssh-keygen -R endereco-do-servidor` apaga a chave antiga, e a próxima conexão pergunta de novo |
+| `no space left on device`, no `docker build` do servidor | O disco do servidor acabou | Avise o docente. Não rode nenhum `prune`: ele apagaria também o que é dos colegas |
 
 ## Como usar
 
@@ -1631,7 +1832,10 @@ programa não é endossado pela CISA nem pelo DHS.
 - **Sem login, por enquanto.** O programa não tem autenticação nem perfis de
   acesso: quem consegue dar `docker attach` (ou seja, quem acessa o servidor)
   pode alterar tudo. Autenticação e autorização ficam para o backend web do
-  trabalho final; até lá, a proteção é o acesso ao servidor.
+  trabalho final; até lá, a proteção é o acesso ao servidor. No servidor do
+  docente, compartilhado pela turma, os outros usuários com `sudo` também
+  alcançam o container: por isso, lá roda só a base de exemplo, que é
+  fictícia.
 
 ## Normas seguidas
 
@@ -1849,7 +2053,7 @@ histórico mesmo quando não há conflito:
 | --- | --- | --- |
 | `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves`, `feature/arvore-de-dependencias`, `feature/base-de-exemplo-completa`, `feature/encapsulamento-e-metodos-especiais`, `feature/plano-de-correcao-e-cve-em-portugues` |
 | `fix/` | Correção de defeito | `fix/normas-oficiais`, `fix/barras-do-risco` |
-| `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas`, `docs/instrucoes-de-execucao`, `docs/revisao-final` |
+| `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas`, `docs/instrucoes-de-execucao`, `docs/revisao-final`, `docs/roteiro-do-servidor` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
 
 `git log --graph --oneline --all` mostra as branches e os merges.
@@ -1941,7 +2145,7 @@ mais detalhe:
 
 | # | O que fazer | O que mostrar | Requisito |
 | --- | --- | --- | --- |
-| 1 | `docker ps` | O container `inventario` no ar (`Up`) e saudável (`(healthy)`). No servidor do docente, o `Up` mostra há quanto tempo | 3 |
+| 1 | `docker ps` | O container `inventario` no ar (`Up`) e saudável (`(healthy)`). No servidor do docente (`docker ps --filter name=inventario-heluiz`), o `Up` mostra há quanto tempo | 3 |
 | 2 | `docker attach inventario` e Enter | A tela de abertura e "Base carregada: 76 equipamento(s), 88 vulnerabilidade(s).", lida do arquivo JSON | 2 |
 | 3 | Opção 7, ID `65` | O `INTEL-SRV01`: um objeto da subclasse `Servidor`, com o fator de exposição dela (1,5), a ficha técnica (Dell PowerEdge R430, Windows Server 2008 R2) e as três vulnerabilidades, uma delas o BlueKeep, aberto | 1 |
 | 4 | Opção 13 | A verificação de `I − A` antes da conta (diagonal dominante, determinante 0,98, número de condição 7,98, posto 76) e o risco próprio e o efetivo de todos: no topo, `PERICIA-SRV01` (40,61), `DRPC-SRV01` (40,01) e `INTEL-SRV01` (37,61) | 4 |
