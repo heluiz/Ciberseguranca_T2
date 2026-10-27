@@ -31,7 +31,9 @@ programa. Se já existir um container `inventario`, criado antes com o
 `docker run`, apague-o primeiro com `docker rm -f inventario` (os dados ficam
 no volume). Sem Docker, com o Python, veja
 [Direto no computador](#direto-no-computador). O que mostrar na apresentação
-está no [Roteiro de demonstração](#roteiro-de-demonstração).
+está no [Roteiro de demonstração](#roteiro-de-demonstração). Para clonar (ou
+atualizar), construir, pôr a base de exemplo e abrir o programa num comando só,
+de qualquer pasta, veja [Em um comando só](#em-um-comando-só).
 
 ## Sumário
 
@@ -56,6 +58,76 @@ está no [Roteiro de demonstração](#roteiro-de-demonstração).
 Há três jeitos de rodar o programa: direto no computador, com o Python; num
 container Docker no seu computador, como na apresentação; e num container no
 servidor do docente, onde ele precisa ficar 24 horas no ar (requisito 3).
+
+### Em um comando só
+
+O jeito mais curto, para quem só quer **abrir o programa**: um único comando
+que confere o que falta, clona o repositório (ou o atualiza com `git pull`, se
+já existir), constrói a imagem, põe a base de exemplo no volume na primeira vez
+e abre o menu. Ele roda de qualquer pasta — não é preciso clonar nem entrar na
+pasta do projeto antes. As seções seguintes explicam cada passo em separado,
+para quando você quiser entender ou controlar o processo.
+
+Diferente do [Início rápido](#início-rápido), ele abre o programa com
+`docker run -it --rm` em vez de `docker attach`: o menu aparece na hora, sem
+teclar Enter. Ao sair (opção 0 ou `sair`), o container é descartado, mas os
+dados ficam no volume `inventario-dados` e voltam no próximo. Rodar o comando
+de novo atualiza o código e reabre, com os mesmos dados.
+
+O Docker precisa estar instalado e ligado — no Windows, o Docker Desktop
+aberto (veja [O que instalar](#o-que-instalar)). No Linux, o próprio comando
+instala o Git e o Docker se faltarem, e usa `sudo` no Docker enquanto o seu
+usuário não estiver no grupo `docker`.
+
+**Windows (PowerShell):**
+
+```
+cd $HOME; if (-not (Get-Command git -ErrorAction SilentlyContinue)) { winget install -e --id Git.Git }; if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Write-Host 'Instale o Docker Desktop: winget install -e --id Docker.DockerDesktop'; return }; docker info *> $null; if ($LASTEXITCODE -ne 0) { Write-Host 'Abra o Docker Desktop, espere "Engine running" e rode de novo.'; return }; if (Test-Path "$HOME\Ciberseguranca_T2\.git") { git -C "$HOME\Ciberseguranca_T2" pull } else { git clone https://github.com/heluiz/Ciberseguranca_T2.git "$HOME\Ciberseguranca_T2" }; cd "$HOME\Ciberseguranca_T2"; docker build -t inventario:1.0 .; docker run --rm --user root --entrypoint sh -v inventario-dados:/app/dados inventario:1.0 -c "[ -f /app/dados/inventario.json ] || { cp /app/dados_exemplo/inventario_exemplo.json /app/dados/inventario.json && chown 10001:10001 /app/dados/inventario.json; }"; docker run -it --rm --read-only --security-opt no-new-privileges -v inventario-dados:/app/dados inventario:1.0
+```
+
+**Linux (Debian e Ubuntu):**
+
+```
+if ! command -v git >/dev/null; then sudo apt update && sudo apt install -y git; fi; if ! command -v docker >/dev/null; then sudo apt install -y docker.io && sudo systemctl enable --now docker; fi; D=docker; docker info >/dev/null 2>&1 || D="sudo docker"; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && $D build -t inventario:1.0 . && $D run --rm --user root --entrypoint sh -v inventario-dados:/app/dados inventario:1.0 -c '[ -f /app/dados/inventario.json ] || { cp /app/dados_exemplo/inventario_exemplo.json /app/dados/inventario.json && chown 10001:10001 /app/dados/inventario.json; }' && $D run -it --rm --read-only --security-opt no-new-privileges -v inventario-dados:/app/dados inventario:1.0
+```
+
+**Arch Linux:**
+
+```
+if ! command -v git >/dev/null; then sudo pacman -S --needed --noconfirm git; fi; if ! command -v docker >/dev/null; then sudo pacman -S --needed --noconfirm docker && sudo systemctl enable --now docker; fi; D=docker; docker info >/dev/null 2>&1 || D="sudo docker"; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && $D build -t inventario:1.0 . && $D run --rm --user root --entrypoint sh -v inventario-dados:/app/dados inventario:1.0 -c '[ -f /app/dados/inventario.json ] || { cp /app/dados_exemplo/inventario_exemplo.json /app/dados/inventario.json && chown 10001:10001 /app/dados/inventario.json; }' && $D run -it --rm --read-only --security-opt no-new-privileges -v inventario-dados:/app/dados inventario:1.0
+```
+
+A base de exemplo só entra quando ainda não há dados: se você já cadastrou
+alguma coisa, o comando não a sobrescreve. Para recomeçar com ela, apague o
+volume antes (`docker volume rm inventario-dados`) e rode de novo. Para abrir
+**vazio**, sem a base de exemplo, use o [Início rápido](#início-rápido) sem os
+passos do `docker cp`. Mais detalhes da base estão em
+[Dados de exemplo](#dados-de-exemplo).
+
+**Sem Docker, com o Python.** Clona ou atualiza, cria o ambiente virtual
+(`.venv`), instala as bibliotecas, põe a base de exemplo em
+`dados/inventario.json` (se ainda não existir) e abre o programa. Requer o
+Python 3.11 ou mais novo (veja [O que instalar](#o-que-instalar)); no Windows,
+o comando chama o Python do `.venv` direto, sem ativar, para não esbarrar na
+política de execução do PowerShell.
+
+**Windows (PowerShell):**
+
+```
+cd $HOME; if (-not (Get-Command git -ErrorAction SilentlyContinue)) { winget install -e --id Git.Git }; if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Write-Host 'Instale o Python 3.11+ (py install 3.14) e abra um terminal novo.'; return }; if (Test-Path "$HOME\Ciberseguranca_T2\.git") { git -C "$HOME\Ciberseguranca_T2" pull } else { git clone https://github.com/heluiz/Ciberseguranca_T2.git "$HOME\Ciberseguranca_T2" }; cd "$HOME\Ciberseguranca_T2"; python -m venv .venv; .\.venv\Scripts\python.exe -m pip install -q -r requirements.txt; if (-not (Test-Path dados\inventario.json)) { New-Item -ItemType Directory -Force dados > $null; Copy-Item dados_exemplo\inventario_exemplo.json dados\inventario.json }; .\.venv\Scripts\python.exe main.py
+```
+
+**Linux (Debian e Ubuntu):**
+
+```
+if ! command -v git >/dev/null; then sudo apt update && sudo apt install -y git; fi; if ! command -v python3 >/dev/null || ! dpkg -s python3-venv >/dev/null 2>&1; then sudo apt update && sudo apt install -y python3 python3-venv; fi; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && python3 -m venv .venv && . .venv/bin/activate && pip install -q -r requirements.txt && mkdir -p dados && { [ -f dados/inventario.json ] || cp dados_exemplo/inventario_exemplo.json dados/inventario.json; } && python main.py
+```
+
+**Arch Linux:**
+
+```
+if ! command -v git >/dev/null; then sudo pacman -S --needed --noconfirm git; fi; if ! command -v python >/dev/null; then sudo pacman -S --needed --noconfirm python; fi; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && python -m venv .venv && . .venv/bin/activate && pip install -q -r requirements.txt && mkdir -p dados && { [ -f dados/inventario.json ] || cp dados_exemplo/inventario_exemplo.json dados/inventario.json; } && python main.py
+```
 
 ### O que instalar
 
