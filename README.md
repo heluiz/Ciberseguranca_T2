@@ -104,12 +104,29 @@ volume antes (`docker volume rm inventario-dados`) e rode de novo. Para abrir
 passos do `docker cp`. Mais detalhes da base estão em
 [Dados de exemplo](#dados-de-exemplo).
 
-**Sem Docker, com o Python** (Linux): clona ou atualiza, cria o ambiente
-virtual, instala as bibliotecas, põe a base de exemplo em
-`dados/inventario.json` (se ainda não existir) e abre o programa.
+**Sem Docker, com o Python.** Clona ou atualiza, cria o ambiente virtual
+(`.venv`), instala as bibliotecas, põe a base de exemplo em
+`dados/inventario.json` (se ainda não existir) e abre o programa. Requer o
+Python 3.11 ou mais novo (veja [O que instalar](#o-que-instalar)); no Windows,
+o comando chama o Python do `.venv` direto, sem ativar, para não esbarrar na
+política de execução do PowerShell.
+
+**Windows (PowerShell):**
 
 ```
-if ! command -v git >/dev/null; then sudo apt update && sudo apt install -y git python3 python3-venv; fi; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && python3 -m venv .venv && . .venv/bin/activate && pip install -q -r requirements.txt && mkdir -p dados && { [ -f dados/inventario.json ] || cp dados_exemplo/inventario_exemplo.json dados/inventario.json; } && python main.py
+cd $HOME; if (-not (Get-Command git -ErrorAction SilentlyContinue)) { winget install -e --id Git.Git }; if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Write-Host 'Instale o Python 3.11+ (py install 3.14) e abra um terminal novo.'; return }; if (Test-Path "$HOME\Ciberseguranca_T2\.git") { git -C "$HOME\Ciberseguranca_T2" pull } else { git clone https://github.com/heluiz/Ciberseguranca_T2.git "$HOME\Ciberseguranca_T2" }; cd "$HOME\Ciberseguranca_T2"; python -m venv .venv; .\.venv\Scripts\python.exe -m pip install -q -r requirements.txt; if (-not (Test-Path dados\inventario.json)) { New-Item -ItemType Directory -Force dados > $null; Copy-Item dados_exemplo\inventario_exemplo.json dados\inventario.json }; .\.venv\Scripts\python.exe main.py
+```
+
+**Linux (Debian e Ubuntu):**
+
+```
+if ! command -v git >/dev/null; then sudo apt update && sudo apt install -y git; fi; if ! command -v python3 >/dev/null || ! dpkg -s python3-venv >/dev/null 2>&1; then sudo apt update && sudo apt install -y python3 python3-venv; fi; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && python3 -m venv .venv && . .venv/bin/activate && pip install -q -r requirements.txt && mkdir -p dados && { [ -f dados/inventario.json ] || cp dados_exemplo/inventario_exemplo.json dados/inventario.json; } && python main.py
+```
+
+**Arch Linux:**
+
+```
+if ! command -v git >/dev/null; then sudo pacman -S --needed --noconfirm git; fi; if ! command -v python >/dev/null; then sudo pacman -S --needed --noconfirm python; fi; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && python -m venv .venv && . .venv/bin/activate && pip install -q -r requirements.txt && mkdir -p dados && { [ -f dados/inventario.json ] || cp dados_exemplo/inventario_exemplo.json dados/inventario.json; } && python main.py
 ```
 
 ### O que instalar
