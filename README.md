@@ -57,7 +57,9 @@ de qualquer pasta, veja [Em um comando só](#em-um-comando-só).
 
 Há três jeitos de rodar o programa: direto no computador, com o Python; num
 container Docker no seu computador, como na apresentação; e num container no
-servidor do docente, onde ele precisa ficar 24 horas no ar (requisito 3).
+servidor do docente, onde ele precisa ficar 24 horas no ar (requisito 3). Lá,
+ele roda desde 27/10/2026, e as provas estão em
+[Provas das 24 horas](#provas-das-24-horas).
 
 ### Em um comando só
 
@@ -360,6 +362,171 @@ da imagem, do container e do volume. Quem repetir os passos troca o sufixo pelo
 próprio nome: num servidor compartilhado, nomes iguais aos de um colega dão
 conflito ou misturam os dados dos dois.
 
+#### Como ficou a implantação
+
+O container foi ligado no servidor do docente em 27/10/2026, com os passos de
+[Implantar, passo a passo](#implantar-passo-a-passo), e o requisito está
+cumprido: na leitura de 29/10, às 20:19, ele estava no ar havia 46 horas, sem
+interrupção, como mostram as [Provas das 24 horas](#provas-das-24-horas).
+
+| O quê | No servidor do docente |
+| --- | --- |
+| Versão | Commit `abae5ec`, a `main` depois do Pull Request #12 |
+| Imagem | `inventario-heluiz:1.0`, construída no próprio servidor (277 MB) |
+| Volume | `inventario-heluiz-dados`, com a base de exemplo, que é fictícia |
+| Container | `inventario-heluiz`, ligado com `--restart unless-stopped`, `--read-only` e `--security-opt no-new-privileges`; roda com o usuário `inventario` e não publica nenhuma porta |
+| Acesso | Por SSH, com chave e o atalho `ufu`; a senha inicial foi trocada |
+| Registro | Uma linha por hora em `uptime_inventario.log`, gravada pelo `cron` do servidor |
+
+#### Acessar o servidor
+
+O servidor só responde de dentro da rede da universidade; fora dela, o `ssh`
+termina em `Connection timed out`. De qualquer computador, quem entra é o mesmo
+usuário: muda só o jeito de provar quem é, com a chave ou com a senha.
+
+**Do computador com a chave**, aquele em que foi feito o passo 2: ele tem a
+chave SSH e o atalho `ufu` e entra sem pedir senha. No PowerShell (no Linux e
+no macOS, no terminal):
+
+```
+ssh ufu                                            # entra no servidor; exit sai
+ssh ufu docker ps --filter name=inventario-heluiz  # o container está no ar?
+ssh ufu "date; docker inspect -f '{{.State.StartedAt}}' inventario-heluiz"
+ssh ufu tail -n 5 uptime_inventario.log            # as últimas horas do registro
+scp ufu:uptime_inventario.log .                    # traz uma cópia do registro
+ssh -t ufu docker attach inventario-heluiz         # abre o menu do programa
+```
+
+O terceiro comando mostra a hora do servidor e o momento em que o container
+ligou, em UTC (três horas à frente de Brasília): a diferença entre os dois é o
+tempo exato no ar, que o `docker ps` arredonda. No último, o `-t` pede um
+terminal ao SSH; sem ele, o `docker attach` recusa com
+`the input device is not a TTY`. No menu, tecle Enter para ver a tela e saia
+com Ctrl+P e depois Ctrl+Q, que desligam o terminal sem parar o programa. A
+opção 0 e o `sair`, depois de confirmados, encerram o programa: o Docker religa
+o container, mas o tempo no ar recomeça (veja o passo 8). No terminal do VS
+Code, o Ctrl+P não chega ao Docker: use o PowerShell ou o Windows Terminal.
+
+**De outro computador seu**, crie nele uma chave e copie a parte pública para o
+servidor, como no passo 2 (a senha é pedida uma última vez), e crie o mesmo
+atalho `ufu`: daí em diante, os comandos acima funcionam iguais. Cada
+computador tem a sua chave; a privada (o arquivo `id_ed25519`, sem o `.pub`)
+nunca sai do computador em que foi criada. Um comentário com o nome do
+computador no `ssh-keygen` (`-C "notebook"`, por exemplo) identifica cada chave
+no servidor: `ssh ufu cat .ssh/authorized_keys` lista as chaves, uma por linha,
+e apagar a linha de um computador (com `nano ~/.ssh/authorized_keys`, no
+servidor) tira o acesso dele.
+
+**De um computador que não é seu**, como o de um laboratório, entre com o
+usuário e a senha, sem criar chave nem atalho nele:
+
+```
+ssh usuario@endereco-do-servidor
+ssh usuario@endereco-do-servidor docker ps --filter name=inventario-heluiz
+ssh -t usuario@endereco-do-servidor docker attach inventario-heluiz
+```
+
+A senha é pedida a cada comando, não aparece enquanto é digitada e nunca vai na
+linha de comando, que fica no histórico do terminal. Na primeira conexão de
+cada computador, o SSH mostra a impressão digital (*fingerprint*) da chave do
+servidor e pergunta se deve confiar nela. Na conexão de 29/10/2026, a chave do
+servidor do docente apareceu como ED25519, com a impressão digital
+`SHA256:fBlR6gdx1SG+BOMn96iQnH3lTCASIODy4Wo1lEs5JsU`; no computador com a
+chave, `ssh-keygen -lF endereco-do-servidor` mostra a que ficou guardada na
+primeira conexão dele. Iguais, responda `yes`; diferentes, não continue (veja
+`REMOTE HOST IDENTIFICATION HAS CHANGED`, em
+[Problemas comuns](#problemas-comuns)).
+
+Ao terminar, apague o que ficou nesse computador: as cópias de provas que tiver
+gravado e o registro do servidor, que o SSH guardou na primeira conexão. No
+PowerShell:
+
+```
+ssh-keygen -R endereco-do-servidor
+Remove-Item $HOME\.ssh\known_hosts.old
+Remove-Item $HOME\evidencias_24h.txt       # se gravou aqui a prova do passo 9
+```
+
+O `ssh-keygen -R` tira o servidor do arquivo `known_hosts` e guarda uma cópia
+de como ele era em `known_hosts.old`, que o segundo comando apaga. Antes de
+apagar uma prova, leve uma cópia dela.
+
+Se a conexão cair no meio de um comando (a rede caiu, o computador foi
+desligado), o container continua rodando: o que roda no servidor não depende da
+conexão de ninguém.
+
+#### Provas das 24 horas
+
+São duas provas independentes: três leituras feitas por SSH, com o comando do
+passo 9, e o registro de hora em hora que o próprio servidor gravou, pelo
+`cron`, sem ninguém conectado.
+
+| Leitura | Quando (Brasília) | `docker ps` | Ligado em (UTC) | Religamentos | Saúde |
+| --- | --- | --- | --- | --- | --- |
+| 1ª | 27/10, 19:33:18 | `Up 3 minutes (healthy)` | 2026-10-27T22:29:37Z | 0 | healthy |
+| 2ª | 28/10, 19:34:27 | `Up 21 hours (healthy)` | 2026-10-28T01:17:52Z | 0 | healthy |
+| 3ª | 29/10, 20:19:02 | `Up 46 hours (healthy)` | 2026-10-28T01:17:52Z | 0 | healthy |
+
+Da 1ª para a 2ª leitura, o horário de ligação mudou de 19:29:37 para 22:17:52
+de 27/10, no horário de Brasília (o `docker inspect` mostra em UTC, três horas
+à frente). Ninguém mexeu no container: o servidor reiniciou, e o `uptime -s`
+mostrou que ele voltou a ligar às 22:17:08; todos os containers que rodavam lá
+mostravam o mesmo tempo no ar. O `--restart unless-stopped` funcionou como
+devia: o Docker religou o `inventario-heluiz` sozinho, 44 segundos depois do
+boot. A contagem das 24 horas recomeçou ali e se completou em 28/10, às
+22:17:52. O religamento continuou em 0 porque esse contador só registra os
+religamentos feitos depois de o programa terminar, e volta a 0 quando o Docker
+liga o container junto com o servidor.
+
+**O critério.** O `docker ps` arredonda o tempo: mostra `Up 24 hours` a partir
+de 23 horas e meia. Por isso, a prova é a diferença entre o horário de ligação
+e a hora da leitura. Na 3ª leitura, de 22:17:52 de 27/10 a 20:19:02 de 29/10,
+são 46 horas e 1 minuto, com o mesmo horário de ligação da 2ª leitura e nenhum
+religamento.
+
+**O registro de hora em hora** tem 49 linhas, de 20:00 de 27/10 a 20:00 de
+29/10, todas `(healthy)`, e cada uma bate com o horário de ligação das
+leituras. A única queda é a do reinício do servidor, entre as linhas das 22:00
+e das 23:00 de 27/10. A linha das 22:00 de 28/10 já mostra `Up 24 hours`, mas
+eram 23 horas e 42 minutos; a primeira com mais de 24 horas é a das 23:00, e
+daí em diante o tempo no ar cresce sem parar. Seis das 49 linhas:
+
+```
+2026-10-27T20:00:01-03:00 Up 30 minutes (healthy)
+2026-10-27T22:00:01-03:00 Up 3 hours (healthy)
+2026-10-27T23:00:01-03:00 Up 42 minutes (healthy)
+2026-10-28T22:00:01-03:00 Up 24 hours (healthy)
+2026-10-28T23:00:01-03:00 Up 25 hours (healthy)
+2026-10-29T20:00:01-03:00 Up 46 hours (healthy)
+```
+
+#### Acesso administrativo
+
+O docente pediu a cada aluno que provasse ter acesso de administrador criando,
+na pasta do `root`, um arquivo com o próprio nome. A pasta `/root` é do
+administrador e fica fechada para os outros usuários: sem `sudo`, o `touch`
+daria `Permission denied`. Foi feito em 27/10, às 20:30, numa sessão aberta com
+`ssh ufu`:
+
+```
+sudo -l                        # (ALL : ALL) ALL: com sudo, pode tudo
+sudo touch /root/Heluiz.txt    # cria o arquivo, vazio, como root
+sudo ls -l /root/Heluiz.txt
+-rw-r--r-- 1 root root 0 Oct 27 20:30 /root/Heluiz.txt
+```
+
+O dono `root`, na saída do `ls -l`, é a prova: o arquivo só teria esse dono se
+o comando tivesse rodado como root. Para mostrá-lo de novo, do computador com a
+chave: `ssh -t ufu sudo ls -l /root/Heluiz.txt` (o `-t` dá ao `sudo` um
+terminal para pedir a senha). Já o `sudo echo texto > /root/arquivo` não
+funcionaria: quem faz o `>` é o shell do usuário comum, sem privilégio; o jeito
+certo é `echo texto | sudo tee /root/arquivo`.
+
+#### Implantar, passo a passo
+
+Os passos que puseram o container no ar em 27/10. Servem para refazer a
+implantação, com uma versão nova ou em outro servidor.
+
 **Antes de começar.**
 
 - Leve para o servidor a versão final, já na `main` do GitHub e com a
@@ -452,7 +619,7 @@ git --version
 docker version                    # tem de mostrar Client e Server
 systemctl is-enabled docker       # "enabled": o Docker liga com o servidor
 groups                            # o grupo docker tem de aparecer
-df -h ~ /var/lib/docker           # espaço livre; a imagem ocupa uns 250 MB
+df -h ~ /var/lib/docker           # espaço livre; a imagem ocupa uns 280 MB
 docker ps -a                      # containers que já existem no servidor
 git ls-remote https://github.com/heluiz/Ciberseguranca_T2.git HEAD
 ```
@@ -484,6 +651,12 @@ use `git pull` no lugar do `git clone`. Se o repositório estiver privado, o
 `git clone` pede login: no lugar da senha, use um token de acesso pessoal do
 GitHub, sem gravá-lo no servidor.
 
+Se o Docker do servidor não tiver o componente `buildx`, como o do servidor do
+docente, o `docker build` começa com o aviso
+`DEPRECATED: The legacy builder is deprecated` e usa o construtor antigo, que
+mostra as 12 etapas do Dockerfile (de `Step 1/12` a `Step 12/12`) e termina em
+`Successfully tagged inventario-heluiz:1.0`. O aviso não muda a imagem.
+
 **5. Pôr a base de exemplo, antes de ligar o container.** No servidor, use só a
 base de exemplo, que é fictícia: lá, os outros usuários com `sudo` também
 alcançam o container e os dados (veja [Segurança e LGPD](#segurança-e-lgpd)).
@@ -512,17 +685,19 @@ docker ps --filter name=inventario-heluiz
 ```
 
 O `STATUS` mostra `Up` e, depois de um minuto, `(healthy)`. Para ver o menu,
-`docker attach inventario-heluiz` e Enter; para sair dele sem parar o programa,
-Ctrl+P e depois Ctrl+Q, no PowerShell ou no Windows Terminal (no terminal do VS
-Code, o Ctrl+P não chega ao Docker). Por fim, `exit` fecha a conexão, e o
-container continua rodando. O `docker attach` não é preciso para provar as 24
-horas: o `docker ps` e o `docker inspect` bastam.
+`docker attach inventario-heluiz` e Enter (do seu computador, direto:
+`ssh -t ufu docker attach inventario-heluiz`); para sair dele sem parar o
+programa, Ctrl+P e depois Ctrl+Q, no PowerShell ou no Windows Terminal (no
+terminal do VS Code, o Ctrl+P não chega ao Docker). Por fim, `exit` fecha a
+conexão, e o container continua rodando. O `docker attach` não é preciso para
+provar as 24 horas: o `docker ps` e o `docker inspect` bastam.
 
 **8. Durante as 24 horas, não mexer no container.** A contagem recomeça com
 `docker restart`, `docker stop` e `docker start`; com um `sair` confirmado no
 menu, ou a opção 0; com a recriação do container (`docker rm` e outro
 `docker run`, que é o jeito de trocar a imagem); e com um reinício do servidor,
-embora o Docker religue o container sozinho. Construir a imagem de novo não
+embora o Docker religue o container sozinho (foi o que aconteceu em 27/10: veja
+[Provas das 24 horas](#provas-das-24-horas)). Construir a imagem de novo não
 afeta o container que está rodando, que continua com a imagem com que foi
 criado. Na apresentação, se for mostrar o container do servidor, entre com
 `docker attach` e saia com Ctrl+P e Ctrl+Q, nunca pela opção 0.
@@ -534,12 +709,14 @@ comando mostra o estado do container e o acrescenta a um arquivo:
 ssh ufu "date; docker ps --filter name=inventario-heluiz; docker inspect -f 'Ligado em {{.State.StartedAt}} (UTC) | religado {{.RestartCount}} vez(es) | {{.State.Health.Status}}' inventario-heluiz" | Tee-Object -Append -FilePath $HOME\evidencias_24h.txt
 ```
 
-No Linux e no macOS, troque o fim por `| tee -a ~/evidencias_24h.txt`. Rode o
-comando logo depois de ligar o container e de novo depois de 24 horas. Na
-segunda vez, o `docker ps` tem de mostrar `Up 24 hours` ou mais, o horário de
-ligação tem de ser o mesmo da primeira e o religamento tem de continuar em 0. O
-horário do `docker inspect` está em UTC, três horas à frente do de Brasília. Um
-print da tela com o `docker ps` também serve de prova.
+No Linux e no macOS, troque o fim por `| tee -a ~/evidencias_24h.txt`. De um
+computador sem a chave, troque `ufu` por `usuario@endereco-do-servidor`: a
+senha é pedida, e o arquivo fica naquele computador. Rode o comando logo depois
+de ligar o container e de novo depois de 24 horas. Na segunda vez, o
+`docker ps` tem de mostrar `Up 24 hours` ou mais, o horário de ligação tem de
+ser o mesmo da primeira e o religamento tem de continuar em 0. O horário do
+`docker inspect` está em UTC, três horas à frente do de Brasília. Um print da
+tela com o `docker ps` também serve de prova.
 
 Para ter ainda um registro de hora em hora, feito pelo próprio servidor, sem
 ninguém conectado, agende a conferência no `cron` do seu usuário, colando o
@@ -663,6 +840,12 @@ Docker não aceita senha nem usa o `sudo`.
 | `Permission denied (publickey,password)`, no `ssh` | Usuário ou senha errados; com o atalho `ufu`, também pode ser a chave, que ainda não está no servidor | Confira o usuário (maiúsculas e minúsculas contam) e a senha; refaça a cópia da chave, no passo 2 de [No servidor do docente](#no-servidor-do-docente) |
 | `WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!` | A chave do servidor não é mais a da primeira conexão: ou o servidor foi reinstalado, ou alguém se pôs no meio da conexão (ataque *man-in-the-middle*) | Não continue: pergunte ao docente se o servidor mudou. Só depois, `ssh-keygen -R endereco-do-servidor` apaga a chave antiga, e a próxima conexão pergunta de novo |
 | `no space left on device`, no `docker build` do servidor | O disco do servidor acabou | Avise o docente. Não rode nenhum `prune`: ele apagaria também o que é dos colegas |
+| `ssh: Could not resolve hostname ufu` | O atalho `ufu` só existe no computador em que foi criado, no passo 2 de [Implantar, passo a passo](#implantar-passo-a-passo) | Use `ssh usuario@endereco-do-servidor`, ou crie o atalho neste computador (veja [Acessar o servidor](#acessar-o-servidor)) |
+| `the input device is not a TTY`, no `ssh ufu docker attach ...` | Sem o `-t`, o SSH não dá terminal ao comando, e o `docker attach` precisa de um | `ssh -t ufu docker attach inventario-heluiz` |
+| O `sudo` diz que precisa de um terminal para ler a senha, no `ssh ufu sudo ...` | Pelo mesmo motivo: sem o `-t`, não há onde digitar a senha | `ssh -t ufu sudo ...` |
+| `command not found` num comando colado no servidor, com `^[[200~` ou `[200~` grudado no texto | O terminal marca o começo e o fim do texto colado (*bracketed paste*), e a marca entrou no comando | Cole uma linha de cada vez; se continuar, rode uma vez no servidor `bind 'set enable-bracketed-paste off'` |
+| `DEPRECATED: The legacy builder is deprecated`, no `docker build` do servidor | O Docker do servidor não tem o componente `buildx` e constrói com o construtor antigo | Nada: a imagem sai igual |
+| `ter├ºa` no lugar de `terça`, na data da prova do passo 9 | O PowerShell lê o texto do servidor, que está em UTF-8, com outra codificação | Nada: a data está certa. Para ver os acentos, rode antes, na mesma janela, `[Console]::OutputEncoding = [Text.Encoding]::UTF8` |
 
 ## Como usar
 
@@ -854,7 +1037,7 @@ ambiente `NO_COLOR` definida, o programa imprime texto puro.
 | --- | --- | --- | --- |
 | 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. A classe "equipamentos" do enunciado é a `Equipamento`, no módulo `equipamentos.py`: o nome segue a convenção da PEP 8 para classes (CapWords) e está no singular, porque cada objeto é *um* equipamento. Cada equipamento tem uma `FichaTecnica` (`ficha_tecnica.py`), com fabricante, modelo, série, patrimônio, sistema e versão: composição. Os dados ficam protegidos por propriedades que conferem cada valor; veja [Orientação a objetos](#orientação-a-objetos). |
 | 2 | Armazenamento em JSON formado por um array de objetos | 20% | `armazenamento.py` grava o que `Inventario.para_dict()` monta: um array JSON na raiz, um objeto por equipamento. Veja [o formato](#formato-do-arquivo-de-dados). |
-| 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker) e [No servidor do docente](#no-servidor-do-docente). |
+| 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker) e [No servidor do docente](#no-servidor-do-docente). Cumprido no servidor do docente: ligado em 27/10/2026, com 46 horas no ar na leitura de 29/10 (veja [Provas das 24 horas](#provas-das-24-horas)). |
 | 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu, e a 17, que usa o mesmo modelo para ordenar as correções. A matriz A fica no mesmo JSON (campo `dependencias`), e o NumPy está declarado em `requirements.txt`, que o `Dockerfile` instala. Veja [o modelo de risco](#o-modelo-de-risco). |
 
 Os requisitos do Trabalho 1 continuam valendo, como pede o enunciado. As
@@ -1908,6 +2091,12 @@ programa não é endossado pela CISA nem pelo DHS.
   docente, compartilhado pela turma, os outros usuários com `sudo` também
   alcançam o container: por isso, lá roda só a base de exemplo, que é
   fictícia.
+- **No servidor do docente.** O acesso é por chave SSH, e a senha inicial foi
+  trocada; o container não publica nenhuma porta (a coluna `PORTS` do
+  `docker ps` fica vazia); lá roda só a base de exemplo; nenhuma senha nem
+  token fica gravado no servidor; e os nomes têm sufixo próprio, para não tocar
+  no que é dos colegas. Num computador que não é seu, a entrada é por senha,
+  sem deixar chave nem atalho (veja [Acessar o servidor](#acessar-o-servidor)).
 
 ## Normas seguidas
 
@@ -2125,7 +2314,7 @@ histórico mesmo quando não há conflito:
 | --- | --- | --- |
 | `feature/` | Funcionalidade nova | `feature/matrizes-e-diagnostico`, `feature/vetor-cvss`, `feature/posto-e-rouche-capelli`, `feature/cve-e-ficha-tecnica`, `feature/base-de-cves`, `feature/arvore-de-dependencias`, `feature/base-de-exemplo-completa`, `feature/encapsulamento-e-metodos-especiais`, `feature/plano-de-correcao-e-cve-em-portugues` |
 | `fix/` | Correção de defeito | `fix/normas-oficiais`, `fix/barras-do-risco` |
-| `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas`, `docs/instrucoes-de-execucao`, `docs/revisao-final`, `docs/roteiro-do-servidor` |
+| `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas`, `docs/instrucoes-de-execucao`, `docs/revisao-final`, `docs/roteiro-do-servidor`, `docs/comando-unico`, `docs/servidor-implantado` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
 
 `git log --graph --oneline --all` mostra as branches e os merges.
@@ -2217,7 +2406,7 @@ mais detalhe:
 
 | # | O que fazer | O que mostrar | Requisito |
 | --- | --- | --- | --- |
-| 1 | `docker ps` | O container `inventario` no ar (`Up`) e saudável (`(healthy)`). No servidor do docente (`docker ps --filter name=inventario-heluiz`), o `Up` mostra há quanto tempo | 3 |
+| 1 | `docker ps` | O container `inventario` no ar (`Up`) e saudável (`(healthy)`). No servidor do docente, do computador com a chave e na rede da universidade: `ssh ufu docker ps --filter name=inventario-heluiz`, em que o `Up` mostra há quanto tempo (as provas das 24 horas estão em [Provas das 24 horas](#provas-das-24-horas)) | 3 |
 | 2 | `docker attach inventario` e Enter | A tela de abertura e "Base carregada: 76 equipamento(s), 88 vulnerabilidade(s).", lida do arquivo JSON | 2 |
 | 3 | Opção 7, ID `65` | O `INTEL-SRV01`: um objeto da subclasse `Servidor`, com o fator de exposição dela (1,5), a ficha técnica (Dell PowerEdge R430, Windows Server 2008 R2) e as três vulnerabilidades, uma delas o BlueKeep, aberto | 1 |
 | 4 | Opção 13 | A verificação de `I − A` antes da conta (diagonal dominante, determinante 0,98, número de condição 7,98, posto 76) e o risco próprio e o efetivo de todos: no topo, `PERICIA-SRV01` (40,61), `DRPC-SRV01` (40,01) e `INTEL-SRV01` (37,61) | 4 |
@@ -2240,6 +2429,8 @@ mais detalhe:
 | Opção 12, ID `28`, e Enter | As duas árvores do `PERICIA-PC01`: quem depende dele e do que ele depende, com as frações. O Enter no fim não remove nada |
 | Opção 17, depois do passo 6; depois `29` e Enter | O plano de correção: na frente, as duas falhas de nota 7,5 do roteador da sede (164,12 cada; juntas, 24,7% do risco total de 1330,42), porque 73 equipamentos herdam risco dele; o BlueKeep, de nota 9,8, só em 29º, na `DPLAN-PC02` (9,80), porque ninguém herda risco dela. O `29` mostra a conta, a CVE explicada em português e o que a CISA manda fazer |
 | `python testes.py` e a aba Actions do GitHub | Os 115 testes e a verificação automática a cada push |
+| `ssh ufu tail -n 5 uptime_inventario.log`, na rede da universidade | As últimas linhas do registro de hora em hora que o servidor grava sozinho: a hora, o tempo no ar e o `(healthy)` |
+| `ssh -t ufu sudo ls -l /root/Heluiz.txt`, na rede da universidade | A prova de acesso administrativo pedida pelo docente: o arquivo pertence ao `root` |
 
 Para as perguntas sobre o código, a tabela de
 [Requisitos do Trabalho 2](#requisitos-do-trabalho-2) diz onde está cada
