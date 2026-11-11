@@ -3,7 +3,7 @@
 Verificações executadas em 11/11/2026, com Python 3.12.14 e PostgreSQL 17.11 reais:
 
 - 115 testes originais: passaram.
-- 42 testes novos: passaram, com cerca de 83% de cobertura agregada dos módulos web e didáticos medidos. Cobertura não equivale a ausência de falhas.
+- 57 testes novos: passaram, com cerca de 84% de cobertura agregada dos módulos web e didáticos medidos. Cobertura não equivale a ausência de falhas.
 - Migrações aplicadas e `makemigrations --check --dry-run`: sem alteração pendente.
 - Ruff: passou.
 - `check --deploy --fail-level WARNING`, com configuração de produção: sem alertas.
@@ -20,3 +20,5 @@ Docker Compose teve a sintaxe YAML conferida; não houve build ou execução do 
 A revisão de neon e mapa está descrita em [VISUAL.md](VISUAL.md). Foram testados também o modo com todos os ativos, busca por tipo, controles visuais e simulação sem gravação.
 
 Direção visual do risco: API e navegador conferem que A depende de B implica animação B → A. Verificadas as 164 conexões desenhadas e curvas separadas para relações recíprocas, além de fixture com frações 50%/25% nos dois sentidos.
+
+Datas de tratamento: 57 testes novos passaram no PostgreSQL, incluindo datas desconhecidas, limites cronológicos, fuso, reabertura, histórico preservado após exclusão, permissões, CSV e ausência de efeito das datas no risco. O navegador exercitou fechamento, reabertura e linha do tempo; capturas em `datas-tratamento.png` e `historico-tratamento.png`.

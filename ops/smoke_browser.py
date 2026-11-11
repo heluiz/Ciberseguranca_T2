@@ -188,6 +188,36 @@ try:
         page.get_by_role("button", name="Salvar registro").click()
         page.locator("#q").fill(test_hostname)
         page.get_by_role("button", name="Buscar", exact=True).last.click()
+        # Exercita datas reais, fechamento e reabertura pelo formulário.
+        asset_response = page.request.get(
+            "http://127.0.0.1:8765/api/asset/"
+        ).json()
+        asset_id = next(
+            row["id"]
+            for row in asset_response["results"]
+            if row["hostname"] == test_hostname
+        )
+        page.goto("http://127.0.0.1:8765/registros/finding/novo/")
+        page.locator("[name=asset]").select_option(str(asset_id))
+        page.locator("[name=vulnerability]").select_option("1")
+        page.locator("[name=situacao]").select_option("3")
+        page.get_by_role("button", name="Salvar registro").click()
+        page.wait_for_url("**/registros/finding/")
+        page.locator("#q").fill(test_hostname)
+        page.get_by_role("button", name="Buscar", exact=True).last.click()
+        page.get_by_role("link", name="Editar", exact=True).click()
+        assert page.locator("[name=corrected_at]").input_value()
+        page.screenshot(path=str(out / "datas-tratamento.png"), full_page=True)
+        page.locator("[name=situacao]").select_option("1")
+        page.get_by_role("button", name="Salvar registro").click()
+        page.locator("#q").fill(test_hostname)
+        page.get_by_role("button", name="Buscar", exact=True).last.click()
+        page.get_by_role("link", name="Histórico", exact=True).click()
+        page.get_by_text("Reaberta", exact=True).wait_for()
+        page.screenshot(
+            path=str(out / "historico-tratamento.png"), full_page=True
+        )
+        page.goto("http://127.0.0.1:8765/registros/asset/?q=" + test_hostname)
         page.get_by_role("link", name="Excluir", exact=True).click()
         page.get_by_role("button", name="Confirmar exclusão").click()
         page.set_viewport_size({"width": 390, "height": 844})

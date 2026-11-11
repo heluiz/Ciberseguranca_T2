@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.views import LoginView
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.db import connection, DatabaseError, IntegrityError
+from django.db import connection, DatabaseError, IntegrityError, transaction
 from django.db.models import Count, Avg, Max, Q
 from django.http import JsonResponse, HttpResponse, Http404
 from django.shortcuts import render, redirect, get_object_or_404
@@ -11,8 +11,15 @@ from django.views.decorators.http import require_GET
 from django_otp.forms import OTPTokenForm
 from django_otp import login as otp_login
 from risco import ModeloRisco, SistemaSingularError
-from .models import Asset, Vulnerability, Finding, Dependency, AuditEvent
-from .repository import snapshot
+from .models import (
+    Asset,
+    Vulnerability,
+    Finding,
+    Dependency,
+    AuditEvent,
+    FindingHistory,
+)
+from .repository import snapshot, lock_inventory
 from .services import (
     save_entity,
     delete_entity,
@@ -220,7 +227,13 @@ def remove(request, kind, pk):
 )
 @require_GET
 def graph_data(request):
-    inv = snapshot()
+    with transaction.atomic():
+        lock_inventory()
+        inv = snapshot()
+        finding_dates = {
+            (item.asset_id, item.vulnerability_id): item
+            for item in Finding.objects.all()
+        }
     model = ModeloRisco(inv)
     try:
         report = model.relatorio()
@@ -240,6 +253,13 @@ def graph_data(request):
                     "gravidade": vuln.gravidade.rotulo,
                     "situacao": treatment.rotulo,
                     "corrigida": treatment.value == 3,
+                    "detected_at": finding_dates[
+                        (asset.id, vuln.id)
+                    ].detected_at,
+                    "corrected_at": finding_dates[
+                        (asset.id, vuln.id)
+                    ].corrected_at,
+                    "history_url": f"/tratamentos/{finding_dates[(asset.id, vuln.id)].pk}/historico/",
                 }
             )
         active = [f for f in findings if not f["corrigida"]]
@@ -345,7 +365,12 @@ def audit_log(request):
     return render(
         request,
         "inventory/audit.html",
-        {"events": AuditEvent.objects.select_related("actor")[:100]},
+        {
+            "events": AuditEvent.objects.select_related("actor")[:100],
+            "finding_events": FindingHistory.objects.select_related("actor")[
+                :100
+            ],
+        },
     )
 
 
@@ -501,6 +526,9 @@ def asset_detail(request, pk):
             "row": row,
             "findings": inv.vulnerabilidades_do(pk),
             "contributions": model.contribuicoes(pk),
+            "occurrences": Finding.objects.filter(asset_id=pk).select_related(
+                "vulnerability"
+            ),
         },
     )
 
@@ -543,3 +571,75 @@ def simulate_correction(request, pk):
             "gravado": False,
         }
     )
+
+
+@login_required
+@permission_required("inventory.view_finding", raise_exception=True)
+def finding_history(request, pk):
+    finding = get_object_or_404(
+        Finding.objects.select_related("asset", "vulnerability"), pk=pk
+    )
+    return render(
+        request,
+        "inventory/finding_history.html",
+        {
+            "finding": finding,
+            "history": finding.history.select_related("actor")[:200],
+        },
+    )
+
+
+@login_required
+@permission_required("inventory.view_auditevent", raise_exception=True)
+@require_GET
+def export_finding_history(request):
+    import csv
+
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = (
+        'attachment; filename="sentinel-historico-tratamentos.csv"'
+    )
+    response.write("\ufeff")
+    writer = csv.writer(response, delimiter=";")
+    writer.writerow(
+        [
+            "Registro em UTC",
+            "Conta ID",
+            "Ativo ID",
+            "Vulnerabilidade ID",
+            "Evento",
+            "Situacao anterior",
+            "Situacao nova",
+            "Deteccao anterior UTC",
+            "Deteccao nova UTC",
+            "Correcao anterior UTC",
+            "Correcao nova UTC",
+        ]
+    )
+    for event in FindingHistory.objects.order_by("id").iterator(
+        chunk_size=500
+    ):
+        writer.writerow(
+            [
+                event.occurred_at.isoformat(),
+                event.actor_id,
+                event.asset_ref,
+                event.vulnerability_ref,
+                event.event,
+                event.old_status,
+                event.new_status,
+                event.old_detected_at.isoformat()
+                if event.old_detected_at
+                else "",
+                event.new_detected_at.isoformat()
+                if event.new_detected_at
+                else "",
+                event.old_corrected_at.isoformat()
+                if event.old_corrected_at
+                else "",
+                event.new_corrected_at.isoformat()
+                if event.new_corrected_at
+                else "",
+            ]
+        )
+    return response

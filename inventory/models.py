@@ -84,6 +84,8 @@ class Finding(models.Model):
         choices=choices(SituacaoTratamento), default=1
     )
     version = models.PositiveIntegerField(default=1)
+    detected_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    corrected_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         constraints = [
@@ -94,7 +96,56 @@ class Finding(models.Model):
                 condition=Q(situacao__gte=1, situacao__lte=4),
                 name="status_range",
             ),
+            models.CheckConstraint(
+                condition=Q(corrected_at__isnull=True) | Q(situacao=3),
+                name="correction_requires_corrected_status",
+            ),
+            models.CheckConstraint(
+                condition=Q(corrected_at__isnull=True)
+                | Q(detected_at__isnull=True)
+                | Q(corrected_at__gte=F("detected_at")),
+                name="correction_after_detection",
+            ),
         ]
+
+
+class FindingHistory(models.Model):
+    """Linha do tempo preservada mesmo após exclusão da ocorrência."""
+
+    finding = models.ForeignKey(
+        Finding, null=True, on_delete=models.SET_NULL, related_name="history"
+    )
+    asset_ref = models.PositiveBigIntegerField()
+    vulnerability_ref = models.PositiveBigIntegerField()
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL
+    )
+    occurred_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    event = models.CharField(
+        max_length=20,
+        choices=[
+            ("created", "Registrada"),
+            ("updated", "Atualizada"),
+            ("corrected", "Corrigida"),
+            ("reopened", "Reaberta"),
+            ("deleted", "Excluída"),
+            ("imported", "Importada sem datas históricas"),
+        ],
+    )
+    old_status = models.PositiveSmallIntegerField(
+        null=True, choices=choices(SituacaoTratamento)
+    )
+    new_status = models.PositiveSmallIntegerField(
+        null=True, choices=choices(SituacaoTratamento)
+    )
+    old_detected_at = models.DateTimeField(null=True)
+    new_detected_at = models.DateTimeField(null=True)
+    old_corrected_at = models.DateTimeField(null=True)
+    new_corrected_at = models.DateTimeField(null=True)
+
+    class Meta:
+        ordering = ["-id"]
+        default_permissions = ("view",)
 
 
 class Dependency(models.Model):

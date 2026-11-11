@@ -67,6 +67,9 @@ async function startGraph() {
       const body = html('div','finding-text');
       body.append(html('strong','',vuln.cve || vuln.descricao));
       body.append(html('small','',vuln.cve ? vuln.descricao : vuln.situacao));
+      const detection=vuln.detected_at ? new Date(vuln.detected_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'short'}) : 'não informada';
+      const history=html('a','finding-dates','Detecção: '+detection);
+      history.href=vuln.history_url;history.title='Abrir histórico do tratamento';body.append(history);
       const badge = html('span', 'severity-badge '+severity({cvss_maximo:vuln.cvss})[1], `${vuln.cvss.toFixed(1)}`);
       badge.title = 'CVSS · '+vuln.gravidade;
       card.append(sign,body,badge); container.append(card);

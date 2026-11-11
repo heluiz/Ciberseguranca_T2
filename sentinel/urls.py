@@ -8,6 +8,16 @@ from django.urls import path
 from inventory import views
 
 urlpatterns = [
+    path(
+        "tratamentos/<int:pk>/historico/",
+        views.finding_history,
+        name="finding_history",
+    ),
+    path(
+        "auditoria/tratamentos.csv",
+        views.export_finding_history,
+        name="finding_history_export",
+    ),
     path("admin/", admin.site.urls),
     path("entrar/", views.SignIn.as_view(), name="login"),
     path("sair/", LogoutView.as_view(), name="logout"),

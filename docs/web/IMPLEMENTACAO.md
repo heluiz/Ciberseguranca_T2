@@ -9,6 +9,7 @@ A revisão visual segue a referência enviada pelo aluno; veja [VISUAL.md](VISUA
 - Login por sessão, logout por POST, alteração de senha e grupos Administrador, Analista e Leitor.
 - Inventário com sete tipos, ficha técnica, pesquisa, paginação e validação do domínio original.
 - Catálogo de vulnerabilidades compartilhadas, CVE/CWE, CVSS e vetor com conferência da nota.
+- Datas de detecção/correção por ocorrência, linha do tempo e exportação administrativa de histórico (veja [TRATAMENTOS.md](TRATAMENTOS.md)).
 - Tratamento por ativo; corrigida sai do risco, aceita como risco continua contando.
 - Dependências direcionadas com frações e soma abaixo de 1, protegidas também por trigger PostgreSQL.
 - Painel, ranking, plano de correção, relatório por setor e mapa com seleção, busca, zoom e enquadramento.

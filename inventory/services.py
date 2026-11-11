@@ -6,6 +6,7 @@ import json
 from django.db import transaction, connection
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
+from django.utils import timezone
 from classificacoes import TipoEquipamento
 from inventario import Inventario
 from vulnerabilidades import Vulnerabilidade
@@ -16,6 +17,7 @@ from .models import (
     Asset,
     Vulnerability,
     Finding,
+    FindingHistory,
     Dependency,
     AuditEvent,
     ImportReceipt,
@@ -58,6 +60,67 @@ def check_version(obj, version):
         raise Conflict(
             "Este registro mudou. Recarregue a página antes de salvar."
         )
+
+
+def finding_state(obj):
+    return {
+        field: getattr(obj, field)
+        for field in ("situacao", "detected_at", "corrected_at")
+    }
+
+
+def record_finding_history(obj, user, before, event):
+    after = finding_state(obj) if event != "deleted" else {}
+    FindingHistory.objects.create(
+        finding=obj,
+        actor=user,
+        asset_ref=obj.asset_id,
+        vulnerability_ref=obj.vulnerability_id,
+        event=event,
+        old_status=before.get("situacao"),
+        new_status=after.get("situacao"),
+        old_detected_at=before.get("detected_at"),
+        new_detected_at=after.get("detected_at"),
+        old_corrected_at=before.get("corrected_at"),
+        new_corrected_at=after.get("corrected_at"),
+    )
+
+
+def apply_finding_dates(obj, data, before, is_new):
+    now = timezone.now().replace(microsecond=0)
+    obj.detected_at = data.get("detected_at", before.get("detected_at"))
+    if is_new and "detected_at" not in data:
+        obj.detected_at = now
+    supplied_correction = data.get("corrected_at")
+    if obj.situacao == 3:
+        obj.corrected_at = supplied_correction or before.get("corrected_at")
+        if obj.corrected_at is None and (
+            is_new or before.get("situacao") != 3
+        ):
+            obj.corrected_at = now
+    else:
+        if supplied_correction and before.get("situacao") != 3:
+            raise ValueError(
+                "Só ocorrências corrigidas podem ter data de correção."
+            )
+        obj.corrected_at = None
+    for value in (obj.detected_at, obj.corrected_at):
+        if value is not None and (
+            not hasattr(value, "tzinfo") or timezone.is_naive(value)
+        ):
+            raise ValueError("As datas devem incluir fuso horário.")
+        if value is not None and value > timezone.now():
+            raise ValueError("Detecção e correção não podem ter data futura.")
+    for field in ("detected_at", "corrected_at"):
+        value = getattr(obj, field)
+        if value is not None:
+            setattr(obj, field, value.replace(microsecond=0))
+    if (
+        obj.detected_at
+        and obj.corrected_at
+        and obj.corrected_at < obj.detected_at
+    ):
+        raise ValueError("A correção não pode ser anterior à detecção.")
 
 
 def assign_asset(obj, equipment):
@@ -120,7 +183,14 @@ def save_entity(user, kind, data, pk=None):
                 raise ValueError("Esta CVE já está no catálogo.")
             assign_vulnerability(obj, vuln)
         elif kind == "finding":
+            before = finding_state(obj) if pk else {}
             asset, vuln = data["asset"], data["vulnerability"]
+            if pk and (
+                obj.asset_id != asset.pk or obj.vulnerability_id != vuln.pk
+            ):
+                raise ValueError(
+                    "Para outro ativo ou vulnerabilidade, crie uma nova ocorrência."
+                )
             if (
                 not pk
                 and Finding.objects.filter(
@@ -132,8 +202,19 @@ def save_entity(user, kind, data, pk=None):
                 )
             obj.asset, obj.vulnerability = asset, vuln
             obj.situacao = int(data["situacao"])
+            apply_finding_dates(obj, data, before, not pk)
             obj.full_clean()
             obj.save()
+            event = (
+                "created"
+                if not pk
+                else "corrected"
+                if obj.situacao == 3 and before["situacao"] != 3
+                else "reopened"
+                if before["situacao"] == 3 and obj.situacao != 3
+                else "updated"
+            )
+            record_finding_history(obj, user, before, event)
         else:
             source, target = data["source"], data["target"]
             if pk:
@@ -156,6 +237,19 @@ def delete_entity(user, kind, pk, version):
         if obj is None:
             raise Http404
         check_version(obj, version)
+        affected = (
+            [obj]
+            if kind == "finding"
+            else Finding.objects.filter(asset=obj)
+            if kind == "asset"
+            else Finding.objects.filter(vulnerability=obj)
+            if kind == "vulnerability"
+            else []
+        )
+        for finding in affected:
+            record_finding_history(
+                finding, user, finding_state(finding), "deleted"
+            )
         obj.delete()
         # Catálogo compartilhado fica preservado: excluir vínculo ou ativo não apaga a CVE.
         audit(user, "delete_" + kind, pk)
@@ -211,11 +305,12 @@ def import_json(content, user=None, dry_run=False):
             assign_vulnerability(Vulnerability(pk=vuln.id), vuln)
         for equipment in inv:
             for vid, status in equipment.vulnerabilidades.items():
-                Finding.objects.create(
+                finding = Finding.objects.create(
                     asset_id=equipment.id,
                     vulnerability_id=vid,
                     situacao=status.value,
                 )
+                record_finding_history(finding, user, {}, "imported")
             for target, fraction in equipment.dependencias.items():
                 Dependency.objects.create(
                     source_id=equipment.id, target_id=target, fracao=fraction
