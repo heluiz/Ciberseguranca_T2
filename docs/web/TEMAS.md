@@ -13,7 +13,7 @@ A preferência é salva apenas no navegador por `localStorage`; não é sincroni
 
 As paletas afetam cabeçalho, menu, botões, painéis, cartões, setas, rótulos, gradientes SVG e brilho. Vermelho/rosa e amarelo das gravidades, ações de exclusão e erros mantêm seus significados. A direção do risco e os dados do inventário não dependem do tema.
 
-A marca gráfica foi adaptada em SVG a partir da família de símbolos enviada (escudo, cadeado/fechadura e circuitos), coerente com a arte original em `banner.py`. Aparece no cabeçalho, na entrada e na visão geral, sem textos “UFU”, “Cibersegurança” ou “2ª turma” dentro do símbolo. O nome do produto continua SENTINEL. A CLI original não foi alterada.
+A marca gráfica foi adaptada em SVG a partir da família de símbolos enviada (escudo, cadeado/fechadura e circuitos), coerente com a arte original em `banner.py`. Aparece no cabeçalho, na entrada e na visão geral, sem textos “UFU”, “Cibersegurança” ou “2ª turma” dentro do símbolo. A versão compacta prioriza um escudo maior e uma fechadura preenchida, com apenas três terminais discretos de cada lado. O anel externo foi removido e o brilho reduzido para preservar a leitura em 38 e 46 px. O nome do produto continua SENTINEL. A CLI original não foi alterada.
 
 Referências foram inspecionadas sem executar a estratégia nem alterar o NinjaTrader. A imagem enviada contém informações de trading que não foram copiadas para a aplicação. O código de trading e as fotos de referência não são distribuídos no repositório web.
 

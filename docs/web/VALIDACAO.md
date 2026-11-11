@@ -24,3 +24,7 @@ Direção visual do risco: API e navegador conferem que A depende de B implica a
 Datas de tratamento: 57 testes novos passaram no PostgreSQL, incluindo datas desconhecidas, limites cronológicos, fuso, reabertura, histórico preservado após exclusão, permissões, CSV e ausência de efeito das datas no risco. O navegador exercitou fechamento, reabertura e linha do tempo; capturas em `datas-tratamento.png` e `historico-tratamento.png`.
 
 Temas: verificados no navegador os quatro esquemas, persistência ao recarregar e navegar, fallback de preferência inválida, cores dos SVG e gravidade preservada; tema verde em celular sem transbordamento. Marca gráfica derivada das referências do aluno, sem dizeres acadêmicos dentro do símbolo. Veja `TEMAS.md`.
+
+### Leitura da marca no cabeçalho
+
+Marca SVG simplificada com escudo maior, fechadura preenchida, circuitos secundários e brilho reduzido. Conferida no Chromium real nos quatro temas: cabeçalho de 46 px, celular de 38 px e entrada de 74 px. Viewport de 390 × 844 px sem transbordamento horizontal da página e sem erros JavaScript. Capturas: `screenshots/logo-corrigida-previa.png`, `screenshots/mapa-logo-corrigida-mobile-tela.png` e `screenshots/mapa-logo-corrigida-mobile.png` (página completa). Mudança visual; suíte de backend não reexecutada nesta revisão.
