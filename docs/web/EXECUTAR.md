@@ -1,5 +1,7 @@
 # Executar a versão web
 
+No Windows, o caminho assistido é `ABRIR-SENTINEL.cmd`, na raiz do projeto, após instalar e abrir o Docker Desktop. Veja o [passo a passo e a correção da inicialização local](INICIALIZACAO-WINDOWS.md). O script prepara a primeira execução e verifica os arquivos da interface antes de abrir o navegador. Os comandos manuais abaixo continuam disponíveis.
+
 ## Local com Docker Desktop (Windows ou Linux)
 
 Pré-requisitos: Git, Docker Engine/Compose ou Docker Desktop. No Windows, usar containers Linux. Não é necessário instalar PostgreSQL nem Python no host.

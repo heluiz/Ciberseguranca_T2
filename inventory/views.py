@@ -38,6 +38,13 @@ TITLES = {
     "dependency": "Dependências",
 }
 
+INVENTORY_READ_PERMISSIONS = (
+    "inventory.view_asset",
+    "inventory.view_vulnerability",
+    "inventory.view_finding",
+    "inventory.view_dependency",
+)
+
 
 class SignIn(LoginView):
     template_name = "registration/login.html"
@@ -64,7 +71,7 @@ def health(request):
 
 
 @login_required
-@permission_required("inventory.view_asset", raise_exception=True)
+@permission_required(INVENTORY_READ_PERMISSIONS, raise_exception=True)
 def dashboard(request):
     inv = snapshot()
     model = ModeloRisco(inv)
@@ -397,7 +404,7 @@ def transfer(request):
 
 
 @login_required
-@permission_required("inventory.view_asset", raise_exception=True)
+@permission_required(INVENTORY_READ_PERMISSIONS, raise_exception=True)
 @require_GET
 def export(request):
     response = HttpResponse(
@@ -436,8 +443,33 @@ def rest(request, kind, pk=None):
             if not queryset.exists():
                 raise Http404
         allowed = FORMS[kind]._meta.fields
-        rows = list(queryset.values("id", *allowed)[:100])
-        return JsonResponse({"results": rows, "limit": 100})
+        try:
+            limit = int(request.GET.get("limit", "100"))
+            offset = int(request.GET.get("offset", "0"))
+            if not 1 <= limit <= 100 or not 0 <= offset <= 2_147_483_647:
+                raise ValueError
+        except ValueError:
+            return JsonResponse(
+                {
+                    "error": "Use limit entre 1 e 100 e offset inteiro não negativo até 2147483647."
+                },
+                status=400,
+            )
+        # Detalhe não é uma coleção paginada; preserva o envelope existente.
+        if pk:
+            limit, offset = 1, 0
+        count = queryset.count()
+        rows = list(queryset.values("id", *allowed)[offset : offset + limit])
+        next_offset = offset + len(rows)
+        return JsonResponse(
+            {
+                "results": rows,
+                "limit": limit,
+                "offset": offset,
+                "count": count,
+                "next_offset": next_offset if next_offset < count else None,
+            }
+        )
     if request.method not in ("POST", "PATCH", "DELETE"):
         return JsonResponse({"error": "Método não permitido."}, status=405)
     if (request.method == "POST" and pk) or (

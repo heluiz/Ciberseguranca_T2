@@ -1,6 +1,6 @@
 # Matriz das sprints e limites de evidência
 
-Revisão detalhada de 11/11/2026: [79 cartões, referências e achados](REVISAO-SPRINTS-2026-11-11.md). Esta matriz é um resumo de implementação; não equivale a aceite acadêmico. A revisão encontrou falha de autorização na exportação, listagem REST incompleta e lacunas específicas descritas no relatório.
+Revisão detalhada de 11/11/2026: [79 cartões, referências e achados](REVISAO-SPRINTS-2026-11-11.md). Esta matriz é um resumo de implementação; não equivale a aceite acadêmico. Autorização na exportação/dashboard e paginação REST foram corrigidas posteriormente; veja [evidências atuais](INICIALIZACAO-WINDOWS.md). As demais lacunas descritas no relatório permanecem.
 
 Base: cartões e referências do [quadro Sprints 1 a 4](https://trello.com/b/mA9IHmx0/sprints-1-a-4-e-trabalhos-1-e-2), consultados no planejamento. O estado de um cartão no quadro não comprova implementação. Os PDFs de enunciado anexados não foram lidos nesta etapa; confirmar requisitos finais nesses documentos antes da entrega.
 
@@ -24,7 +24,7 @@ Sprints 1 e 2 (39 cartões): fundamentos de Python, CRUD, enums, validações, p
 | 15 — UX/Figma/WCAG | Interface responsiva implementada; Figma e relatório heurístico/manual pendentes |
 | 16 — frontend | Templates, CSS Grid, variáveis CSS, JavaScript modular simples |
 | 17 — Fetch | Grafo carrega JSON via Fetch e async/await, com falha tratada |
-| 18 — REST | CRUD de quatro recursos e testes; coleção Postman inicial tem exemplos, mas ainda não scripts de teste. Listagem REST limitada a 100 sem paginação; correção pendente |
+| 18 — REST | CRUD de quatro recursos e testes; coleção Postman inicial tem exemplos, mas ainda não scripts de teste. Paginação REST com limit/offset corrigida e testada |
 | 19 — backend/relacional | Django e PostgreSQL; substituição dos exemplos Flask/FastAPI, explicar escolha |
 | 20 — segurança/rede/LGPD | Controles e modelo de ameaças; relatório acadêmico de estatística/sustentabilidade pendente |
 

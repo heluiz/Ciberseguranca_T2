@@ -1,5 +1,9 @@
 # Evidências desta versão local
 
+## Correções posteriores à revisão — 11/11/2026
+
+Autorização da exportação/dashboard e paginação REST corrigidas: 115 testes originais e 69 web/didáticos passaram, com 85% de cobertura agregada de `inventory` + `academic`. O modo local agora serve os CSS/JS: cinco endereços HTTP retornaram 200 com PostgreSQL real. Iniciador Windows preparado e verificado em PowerShell/Linux com serviços simulados; Docker Desktop/Windows real continua sem acesso para confirmação. Detalhes em [INICIALIZACAO-WINDOWS.md](INICIALIZACAO-WINDOWS.md). Os achados R01/R02 abaixo descrevem a versão anterior.
+
 ## Revisão contra as sprints — 11/11/2026
 
 No commit de aplicação `73c4a6e`, foram reexecutados os 115 testes originais, 57 testes web/didáticos e Ruff: todos passaram. Cobertura agregada de `inventory` e `academic`: 84% (946 instruções, 150 não cobertas).

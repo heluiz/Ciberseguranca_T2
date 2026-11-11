@@ -2,7 +2,7 @@
 
 A versão web usa Django 5.2 LTS, PostgreSQL, templates HTML, CSS, JavaScript, SVG e Cytoscape.js. A CLI original permanece disponível. Esta branch é local; não houve publicação nem implantação no servidor.
 
-**Pendências confirmadas na revisão de 11/11/2026:** exportação permite consultar vulnerabilidades com apenas a permissão de visualizar ativos; listagens REST param em 100 registros sem paginação. O contrato de Repository também não permite substituir os serviços completos por um adaptador em memória. Os testes existentes passam, mas não cobriam esses casos. Ver [relatório completo](REVISAO-SPRINTS-2026-11-11.md). Falhas ainda não corrigidas nesta rodada de revisão.
+**Atualização após a revisão de 11/11/2026:** as falhas de autorização na exportação/dashboard e de paginação REST foram corrigidas e receberam testes de regressão. A inicialização local também foi corrigida para servir CSS/JS e ganhou iniciador Windows; veja [evidências e limites](INICIALIZACAO-WINDOWS.md). O contrato de Repository ainda não permite substituir os serviços completos por um adaptador em memória. O [relatório original](REVISAO-SPRINTS-2026-11-11.md) descreve o estado anterior às correções; as demais pendências permanecem.
 
 A revisão visual segue a referência enviada pelo aluno; veja [VISUAL.md](VISUAL.md) e o vídeo real dos efeitos em `screenshots/sentinel-neon.mp4`.
 
@@ -17,7 +17,7 @@ A revisão visual segue a referência enviada pelo aluno; veja [VISUAL.md](VISUA
 - Painel, ranking, plano de correção, relatório por setor e mapa com seleção, busca, zoom e enquadramento.
 - Importação inicial de JSON com validação, simulação, transação, reconciliação e recibo idempotente; exportação compatível.
 - Consulta local ao CISA KEV incluído no projeto. Atualização remota continua no fluxo CLI original; não há atualização automática ou URL arbitrária na web.
-- API de sessão para os quatro recursos, com CSRF e permissões por recurso; revisar a inconsistência de autorização da exportação descrita acima.
+- API de sessão para os quatro recursos, com CSRF, permissões por recurso e paginação; exportação completa exige as quatro permissões de leitura do inventário.
 - Auditoria de mutações e autenticação; eventos de administração de usuários também têm o histórico do admin Django.
 
 ## Arquitetura
