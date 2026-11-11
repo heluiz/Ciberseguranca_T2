@@ -186,8 +186,8 @@ async function startGraph() {
       g.dataset.id=id;
       g.append(el('rect',{x:-3,y:-3,width:204,height:92,rx:13,class:'node-halo'}),el('rect',{width:198,height:86,rx:11,class:'node-card'}));
       g.append(icon(icons[node.tipo_id],15,23,35));
-      const title=el('text',{x:64,y:24,class:'node-hostname'},node.label.length>19?node.label.slice(0,18)+'…':node.label);
-      g.append(title,el('text',{x:64,y:43,class:'node-kind'},node.tipo.length>22?node.tipo.slice(0,21)+'…':node.tipo));
+      const title=el('text',{x:64,y:24,class:'node-hostname'},node.label.length>17?node.label.slice(0,16)+'…':node.label);
+      g.append(title,el('text',{x:64,y:43,class:'node-kind'},({1:'Computador',2:'Servidor',3:'Roteador',4:'Impressora',5:'Sistema interno',6:'Banco de dados',7:'Outro ativo'})[node.tipo_id]));
       const badgeWidth=Math.min(127,Math.max(55,severityText.length*6+21));
       g.append(el('rect',{x:64,y:53,width:badgeWidth,height:21,rx:7,class:'node-severity-bg '+severityClass}),el('text',{x:73,y:68,class:'node-severity-text '+severityClass},severityText));
       const choose=()=>showInspector(node);

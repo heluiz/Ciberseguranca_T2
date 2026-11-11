@@ -22,3 +22,5 @@ A revisão de neon e mapa está descrita em [VISUAL.md](VISUAL.md). Foram testad
 Direção visual do risco: API e navegador conferem que A depende de B implica animação B → A. Verificadas as 164 conexões desenhadas e curvas separadas para relações recíprocas, além de fixture com frações 50%/25% nos dois sentidos.
 
 Datas de tratamento: 57 testes novos passaram no PostgreSQL, incluindo datas desconhecidas, limites cronológicos, fuso, reabertura, histórico preservado após exclusão, permissões, CSV e ausência de efeito das datas no risco. O navegador exercitou fechamento, reabertura e linha do tempo; capturas em `datas-tratamento.png` e `historico-tratamento.png`.
+
+Temas: verificados no navegador os quatro esquemas, persistência ao recarregar e navegar, fallback de preferência inválida, cores dos SVG e gravidade preservada; tema verde em celular sem transbordamento. Marca gráfica derivada das referências do aluno, sem dizeres acadêmicos dentro do símbolo. Veja `TEMAS.md`.

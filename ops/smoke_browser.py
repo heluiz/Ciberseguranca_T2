@@ -108,6 +108,50 @@ try:
                 )
             page.locator("#motion-toggle").click()
             page.emulate_media(reduced_motion="reduce")
+        # Temas alteram CSS e SVG sem mudar a direção nem os dados do grafo.
+        expected_colors = {
+            "neon": "rgb(18, 240, 255)",
+            "sniper": "rgb(0, 255, 65)",
+            "ninjatrader": "rgb(100, 231, 155)",
+            "campo": "rgb(109, 255, 155)",
+        }
+        severity_color = page.locator(
+            ".node-severity-bg.critical"
+        ).first.evaluate("(node) => getComputedStyle(node).fill")
+        for theme, color in expected_colors.items():
+            page.locator("#theme-select").select_option(theme)
+            assert page.locator("html").get_attribute("data-theme") == theme
+            assert (
+                page.locator(".asset-node.is-selected .node-card").evaluate(
+                    "(node) => getComputedStyle(node).stroke"
+                )
+                == color
+            )
+            assert (
+                page.locator(".node-severity-bg.critical").first.evaluate(
+                    "(node) => getComputedStyle(node).fill"
+                )
+                == severity_color
+            )
+            page.screenshot(
+                path=str(out / f"mapa-tema-{theme}.png"), full_page=True
+            )
+        page.locator("#theme-select").select_option("sniper")
+        page.reload()
+        page.get_by_text("76 ativos ·", exact=False).wait_for()
+        assert page.locator("html").get_attribute("data-theme") == "sniper"
+        assert page.locator("#theme-select").input_value() == "sniper"
+        page.goto("http://127.0.0.1:8765/registros/asset/")
+        assert page.locator("html").get_attribute("data-theme") == "sniper"
+        page.goto("http://127.0.0.1:8765/mapa/")
+        page.get_by_text("76 ativos ·", exact=False).wait_for()
+        page.evaluate(
+            "localStorage.setItem('sentinel.theme', 'invalid-theme')"
+        )
+        page.reload()
+        page.get_by_text("76 ativos ·", exact=False).wait_for()
+        assert page.locator("html").get_attribute("data-theme") == "neon"
+        page.locator("#theme-select").select_option("neon")
         assert page.locator(".asset-node").count() > 1
         assert (
             page.locator(".node-card").count()
@@ -167,6 +211,14 @@ try:
         assert page.evaluate(
             "document.documentElement.scrollWidth <= window.innerWidth"
         )
+        page.locator("#theme-select").select_option("sniper")
+        assert page.evaluate(
+            "document.documentElement.scrollWidth <= window.innerWidth"
+        )
+        page.screenshot(
+            path=str(out / "mapa-tema-sniper-mobile.png"), full_page=True
+        )
+        page.locator("#theme-select").select_option("neon")
         page.screenshot(path=str(out / "mapa-mobile.png"), full_page=True)
         page.set_viewport_size({"width": 1600, "height": 1000})
         for route in ["asset", "vulnerability", "finding", "dependency"]:
