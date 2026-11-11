@@ -18,3 +18,5 @@ A marca gráfica foi adaptada em SVG a partir da família de símbolos enviada (
 Referências foram inspecionadas sem executar a estratégia nem alterar o NinjaTrader. A imagem enviada contém informações de trading que não foram copiadas para a aplicação. O código de trading e as fotos de referência não são distribuídos no repositório web.
 
 Validação de navegador: alternância das quatro opções; cor efetiva dos cartões SVG; preservação da cor de gravidade; escolha após recarregar e navegar; retorno seguro para preferência inválida; mapa e controles em viewport de 390 px sem transbordamento. Capturas reais em `screenshots/mapa-tema-*.png`.
+
+Demonstração real de 16 segundos: `screenshots/sentinel-animacoes-verdes.mp4`. Mostra verde NQ Sniper e verde NinjaTrader com fluxo ativo, realce ao passar o mouse, seleção, zoom, pausa e retomada. Os quadros foram capturados no navegador com movimento habilitado e os tempos preservados na montagem. MP4 H.264, 1280×800, sem áudio. A gravação não altera o inventário.
