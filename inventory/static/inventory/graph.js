@@ -117,12 +117,13 @@ async function startGraph() {
     svg.append(defs);
   }
   function focusLayout() {
-    const incoming=edges.filter(e=>e.target===focused.id).sort((a,b)=>b.fracao-a.fracao);
-    const outgoing=edges.filter(e=>e.source===focused.id).sort((a,b)=>b.fracao-a.fracao);
+    // O modelo guarda A -> B quando A depende de B. O risco flui B -> A.
+    const incoming=edges.filter(e=>e.risk_target===focused.id).sort((a,b)=>b.fracao-a.fracao);
+    const outgoing=edges.filter(e=>e.risk_source===focused.id).sort((a,b)=>b.fracao-a.fracao);
     const used=new Set([focused.id]);
     const left=[],right=[],last=[];
-    for (const edge of incoming) if (!used.has(edge.source) && left.length<4) {used.add(edge.source);left.push(nodes.get(edge.source));}
-    for (const edge of outgoing) if (!used.has(edge.target) && right.length<4) {used.add(edge.target);right.push(nodes.get(edge.target));}
+    for (const edge of incoming) if (!used.has(edge.risk_source) && left.length<4) {used.add(edge.risk_source);left.push(nodes.get(edge.risk_source));}
+    for (const edge of outgoing) if (!used.has(edge.risk_target) && right.length<4) {used.add(edge.risk_target);right.push(nodes.get(edge.risk_target));}
     // Contexto de segundo nível, sempre com relações realmente cadastradas.
     for (const edge of edges) {
       const candidate=used.has(edge.source) && !used.has(edge.target) ? edge.target : used.has(edge.target) && !used.has(edge.source) ? edge.source : null;
@@ -158,7 +159,7 @@ async function startGraph() {
     for (const edge of edges) {
       if (!positions.has(edge.source)||!positions.has(edge.target)) continue;
       if(!isAll && edge.source!==focused.id && edge.target!==focused.id && !context.has(edge.id))continue;
-      const s=positions.get(edge.source),t=positions.get(edge.target);
+      const s=positions.get(edge.risk_source),t=positions.get(edge.risk_target);
       const direction=t.x>=s.x?1:-1;
       const x1=s.x+direction*96,x2=t.x-direction*104;
       const curve=Math.max(45,Math.abs(x2-x1)*.5);
@@ -166,7 +167,10 @@ async function startGraph() {
       const arc=reverse?(Number(edge.source)<Number(edge.target)?-32:32):0;
       const d=`M${x1},${s.y} C${x1+direction*curve},${s.y+arc} ${x2-direction*curve},${t.y+arc} ${x2},${t.y}`;
       const color=edge.source===focused.id || edge.target===focused.id ? 'cyan':'purple';
-      const group=el('g',{class:'connection '+color});
+      const group=el('g',{class:'connection '+color,'data-edge-id':edge.id,
+        'data-risk-source':edge.risk_source,'data-risk-target':edge.risk_target,
+        'data-fraction':edge.fracao});
+      group.append(el('title',{},`${nodes.get(edge.risk_target).label} herda ${(edge.fracao*100).toLocaleString('pt-BR')}% do risco de ${nodes.get(edge.risk_source).label}`));
       group.append(el('path',{d,class:'wire-halo'}),el('path',{d,class:'wire-line','marker-end':'url(#arrow-'+color+')'}));
       if (!isAll) group.append(el('path',{d,class:'wire-flow'}));
       const cx=(x1+x2)/2,cy=(s.y+t.y)/2+arc*.75;

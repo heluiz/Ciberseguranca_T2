@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 import urllib.request
 import tempfile
+import re
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "sentinel.settings")
@@ -117,6 +118,46 @@ try:
         page.locator("#motion-toggle").click()
         page.locator("#graph-scope").select_option("all")
         assert page.locator(".asset-node").count() == 76
+        # Confere a geometria desenhada: o caminho começa no emissor de risco
+        # e termina no ativo que o herda, inclusive nas relações recíprocas.
+        data = page.request.get("http://127.0.0.1:8765/api/grafo/").json()
+        drawn_paths = {}
+        api_edges = [
+            item["data"]
+            for item in data["elements"]
+            if "source" in item["data"]
+        ]
+        assert page.locator(".connection").count() == len(api_edges)
+        for edge in api_edges:
+            group = page.locator(f'.connection[data-edge-id="{edge["id"]}"]')
+            assert group.get_attribute("data-risk-source") == edge["target"]
+            assert group.get_attribute("data-risk-target") == edge["source"]
+            path = group.locator(".wire-line").get_attribute("d")
+            numbers = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", path)]
+            source_transform = page.locator(
+                f'.asset-node[data-id="{edge["target"]}"]'
+            ).get_attribute("transform")
+            target_transform = page.locator(
+                f'.asset-node[data-id="{edge["source"]}"]'
+            ).get_attribute("transform")
+            sx, sy = [
+                float(n)
+                for n in re.findall(r"-?\d+(?:\.\d+)?", source_transform)
+            ]
+            tx, ty = [
+                float(n)
+                for n in re.findall(r"-?\d+(?:\.\d+)?", target_transform)
+            ]
+            assert abs(numbers[0] - (sx + 99)) == 96
+            assert numbers[1] == sy + 43
+            assert abs(numbers[-2] - (tx + 99)) == 104
+            assert numbers[-1] == ty + 43
+            assert group.locator(".wire-line").get_attribute("marker-end")
+            drawn_paths[(edge["source"], edge["target"])] = path
+        reciprocal = [(a, b) for a, b in drawn_paths if (b, a) in drawn_paths]
+        assert reciprocal
+        for a, b in reciprocal:
+            assert drawn_paths[(a, b)] != drawn_paths[(b, a)]
         page.locator("#graph-scope").select_option("focus")
         page.locator("#graph-search").fill("BANCO")
         assert page.locator("#graph-results button").count() > 0

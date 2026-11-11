@@ -462,3 +462,45 @@ def test_map_detail_does_not_expose_vulnerability_data_to_asset_only_account(
     client.force_login(user)
     for path in ["/api/grafo/", "/api/simular/1/", "/ativos/1/"]:
         assert client.get(path).status_code == 403
+
+
+def test_risk_flow_direction_is_inverse_of_dependency_including_reciprocal(
+    admin, sample
+):
+    client = Client()
+    client.force_login(admin)
+    payload = client.get("/api/grafo/").json()
+    edges = {
+        item["data"]["id"]: item["data"]
+        for item in payload["elements"]
+        if "source" in item["data"]
+    }
+    # Estação depende do servidor: risco do servidor -> estação, sem volta.
+    assert edges["d1-2"]["source"] == "1"
+    assert edges["d1-2"]["target"] == "2"
+    assert edges["d1-2"]["risk_source"] == "2"
+    assert edges["d1-2"]["risk_target"] == "1"
+    assert "d2-1" not in edges
+    # Servidor e banco dependem um do outro, com pesos independentes.
+    assert (
+        edges["d2-3"]["risk_source"],
+        edges["d2-3"]["risk_target"],
+        edges["d2-3"]["fracao"],
+    ) == ("3", "2", 0.5)
+    assert (
+        edges["d3-2"]["risk_source"],
+        edges["d3-2"]["risk_target"],
+        edges["d3-2"]["fracao"],
+    ) == ("2", "3", 0.25)
+    # A contribuição deve usar exatamente a fração e o risco do emissor.
+    rows = {
+        item["data"]["id"]: item["data"]
+        for item in payload["elements"]
+        if "source" not in item["data"]
+    }
+    inherited = sum(
+        rows[edge["risk_source"]]["risco"] * edge["fracao"]
+        for edge in edges.values()
+        if edge["risk_target"] == "2"
+    )
+    assert rows["2"]["herdado"] == pytest.approx(inherited)

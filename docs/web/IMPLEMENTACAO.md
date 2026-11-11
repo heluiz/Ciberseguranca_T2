@@ -23,7 +23,7 @@ A revisão visual segue a referência enviada pelo aluno; veja [VISUAL.md](VISUA
 
 A Factory original escolhe a subclasse de equipamento; o polimorfismo fornece o fator de exposição. O Repository possui adaptadores PostgreSQL e memória. O serviço aplica autorização e transação. O cálculo continua em `risco.ModeloRisco`: `x = b + Ax`, usando `numpy.linalg.solve`, diagnóstico de condição e conferência de resíduo.
 
-O risco próprio e efetivo são pontos sem limite de 100. CVSS é a escala de 0,1 a 10. Setas mostram dependências declaradas, sem medir tráfego ou comprovar exploração. Ciclos não significam necessariamente singularidade.
+O risco próprio e efetivo são pontos sem limite de 100. CVSS é a escala de 0,1 a 10. Setas mostram a propagação do risco pelas dependências declaradas, sem medir tráfego ou comprovar exploração. Ciclos não significam necessariamente singularidade.
 
 ## Decisões e diferenças do legado
 

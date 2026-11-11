@@ -15,7 +15,7 @@ O mapa foi reconstruído seguindo a imagem enviada: cabeçalho com escudo, barra
 
 ## Precisão dos dados
 
-Nenhum ativo, ligação ou valor da imagem conceitual foi inventado na aplicação. Os percentuais das setas são as frações de dependência. Risco próprio, herdado, efetivo e redução prevista são pontos do modelo, não percentuais. Gravidade nos cartões é baseada no maior CVSS não corrigido.
+Nenhum ativo, ligação ou valor da imagem conceitual foi inventado na aplicação. Os percentuais das setas são as frações de dependência. A convenção do mapa é a propagação do risco: se A depende de B, seta e animação vão de B para A. Relações recíprocas têm curvas separadas e podem ter frações diferentes. O esquema relacional e os campos `source`/`target` da API continuam representando a dependência; `risk_source`/`risk_target` explicitam a direção visual. Risco próprio, herdado, efetivo e redução prevista são pontos do modelo, não percentuais. Gravidade nos cartões é baseada no maior CVSS não corrigido.
 
 O plano usa a redução calculada pelo ModeloRisco. “Revisar tratamento” abre os tratamentos filtrados pelo ativo; não se apresenta uma remediação genérica como solução comprovada de uma CVE.
 

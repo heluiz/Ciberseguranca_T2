@@ -279,6 +279,8 @@ def graph_data(request):
                 "id": f"d{e.id}-{target}",
                 "source": str(e.id),
                 "target": str(target),
+                "risk_source": str(target),
+                "risk_target": str(e.id),
                 "label": f"{fraction:.0%}",
                 "fracao": fraction,
             }
