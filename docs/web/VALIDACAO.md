@@ -1,5 +1,15 @@
 # Evidências desta versão local
 
+## Revisão contra as sprints — 11/11/2026
+
+No commit de aplicação `73c4a6e`, foram reexecutados os 115 testes originais, 57 testes web/didáticos e Ruff: todos passaram. Cobertura agregada de `inventory` e `academic`: 84% (946 instruções, 150 não cobertas).
+
+Duas verificações adicionais encontraram defeitos ainda abertos: uma conta com apenas `view_asset` recebe 403 na API de vulnerabilidades, mas 200 na exportação com essas vulnerabilidades; a API de dependências retorna 100 dos 164 registros sem mecanismo de continuação. A conta de teste foi usada em transação revertida. Não houve correção de aplicação nesta rodada.
+
+O [relatório detalhado](REVISAO-SPRINTS-2026-11-11.md) compara os 79 cartões e cataloga as referências. PDFs de enunciado e conteúdo integral dos vídeos sem transcrição permanecem pendentes. A base original foi confrontada com a árvore remota (34 itens, sem diferenças); não houve push ou implantação.
+
+## Evidências das etapas anteriores
+
 Verificações executadas em 11/11/2026, com Python 3.12.14 e PostgreSQL 17.11 reais:
 
 - 115 testes originais: passaram.

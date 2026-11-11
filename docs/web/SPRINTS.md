@@ -1,5 +1,7 @@
 # Matriz das sprints e limites de evidência
 
+Revisão detalhada de 11/11/2026: [79 cartões, referências e achados](REVISAO-SPRINTS-2026-11-11.md). Esta matriz é um resumo de implementação; não equivale a aceite acadêmico. A revisão encontrou falha de autorização na exportação, listagem REST incompleta e lacunas específicas descritas no relatório.
+
 Base: cartões e referências do [quadro Sprints 1 a 4](https://trello.com/b/mA9IHmx0/sprints-1-a-4-e-trabalhos-1-e-2), consultados no planejamento. O estado de um cartão no quadro não comprova implementação. Os PDFs de enunciado anexados não foram lidos nesta etapa; confirmar requisitos finais nesses documentos antes da entrega.
 
 Sprints 1 e 2 (39 cartões): fundamentos de Python, CRUD, enums, validações, persistência, requisitos, especificação e Git já são representados pelo projeto original e seus testes. Não se atribui atendimento individual a cada exercício teórico pela existência do programa. A extensão web preserva as regras e acrescenta documentação e testes.
@@ -22,7 +24,7 @@ Sprints 1 e 2 (39 cartões): fundamentos de Python, CRUD, enums, validações, p
 | 15 — UX/Figma/WCAG | Interface responsiva implementada; Figma e relatório heurístico/manual pendentes |
 | 16 — frontend | Templates, CSS Grid, variáveis CSS, JavaScript modular simples |
 | 17 — Fetch | Grafo carrega JSON via Fetch e async/await, com falha tratada |
-| 18 — REST | CRUD de quatro recursos e testes; coleção Postman inicial com exemplos em `SENTINEL.postman_collection.json` |
+| 18 — REST | CRUD de quatro recursos e testes; coleção Postman inicial tem exemplos, mas ainda não scripts de teste. Listagem REST limitada a 100 sem paginação; correção pendente |
 | 19 — backend/relacional | Django e PostgreSQL; substituição dos exemplos Flask/FastAPI, explicar escolha |
 | 20 — segurança/rede/LGPD | Controles e modelo de ameaças; relatório acadêmico de estatística/sustentabilidade pendente |
 
@@ -31,16 +33,16 @@ Sprints 1 e 2 (39 cartões): fundamentos de Python, CRUD, enums, validações, p
 | Cartão | Evidência / situação |
 |---|---|
 | 01 — camadas | `views`, `services`, `repository`, domínio original e esquema relacional |
-| 02 — SOLID | Interface Repository e implementações memória/PostgreSQL; teste de reconstrução |
+| 02 — SOLID | Interface de carga e leitores memória/PostgreSQL; serviços ainda dependem do adaptador concreto e escrevem no ORM. DIP/substituição de casos de uso e relatório pendentes |
 | 03 — padrões | Factory e Repository concretos; Strategy alterna ranking por risco próprio/efetivo |
 | 04 — JSON | Importação/exportação e CLI legado preservados; banco ativo conforme orientação verbal |
 | 05 — HTTP | Django/Gunicorn, `/health/`, teste cliente, API; 24h ainda sem evidência |
 | 06 — JOINs | FKs, M:N Finding, autorrelação Dependency, ORM parametrizado |
 | 07 — agregações | Relatório com COUNT/AVG/MAX/GROUP BY; exemplos HAVING/CASE em `consultas.sql` |
 | 08 — hash/índices | Hash encadeado testado, índices PostgreSQL; comparação 10/1000/100000 em `MEDICOES.md`; EXPLAIN em `consultas.sql` |
-| 09 — BST | Inserção, percurso em ordem, altura, entradas ordenadas/aleatórias; percursos pré/pós-ordem incluídos |
-| 10 — BFS/DFS | Alcançabilidade e detecção de ciclo testadas; sem alegar descoberta de ataque |
-| 11 — Merge Sort | Implementação estável e teste de estabilidade/equivalência; medições em `MEDICOES.md` |
+| 09 — BST | Inserção, em ordem, pré/pós-ordem e altura testados; busca, percurso por nível e relatório de alturas pendentes |
+| 10 — BFS/DFS | Alcançabilidade/ciclo testados em grafo sintético; aplicação ao inventário e relatório de alcance/saltos pendentes; sem alegar descoberta de ataque |
+| 11 — Merge Sort | Implementação estável e testes; medições em `MEDICOES.md`. Ranking usa `sorted`; demonstração acadêmica sobre o risco real pendente |
 | 12 — Quick Sort | Lomuto aleatório iterativo e testes; comparação em `MEDICOES.md` |
 | 13 — desempenho | Complexidades documentadas; timeit/cProfile e solve 10/100/1000 em `MEDICOES.md` (não mede pipeline completo) |
 | 14 — pytest/cobertura | Fixtures, approx, tmp_path, testes de concorrência; CI preparado |
