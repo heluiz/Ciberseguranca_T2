@@ -1,6 +1,8 @@
 # SENTINEL Web — implementação em revisão
 
-A versão web usa Django 5.2 LTS, PostgreSQL, templates HTML, CSS, JavaScript e Cytoscape.js. A CLI original permanece disponível. Esta branch é local; não houve publicação nem implantação no servidor.
+A versão web usa Django 5.2 LTS, PostgreSQL, templates HTML, CSS, JavaScript, SVG e Cytoscape.js. A CLI original permanece disponível. Esta branch é local; não houve publicação nem implantação no servidor.
+
+A revisão visual segue a referência enviada pelo aluno; veja [VISUAL.md](VISUAL.md) e o vídeo real dos efeitos em `screenshots/sentinel-neon.mp4`.
 
 ## Funcionalidades
 

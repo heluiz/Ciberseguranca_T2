@@ -7,6 +7,7 @@ import subprocess
 import time
 from pathlib import Path
 import urllib.request
+import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "sentinel.settings")
@@ -20,8 +21,9 @@ root = Path(__file__).resolve().parent.parent
 out = root / "docs/web/screenshots"
 out.mkdir(parents=True, exist_ok=True)
 password = secrets.token_urlsafe(32)
+test_hostname = "PC-BROWSER-" + secrets.token_hex(3).upper()
 user = get_user_model().objects.create_superuser(
-    "browser-" + secrets.token_hex(4), password=password
+    "browser-" + secrets.token_hex(4), password=password, first_name="Heluiz"
 )
 server = subprocess.Popen(
     [
@@ -55,7 +57,7 @@ try:
             ],
         )
         page = browser.new_page(
-            viewport={"width": 1440, "height": 1080},
+            viewport={"width": 1600, "height": 1000},
             device_scale_factor=1,
             reduced_motion="reduce",
         )
@@ -72,26 +74,79 @@ try:
         page.get_by_text("76 ativos ·", exact=False).wait_for()
         page.wait_for_timeout(800)
         page.screenshot(path=str(out / "mapa-desktop.png"), full_page=True)
+        if os.environ.get("CAPTURE_EFFECTS") == "1":
+            page.emulate_media(reduced_motion="no-preference")
+            page.locator("#motion-toggle").click()
+            with tempfile.TemporaryDirectory() as frame_dir:
+                for frame in range(32):
+                    page.screenshot(
+                        path=str(Path(frame_dir) / f"frame-{frame:03d}.png")
+                    )
+                    page.wait_for_timeout(90)
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-loglevel",
+                        "error",
+                        "-framerate",
+                        "8",
+                        "-i",
+                        str(Path(frame_dir) / "frame-%03d.png"),
+                        "-vf",
+                        "scale=1280:-2",
+                        "-c:v",
+                        "libx264",
+                        "-pix_fmt",
+                        "yuv420p",
+                        "-movflags",
+                        "+faststart",
+                        str(out / "sentinel-neon.mp4"),
+                    ],
+                    check=True,
+                )
+            page.locator("#motion-toggle").click()
+            page.emulate_media(reduced_motion="reduce")
+        assert page.locator(".asset-node").count() > 1
+        assert (
+            page.locator(".node-card").count()
+            == page.locator(".asset-node").count()
+        )
+        page.get_by_role("button", name="Simular correção").click()
+        page.get_by_text("Nenhum dado foi alterado.", exact=False).wait_for()
+        page.locator("#motion-toggle").click()
+        page.locator("#graph-scope").select_option("all")
+        assert page.locator(".asset-node").count() == 76
+        page.locator("#graph-scope").select_option("focus")
         page.locator("#graph-search").fill("BANCO")
+        assert page.locator("#graph-results button").count() > 0
+        page.locator("#graph-results button").first.click()
+        page.screenshot(path=str(out / "mapa-foco.png"), full_page=True)
+        page.set_viewport_size({"width": 390, "height": 844})
+        assert page.evaluate(
+            "document.documentElement.scrollWidth <= window.innerWidth"
+        )
+        page.screenshot(path=str(out / "mapa-mobile.png"), full_page=True)
+        page.set_viewport_size({"width": 1600, "height": 1000})
         for route in ["asset", "vulnerability", "finding", "dependency"]:
             page.goto(f"http://127.0.0.1:8765/registros/{route}/")
             assert page.locator("table").is_visible()
         page.goto("http://127.0.0.1:8765/registros/asset/novo/")
-        page.locator("[name=hostname]").fill("PC-BROWSER-TESTE")
+        page.locator("[name=hostname]").fill(test_hostname)
         page.locator("[name=tipo]").select_option("1")
         page.locator("[name=custodiante]").fill("Suporte")
         page.locator("[name=lotacao]").fill("Laboratório")
         page.locator("[name=descricao]").fill("Teste de cadastro no navegador")
         page.get_by_role("button", name="Salvar registro").click()
         page.wait_for_url("**/registros/asset/")
-        page.locator("[name=q]").fill("PC-BROWSER-TESTE")
-        page.get_by_role("button", name="Buscar").click()
-        assert page.get_by_text("PC-BROWSER-TESTE", exact=True).is_visible()
+        page.locator("#q").fill(test_hostname)
+        page.get_by_role("button", name="Buscar", exact=True).last.click()
+        assert page.get_by_text(test_hostname, exact=True).is_visible()
         page.get_by_role("link", name="Editar", exact=True).click()
         page.locator("[name=descricao]").fill("Edição pelo navegador")
         page.get_by_role("button", name="Salvar registro").click()
-        page.locator("[name=q]").fill("PC-BROWSER-TESTE")
-        page.get_by_role("button", name="Buscar").click()
+        page.locator("#q").fill(test_hostname)
+        page.get_by_role("button", name="Buscar", exact=True).last.click()
         page.get_by_role("link", name="Excluir", exact=True).click()
         page.get_by_role("button", name="Confirmar exclusão").click()
         page.set_viewport_size({"width": 390, "height": 844})
@@ -108,4 +163,7 @@ try:
 finally:
     server.terminate()
     server.wait(timeout=10)
+    from inventory.models import Asset
+
+    Asset.objects.filter(hostname=test_hostname).delete()
     user.delete()

@@ -117,6 +117,12 @@ def collection(request, kind):
         )
     elif kind == "finding":
         objects = objects.select_related("asset", "vulnerability")
+        if query:
+            objects = objects.filter(
+                Q(asset__hostname__icontains=query)
+                | Q(vulnerability__descricao__icontains=query)
+                | Q(vulnerability__cve__icontains=query)
+            )
     elif kind == "dependency":
         objects = objects.select_related("source", "target")
     from django.core.paginator import Paginator
@@ -203,7 +209,15 @@ def remove(request, kind, pk):
 
 
 @login_required
-@permission_required("inventory.view_asset", raise_exception=True)
+@permission_required(
+    (
+        "inventory.view_asset",
+        "inventory.view_vulnerability",
+        "inventory.view_finding",
+        "inventory.view_dependency",
+    ),
+    raise_exception=True,
+)
 @require_GET
 def graph_data(request):
     inv = snapshot()
@@ -212,20 +226,53 @@ def graph_data(request):
         report = model.relatorio()
     except SistemaSingularError as error:
         return JsonResponse({"error": str(error)}, status=422)
-    nodes = [
-        {
-            "data": {
-                "id": str(r.equipamento.id),
-                "label": r.equipamento.hostname,
-                "tipo": r.equipamento.tipo.rotulo,
-                "setor": r.equipamento.lotacao,
-                "proprio": r.proprio,
-                "risco": r.efetivo,
-                "falhas": len(r.equipamento.vulnerabilidades),
+    nodes = []
+    for row in report:
+        asset = row.equipamento
+        findings = []
+        for vuln, treatment in inv.vulnerabilidades_do(asset.id):
+            findings.append(
+                {
+                    "id": vuln.id,
+                    "descricao": vuln.descricao,
+                    "cve": vuln.cve,
+                    "cvss": vuln.cvss,
+                    "gravidade": vuln.gravidade.rotulo,
+                    "situacao": treatment.rotulo,
+                    "corrigida": treatment.value == 3,
+                }
+            )
+        active = [f for f in findings if not f["corrigida"]]
+        nodes.append(
+            {
+                "data": {
+                    "id": str(asset.id),
+                    "label": asset.hostname,
+                    "tipo": asset.tipo.rotulo,
+                    "tipo_id": asset.tipo.value,
+                    "setor": asset.lotacao,
+                    "custodiante": asset.custodiante,
+                    "descricao": asset.descricao,
+                    "proprio": row.proprio,
+                    "herdado": row.efetivo - row.proprio,
+                    "contribuicoes": [
+                        {
+                            "hostname": other.hostname,
+                            "fracao": fraction,
+                            "pontos": inherited,
+                        }
+                        for other, fraction, effective, inherited in model.contribuicoes(
+                            asset.id
+                        )
+                    ],
+                    "risco": row.efetivo,
+                    "falhas": len(findings),
+                    "cvss_maximo": max((f["cvss"] for f in active), default=0),
+                    "vulnerabilidades": findings,
+                    "ficha_url": f"/ativos/{asset.id}/",
+                }
             }
-        }
-        for r in report
-    ]
+        )
     edges = [
         {
             "data": {
@@ -239,7 +286,29 @@ def graph_data(request):
         for e in inv
         for target, fraction in e.dependencias.items()
     ]
-    return JsonResponse({"elements": nodes + edges})
+    plan = [
+        {
+            "asset_id": str(item.equipamento.id),
+            "asset": item.equipamento.hostname,
+            "vulnerability": item.vulnerabilidade.cve
+            or item.vulnerabilidade.descricao,
+            "reducao": item.reducao,
+        }
+        for item in model.plano_de_correcao()
+    ]
+    return JsonResponse(
+        {
+            "elements": nodes + edges,
+            "plan": plan,
+            "total": model.risco_total(),
+            "open_count": sum(
+                1
+                for node in nodes
+                for f in node["data"]["vulnerabilidades"]
+                if f["situacao"] in ("Aberta", "Em tratamento")
+            ),
+        }
+    )
 
 
 @login_required
@@ -403,3 +472,72 @@ def rest(request, kind, pk=None):
         return JsonResponse(
             {"error": "Duplicidade ou conflito de integridade."}, status=409
         )
+
+
+@login_required
+@permission_required(
+    (
+        "inventory.view_asset",
+        "inventory.view_vulnerability",
+        "inventory.view_finding",
+        "inventory.view_dependency",
+    ),
+    raise_exception=True,
+)
+def asset_detail(request, pk):
+    inv = snapshot()
+    asset = inv.buscar_por_id(pk)
+    if asset is None:
+        raise Http404
+    model = ModeloRisco(inv)
+    row = model.risco_de(pk)
+    return render(
+        request,
+        "inventory/asset_detail.html",
+        {
+            "asset": asset,
+            "row": row,
+            "findings": inv.vulnerabilidades_do(pk),
+            "contributions": model.contribuicoes(pk),
+        },
+    )
+
+
+@login_required
+@permission_required(
+    (
+        "inventory.view_asset",
+        "inventory.view_vulnerability",
+        "inventory.view_finding",
+        "inventory.view_dependency",
+    ),
+    raise_exception=True,
+)
+@require_GET
+def simulate_correction(request, pk):
+    """Simulação sem gravação usando o mesmo domínio e cálculo da aplicação."""
+    from classificacoes import SituacaoTratamento
+    from inventario import Inventario
+
+    inv = snapshot()
+    if inv.buscar_por_id(pk) is None:
+        raise Http404
+    model = ModeloRisco(inv)
+    original = model.risco_total()
+    changes = []
+    clone = Inventario.de_dict(inv.para_dict())
+    for vuln, treatment in clone.vulnerabilidades_do(pk):
+        if treatment != SituacaoTratamento.CORRIGIDA:
+            clone.alterar_situacao(pk, vuln.id, SituacaoTratamento.CORRIGIDA)
+            changes.append(vuln.id)
+    updated = ModeloRisco(clone)
+    after = updated.risco_total()
+    return JsonResponse(
+        {
+            "antes": original,
+            "depois": after,
+            "reducao": original - after,
+            "correcoes": len(changes),
+            "gravado": False,
+        }
+    )

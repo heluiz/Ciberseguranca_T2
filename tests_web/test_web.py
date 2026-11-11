@@ -407,3 +407,58 @@ def test_malformed_json_rejected(content):
     with pytest.raises(ValueError):
         import_json(content)
     assert Asset.objects.count() == 0
+
+
+def test_neon_map_exposes_real_details_and_simulation_without_write(
+    admin, sample
+):
+    client = Client()
+    client.force_login(admin)
+    payload = client.get("/api/grafo/").json()
+    node = payload["elements"][0]["data"]
+    assert node["tipo_id"] == 1
+    assert node["custodiante"]
+    assert node["cvss_maximo"] == 4
+    assert node["herdado"] == pytest.approx(node["risco"] - node["proprio"])
+    assert node["vulnerabilidades"][0]["situacao"] == "Aberta"
+    assert payload["open_count"] == 4
+    assert payload["plan"]
+    before = snapshot().para_dict()
+    result = client.get("/api/simular/1/").json()
+    assert result["gravado"] is False
+    assert result["correcoes"] == 1
+    assert result["reducao"] > 0
+    assert result["antes"] - result["depois"] == pytest.approx(
+        result["reducao"]
+    )
+    assert snapshot().para_dict() == before
+    assert client.get("/ativos/1/").status_code == 200
+    assert client.get("/ativos/9999/").status_code == 404
+    assert client.get("/api/simular/9999/").status_code == 404
+
+
+def test_simulation_requires_permission_and_read_only_method(reader, sample):
+    client = Client()
+    assert client.get("/api/simular/1/").status_code == 302
+    client.force_login(reader)
+    assert client.get("/api/simular/1/").status_code == 200
+    assert client.post("/api/simular/1/").status_code == 405
+    reader.groups.clear()
+    assert client.get("/api/simular/1/").status_code == 403
+
+
+def test_map_detail_does_not_expose_vulnerability_data_to_asset_only_account(
+    sample,
+):
+    from django.contrib.auth.models import Permission
+
+    user = User.objects.create_user("somente-ativos")
+    user.user_permissions.add(
+        Permission.objects.get(
+            codename="view_asset", content_type__app_label="inventory"
+        )
+    )
+    client = Client()
+    client.force_login(user)
+    for path in ["/api/grafo/", "/api/simular/1/", "/ativos/1/"]:
+        assert client.get(path).status_code == 403

@@ -28,6 +28,12 @@ urlpatterns = [
     ),
     path("health/", views.health, name="health"),
     path("", views.dashboard, name="dashboard"),
+    path("ativos/<int:pk>/", views.asset_detail, name="asset_detail"),
+    path(
+        "api/simular/<int:pk>/",
+        views.simulate_correction,
+        name="simulate_correction",
+    ),
     path("mapa/", views.graph, name="graph"),
     path("api/grafo/", views.graph_data, name="graph_data"),
     path("relatorios/", views.reports, name="reports"),
