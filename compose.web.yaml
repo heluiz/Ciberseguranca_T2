@@ -1,0 +1,82 @@
+name: sentinel-web
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sentinel}
+      POSTGRES_USER: sentinel_owner
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Defina a senha do proprietario}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_PASSWORD:?Defina a senha da aplicacao}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./ops/init-db.sh:/docker-entrypoint-initdb.d/01-sentinel.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    environment: &app-env
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Gere uma chave aleatoria}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-0}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
+      POSTGRES_DB: ${POSTGRES_DB:-sentinel}
+      POSTGRES_USER: sentinel_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina a senha do banco}
+      POSTGRES_HOST: db
+      TRUST_PROXY: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - static-data:/app/staticfiles
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    logging: *logging
+  migrate:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    environment:
+      <<: *app-env
+      POSTGRES_USER: sentinel_owner
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Defina a senha do proprietario}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    restart: "no"
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      SENTINEL_DOMAIN: ${SENTINEL_DOMAIN:-localhost}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - static-data:/srv/static:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [app]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+volumes:
+  postgres-data:
+  static-data:
+  caddy-data:
+  caddy-config:

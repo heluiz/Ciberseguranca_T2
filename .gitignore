@@ -21,3 +21,15 @@ dados/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Aplicação web e arquivos privados
+.env
+.env.*
+!.env.example
+staticfiles/
+artifacts/
+*.dump
+*.sql.gz
+playwright-report/
+test-results/
+.ruff_cache/

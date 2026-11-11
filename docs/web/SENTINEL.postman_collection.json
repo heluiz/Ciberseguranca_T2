@@ -1,0 +1,358 @@
+{
+  "info": {
+    "name": "SENTINEL · API de sessão",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "id",
+      "value": "1"
+    },
+    {
+      "key": "csrf_token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Listar asset",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/asset/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies."
+      }
+    },
+    {
+      "name": "Criar asset",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/api/asset/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"hostname\": \"PC-API-TESTE\", \"tipo\": 1, \"custodiante\": \"Suporte\", \"lotacao\": \"Laborat\\u00f3rio\", \"descricao\": \"Ativo de teste\", \"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Editar asset",
+      "request": {
+        "method": "PATCH",
+        "url": "{{base_url}}/api/asset/{{id}}/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Excluir asset",
+      "request": {
+        "method": "DELETE",
+        "url": "{{base_url}}/api/asset/{{id}}/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Listar vulnerability",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/vulnerability/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies."
+      }
+    },
+    {
+      "name": "Criar vulnerability",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/api/vulnerability/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"descricao\": \"Falha de configura\\u00e7\\u00e3o de teste\", \"origem\": 1, \"cvss\": 7.5, \"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Editar vulnerability",
+      "request": {
+        "method": "PATCH",
+        "url": "{{base_url}}/api/vulnerability/{{id}}/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Excluir vulnerability",
+      "request": {
+        "method": "DELETE",
+        "url": "{{base_url}}/api/vulnerability/{{id}}/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Listar finding",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/finding/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies."
+      }
+    },
+    {
+      "name": "Criar finding",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/api/finding/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"asset\": 1, \"vulnerability\": 1, \"situacao\": 1, \"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Editar finding",
+      "request": {
+        "method": "PATCH",
+        "url": "{{base_url}}/api/finding/{{id}}/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Excluir finding",
+      "request": {
+        "method": "DELETE",
+        "url": "{{base_url}}/api/finding/{{id}}/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Listar dependency",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/dependency/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies."
+      }
+    },
+    {
+      "name": "Criar dependency",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/api/dependency/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"source\": 1, \"target\": 3, \"fracao\": 0.1, \"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Editar dependency",
+      "request": {
+        "method": "PATCH",
+        "url": "{{base_url}}/api/dependency/{{id}}/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"version\": 1}"
+        }
+      }
+    },
+    {
+      "name": "Excluir dependency",
+      "request": {
+        "method": "DELETE",
+        "url": "{{base_url}}/api/dependency/{{id}}/",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRFToken",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "description": "Autenticar primeiro no navegador; importar cookies de sessão e CSRF pelo mecanismo seguro do Postman. Preencher campos conforme formulário; não compartilhar cookies.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"version\": 1}"
+        }
+      }
+    }
+  ]
+}

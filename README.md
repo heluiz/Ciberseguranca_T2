@@ -1,3 +1,5 @@
+> **Versão web em desenvolvimento local:** veja [implementação](docs/web/IMPLEMENTACAO.md), [execução](docs/web/EXECUTAR.md), [sprints](docs/web/SPRINTS.md) e [segurança](docs/web/SEGURANCA.md). Os comandos abaixo descrevem a CLI original.
+
 # Inventário de Equipamentos e Vulnerabilidades
 
 Programa de linha de comando em Python para cadastro, consulta, atualização e

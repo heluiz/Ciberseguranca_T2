@@ -19,3 +19,12 @@ README.md
 .coverage
 .pytest_cache/
 ruff.toml
+
+.env
+.env.*
+staticfiles/
+artifacts/
+*.dump
+*.sql.gz
+test-results/
+playwright-report/
