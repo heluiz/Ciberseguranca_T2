@@ -27,3 +27,17 @@ if (themeSelector) {
     if (event.key === 'sentinel.theme') applyTheme(event.newValue);
   });
 }
+
+// Fecha ao clicar fora; Escape devolve o foco à configuração.
+const appearanceSettings = document.querySelector('.appearance-settings');
+if (appearanceSettings) {
+  document.addEventListener('click', event => {
+    if (!appearanceSettings.contains(event.target)) appearanceSettings.open = false;
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && appearanceSettings.open) {
+      appearanceSettings.open = false;
+      appearanceSettings.querySelector('summary').focus();
+    }
+  });
+}

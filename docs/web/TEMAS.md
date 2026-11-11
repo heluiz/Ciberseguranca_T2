@@ -1,13 +1,13 @@
 # Temas e identidade visual
 
-A interface oferece quatro paletas no seletor “Tema visual”, no cabeçalho e na tela de login:
+A interface oferece quatro paletas em **Configurações de aparência → Tema de cores**, acessíveis por uma engrenagem discreta no cabeçalho e na tela de login. O seletor começa recolhido. Pode ser fechado com Escape ou clicando fora; Escape devolve o foco à engrenagem. Os nomes apresentados usam somente cores:
 
 | Tema | Referência | Características |
 |---|---|---|
-| Neon ciano e roxo | Referência conceitual já aprovada como direção visual | Mantém a paleta existente |
-| NQ Sniper · verde neon | Código de `NQOpeningSniper.cs` fornecido pelo aluno | Verde `#00FF41`, fundo `#040A06`, monoespaçada, scanlines discretas e cantos de HUD |
-| NinjaTrader · verde escuro | Print enviado pelo aluno | Verde menos saturado, superfícies escuras e barras em degradê |
-| Campo Aberto · verde suave | `heluiz/campo-aberto-osint/index.html` | Verde `#6DFF9B`, fundo `#07100D`, painéis verdes e acentos âmbar |
+| Ciano e roxo | Referência conceitual já aprovada como direção visual | Mantém a paleta existente |
+| Verde neon | Código de `NQOpeningSniper.cs` fornecido pelo aluno | Verde `#00FF41`, fundo `#040A06`, monoespaçada, scanlines discretas e cantos de HUD |
+| Verde escuro | Print enviado pelo aluno | Verde menos saturado, superfícies escuras e barras em degradê |
+| Verde suave e âmbar | `heluiz/campo-aberto-osint/index.html` | Verde `#6DFF9B`, fundo `#07100D`, painéis verdes e acentos âmbar |
 
 A preferência é salva apenas no navegador por `localStorage`; não é sincronizada entre dispositivos ou contas. A escolha é restaurada antes do CSS para reduzir flashes da paleta padrão. Valores inválidos voltam ao neon original, e indisponibilidade do armazenamento não impede o uso. Mudanças feitas em outra aba do mesmo navegador são refletidas pelo evento de armazenamento.
 
@@ -20,3 +20,5 @@ Referências foram inspecionadas sem executar a estratégia nem alterar o NinjaT
 Validação de navegador: alternância das quatro opções; cor efetiva dos cartões SVG; preservação da cor de gravidade; escolha após recarregar e navegar; retorno seguro para preferência inválida; mapa e controles em viewport de 390 px sem transbordamento. Capturas reais em `screenshots/mapa-tema-*.png`.
 
 Demonstração real de 16 segundos: `screenshots/sentinel-animacoes-verdes.mp4`. Mostra verde NQ Sniper e verde NinjaTrader com fluxo ativo, realce ao passar o mouse, seleção, zoom, pausa e retomada. Os quadros foram capturados no navegador com movimento habilitado e os tempos preservados na montagem. MP4 H.264, 1280×800, sem áudio. A gravação não altera o inventário.
+
+Os identificadores internos antigos foram preservados para manter preferências já salvas. As referências de design ficam somente na documentação, sem nomes de estratégias ou plataformas no seletor. Capturas e vídeos anteriores ao menu de aparência mostram a interface histórica.

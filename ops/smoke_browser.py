@@ -18,6 +18,15 @@ django.setup()
 from django.contrib.auth import get_user_model
 from playwright.sync_api import sync_playwright
 
+def choose_theme(page, value):
+    """Escolhe a paleta pelo menu recolhido e devolve o foco à configuração."""
+    settings = page.locator(".appearance-settings")
+    if settings.get_attribute("open") is None:
+        settings.locator("summary").click()
+    page.locator("#theme-select").select_option(value)
+    page.keyboard.press("Escape")
+
+
 root = Path(__file__).resolve().parent.parent
 out = root / "docs/web/screenshots"
 out.mkdir(parents=True, exist_ok=True)
@@ -70,6 +79,16 @@ try:
         page.get_by_role("button", name="Entrar").click()
         page.wait_for_url("http://127.0.0.1:8765/")
         assert page.get_by_role("heading", name="Visão geral.").is_visible()
+        assert not page.locator("#theme-select").is_visible()
+        assert page.locator("#theme-select option").all_text_contents() == [
+            "Ciano e roxo", "Verde neon", "Verde escuro", "Verde suave e âmbar"
+        ]
+        page.locator(".appearance-settings summary").focus()
+        page.keyboard.press("Enter")
+        assert page.locator("#theme-select").is_visible()
+        page.keyboard.press("Escape")
+        assert not page.locator("#theme-select").is_visible()
+        page.locator("h1").click()
         page.screenshot(path=str(out / "painel-desktop.png"), full_page=True)
         page.goto("http://127.0.0.1:8765/mapa/")
         page.get_by_text("76 ativos ·", exact=False).wait_for()
@@ -119,7 +138,7 @@ try:
             ".node-severity-bg.critical"
         ).first.evaluate("(node) => getComputedStyle(node).fill")
         for theme, color in expected_colors.items():
-            page.locator("#theme-select").select_option(theme)
+            choose_theme(page, theme)
             assert page.locator("html").get_attribute("data-theme") == theme
             assert (
                 page.locator(".asset-node.is-selected .node-card").evaluate(
@@ -136,7 +155,7 @@ try:
             page.screenshot(
                 path=str(out / f"mapa-tema-{theme}.png"), full_page=True
             )
-        page.locator("#theme-select").select_option("sniper")
+        choose_theme(page, "sniper")
         page.reload()
         page.get_by_text("76 ativos ·", exact=False).wait_for()
         assert page.locator("html").get_attribute("data-theme") == "sniper"
@@ -151,7 +170,7 @@ try:
         page.reload()
         page.get_by_text("76 ativos ·", exact=False).wait_for()
         assert page.locator("html").get_attribute("data-theme") == "neon"
-        page.locator("#theme-select").select_option("neon")
+        choose_theme(page, "neon")
         assert page.locator(".asset-node").count() > 1
         assert (
             page.locator(".node-card").count()
@@ -211,14 +230,14 @@ try:
         assert page.evaluate(
             "document.documentElement.scrollWidth <= window.innerWidth"
         )
-        page.locator("#theme-select").select_option("sniper")
+        choose_theme(page, "sniper")
         assert page.evaluate(
             "document.documentElement.scrollWidth <= window.innerWidth"
         )
         page.screenshot(
             path=str(out / "mapa-tema-sniper-mobile.png"), full_page=True
         )
-        page.locator("#theme-select").select_option("neon")
+        choose_theme(page, "neon")
         page.screenshot(path=str(out / "mapa-mobile.png"), full_page=True)
         page.set_viewport_size({"width": 1600, "height": 1000})
         for route in ["asset", "vulnerability", "finding", "dependency"]:

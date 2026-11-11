@@ -28,3 +28,7 @@ Temas: verificados no navegador os quatro esquemas, persistência ao recarregar 
 ### Leitura da marca no cabeçalho
 
 Marca SVG simplificada com escudo maior, fechadura preenchida, circuitos secundários e brilho reduzido. Conferida no Chromium real nos quatro temas: cabeçalho de 46 px, celular de 38 px e entrada de 74 px. Viewport de 390 × 844 px sem transbordamento horizontal da página e sem erros JavaScript. Capturas: `screenshots/logo-corrigida-previa.png`, `screenshots/mapa-logo-corrigida-mobile-tela.png` e `screenshots/mapa-logo-corrigida-mobile.png` (página completa). Mudança visual; suíte de backend não reexecutada nesta revisão.
+
+### Configuração discreta de aparência
+
+Tema recolhido em uma engrenagem, com nomes de cores. Conferidos no Chromium: abertura por teclado, Escape com retorno do foco, clique externo, quatro paletas, persistência após recarga, uso na entrada e larguras de 320, 390, 768 e 1600 px. Menu dentro da tela, sem transbordamento horizontal da página e sem erros JavaScript. Capturas: `screenshots/aparencia-desktop.png`, `screenshots/aparencia-celular.png` e `screenshots/aparencia-configuracoes.png`.
