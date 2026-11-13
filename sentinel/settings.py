@@ -7,14 +7,33 @@ from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
+
+
+def flag(name, default):
+    """Lê uma opção 0/1 do ambiente; sem a variável, vale o padrão."""
+    return os.getenv(name, "1" if default else "0") == "1"
+
+
+# HTTPS e MFA são exigidos por padrão fora do modo de desenvolvimento.
+# Em rede interna sem certificado (servidor da disciplina), o operador pode
+# desligá-los de forma explícita, sem precisar ligar o DEBUG.
+HTTPS_ONLY = flag("DJANGO_HTTPS", not DEBUG)
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
 if len(SECRET_KEY) < 50:
     raise ImproperlyConfigured(
         "Defina DJANGO_SECRET_KEY com ao menos 50 caracteres aleatórios."
     )
-ALLOWED_HOSTS = os.getenv(
-    "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]"
-).split(",")
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]"
+    ).split(",")
+    if host.strip()
+]
+# A verificação de saúde do próprio container sempre chega por localhost.
+for local_host in ("localhost", "127.0.0.1"):
+    if local_host not in ALLOWED_HOSTS and "*" not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(local_host)
 CSRF_TRUSTED_ORIGINS = list(
     filter(None, os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(","))
 )
@@ -33,6 +52,8 @@ INSTALLED_APPS = [
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Entrega CSS/JS pelo próprio processo da aplicação, sem depender de proxy.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -108,32 +129,56 @@ TIME_ZONE = "America/Sao_Paulo"
 USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"
+    },
+}
+# Em desenvolvimento os arquivos vêm direto das pastas dos apps; em produção,
+# da pasta gerada por collectstatic na construção da imagem.
+WHITENOISE_USE_FINDERS = DEBUG
+WHITENOISE_AUTOREFRESH = DEBUG
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/entrar/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/entrar/"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = HTTPS_ONLY
+CSRF_COOKIE_SECURE = HTTPS_ONLY
 SESSION_COOKIE_AGE = 3600
 SESSION_SAVE_EVERY_REQUEST = True
-SECURE_SSL_REDIRECT = not DEBUG
-SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
-SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
-SECURE_HSTS_PRELOAD = not DEBUG
+SECURE_SSL_REDIRECT = HTTPS_ONLY
+SECURE_HSTS_SECONDS = 31536000 if HTTPS_ONLY else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = HTTPS_ONLY
+SECURE_HSTS_PRELOAD = HTTPS_ONLY
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 # Só habilitar atrás do proxy dedicado, que substitui o cabeçalho recebido.
 if os.getenv("TRUST_PROXY", "0") == "1":
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-REQUIRE_ADMIN_MFA = not DEBUG
+REQUIRE_ADMIN_MFA = flag("DJANGO_REQUIRE_MFA", not DEBUG)
+if not HTTPS_ONLY:
+    # Sem HTTPS de propósito: silencia só os avisos que pedem HTTPS, para que
+    # "check --deploy" continue acusando qualquer outro problema.
+    SILENCED_SYSTEM_CHECKS = [
+        "security.W004",
+        "security.W008",
+        "security.W012",
+        "security.W016",
+    ]
 DATA_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = DATA_UPLOAD_MAX_MEMORY_SIZE
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "formatters": {
+        "padrao": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "padrao"}
+    },
     "root": {"handlers": ["console"], "level": "INFO"},
 }
 

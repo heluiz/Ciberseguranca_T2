@@ -1,1 +1,28 @@
-{% extends 'inventory/base.html' %}{% block content %}<div class="page-heading"><div><p class="eyebrow cyan">{{ title }} / {% if editing %}EDIÇÃO{% else %}CADASTRO{% endif %}</p><h1>{% if editing %}Editar{% else %}Novo{% endif %} registro<span class="cyan">.</span></h1></div><a href="{% url 'collection' kind %}">← Voltar</a></div><section class="panel form-panel"><form method="post">{% csrf_token %}{{ form.non_field_errors }}<div class="form-grid">{% for field in form %}{% if field.is_hidden %}{{ field }}{% else %}<div class="field">{{ field.label_tag }}{{ field }}{{ field.errors }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}</div>{% endif %}{% endfor %}</div><div class="form-actions"><button class="button primary">Salvar registro</button><a class="button" href="{% url 'collection' kind %}">Cancelar</a></div></form></section>{% endblock %}
+{% extends "inventory/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow cyan">{{ title }} / {% if editing %}EDIÇÃO{% else %}CADASTRO{% endif %}</p>
+      <h1>
+        {% if editing %}Editar{% else %}Novo{% endif %} registro<span class="cyan">.</span>
+      </h1>
+    </div><a href="{% url 'collection' kind %}">← Voltar</a>
+  </div>
+  <section class="panel form-panel">
+    <form method="post">
+      {% csrf_token %}{{ form.non_field_errors }}
+      <div class="form-grid">
+        {% for field in form %}
+          {% if field.is_hidden %}{{ field }}{% else %}
+            <div class="field">{{ field.label_tag }}{{ field }}{{ field.errors }}{% if field.help_text %}<small>{{ field.help_text }}</small>
+          {% endif %}
+          </div>
+        {% endif %}
+{% endfor %}
+</div>
+<div class="form-actions"><button class="button primary">Salvar registro</button><a class="button"
+                                                                                    href="{% url 'collection' kind %}">Cancelar</a>
+</div>
+</form>
+</section>
+{% endblock %}

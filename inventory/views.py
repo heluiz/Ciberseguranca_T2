@@ -10,7 +10,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_GET
 from django_otp.forms import OTPTokenForm
 from django_otp import login as otp_login
+from classificacoes import (
+    NivelGravidade,
+    SituacaoTratamento,
+    TipoEquipamento,
+)
 from risco import ModeloRisco, SistemaSingularError
+from . import analysis
 from .models import (
     Asset,
     Vulnerability,
@@ -19,7 +25,7 @@ from .models import (
     AuditEvent,
     FindingHistory,
 )
-from .repository import snapshot, lock_inventory
+from .repository import snapshot, lock_inventory, SnapshotRepository
 from .services import (
     save_entity,
     delete_entity,
@@ -44,6 +50,23 @@ INVENTORY_READ_PERMISSIONS = (
     "inventory.view_finding",
     "inventory.view_dependency",
 )
+
+
+# Faixas de nota CVSS de cada gravidade, para filtrar no banco.
+SEVERITY_RANGES = {
+    NivelGravidade.BAIXA.value: (0.1, 3.9),
+    NivelGravidade.MEDIA.value: (4.0, 6.9),
+    NivelGravidade.ALTA.value: (7.0, 8.9),
+    NivelGravidade.CRITICA.value: (9.0, 10.0),
+}
+
+
+def choice_filter(request, name, enum):
+    """Valor inteiro de um filtro de lista, ou None se ausente/inválido."""
+    try:
+        return enum(int(request.GET.get(name, ""))).value
+    except ValueError:
+        return None
 
 
 class SignIn(LoginView):
@@ -75,6 +98,8 @@ def health(request):
 def dashboard(request):
     inv = snapshot()
     model = ModeloRisco(inv)
+    # A verificação de invertibilidade não depende de resolver o sistema.
+    diagnostic = model.diagnosticar()
     try:
         strategy = (
             OwnRiskRanking()
@@ -84,9 +109,8 @@ def dashboard(request):
         ranking = strategy.rank(model.relatorio())
         plan = model.plano_de_correcao()[:8]
         total = model.risco_total()
-        diagnostic = model.diagnosticar()
     except SistemaSingularError as error:
-        ranking, plan, total, diagnostic = [], [], None, None
+        ranking, plan, total = [], [], None
         messages.error(request, str(error))
     return render(
         request,
@@ -116,29 +140,65 @@ def collection(request, kind):
     authorize(request.user, "view_" + kind)
     query = request.GET.get("q", "").strip()[:150]
     objects = MODELS[kind].objects.all().order_by("pk")
-    if kind == "asset" and query:
-        objects = objects.filter(
-            Q(hostname__icontains=query)
-            | Q(lotacao__icontains=query)
-            | Q(patrimonio__icontains=query)
-            | Q(descricao__icontains=query)
-        )
-    elif kind == "vulnerability" and query:
-        objects = objects.filter(
-            Q(cve__icontains=query)
-            | Q(cwe__icontains=query)
-            | Q(descricao__icontains=query)
-        )
+    asset_type = severity = status = None
+    if kind == "asset":
+        asset_type = choice_filter(request, "tipo", TipoEquipamento)
+        if asset_type:
+            objects = objects.filter(tipo=asset_type)
+        if query:
+            condition = Q()
+            for field in (
+                "hostname",
+                "custodiante",
+                "lotacao",
+                "descricao",
+                "patrimonio",
+                "fabricante",
+                "modelo",
+                "numero_serie",
+                "sistema",
+                "versao",
+            ):
+                condition |= Q(**{field + "__icontains": query})
+            if query.lstrip("#").isdigit():
+                condition |= Q(pk=int(query.lstrip("#")))
+            objects = objects.filter(condition)
+    elif kind == "vulnerability":
+        severity = choice_filter(request, "gravidade", NivelGravidade)
+        if severity:
+            low, high = SEVERITY_RANGES[severity]
+            objects = objects.filter(cvss__gte=low, cvss__lte=high)
+        if query:
+            objects = objects.filter(
+                Q(cve__icontains=query)
+                | Q(cwe__icontains=query)
+                | Q(descricao__icontains=query)
+            )
     elif kind == "finding":
         objects = objects.select_related("asset", "vulnerability")
+        status = choice_filter(request, "situacao", SituacaoTratamento)
+        severity = choice_filter(request, "gravidade", NivelGravidade)
+        if status:
+            objects = objects.filter(situacao=status)
+        if severity:
+            low, high = SEVERITY_RANGES[severity]
+            objects = objects.filter(
+                vulnerability__cvss__gte=low, vulnerability__cvss__lte=high
+            )
         if query:
             objects = objects.filter(
                 Q(asset__hostname__icontains=query)
+                | Q(asset__lotacao__icontains=query)
                 | Q(vulnerability__descricao__icontains=query)
                 | Q(vulnerability__cve__icontains=query)
             )
     elif kind == "dependency":
         objects = objects.select_related("source", "target")
+        if query:
+            objects = objects.filter(
+                Q(source__hostname__icontains=query)
+                | Q(target__hostname__icontains=query)
+            )
     from django.core.paginator import Paginator
 
     page = Paginator(objects, 30).get_page(request.GET.get("page"))
@@ -150,6 +210,22 @@ def collection(request, kind):
             "title": TITLES[kind],
             "page": page,
             "query": query,
+            "asset_type": asset_type,
+            "severity": severity,
+            "status": status,
+            "asset_types": [(t.value, t.rotulo) for t in TipoEquipamento],
+            "severities": [(g.value, g.rotulo) for g in NivelGravidade],
+            "statuses": [(x.value, x.rotulo) for x in SituacaoTratamento],
+            # Mantém busca e filtros ao trocar de página.
+            "filters": "".join(
+                f"&{name}={value}"
+                for name, value in (
+                    ("tipo", asset_type),
+                    ("gravidade", severity),
+                    ("situacao", status),
+                )
+                if value
+            ),
             "can_add": request.user.has_perm("inventory.add_" + kind),
             "can_change": request.user.has_perm("inventory.change_" + kind),
             "can_delete": request.user.has_perm("inventory.delete_" + kind),
@@ -470,13 +546,13 @@ def rest(request, kind, pk=None):
                 "next_offset": next_offset if next_offset < count else None,
             }
         )
-    if request.method not in ("POST", "PATCH", "DELETE"):
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
         return JsonResponse({"error": "Método não permitido."}, status=405)
     if (request.method == "POST" and pk) or (
         request.method != "POST" and not pk
     ):
         return JsonResponse(
-            {"error": "Use POST na coleção e PATCH/DELETE no registro."},
+            {"error": "Use POST na coleção e PUT/PATCH/DELETE no registro."},
             status=405,
         )
     authorize(
@@ -507,7 +583,9 @@ def rest(request, kind, pk=None):
             delete_entity(request.user, kind, pk, data["version"])
             return HttpResponse(status=204)
         obj = get_object_or_404(MODELS[kind], pk=pk) if pk else None
-        if pk:
+        # PUT substitui o registro inteiro: o corpo precisa trazer todos os
+        # campos obrigatórios. PATCH altera só os campos enviados.
+        if request.method == "PATCH":
             from django.forms.models import model_to_dict
 
             initial = model_to_dict(obj, fields=FORMS[kind]._meta.fields)
@@ -558,6 +636,7 @@ def asset_detail(request, pk):
             "row": row,
             "findings": inv.vulnerabilidades_do(pk),
             "contributions": model.contribuicoes(pk),
+            "reached": analysis.reachability(inv, pk),
             "occurrences": Finding.objects.filter(asset_id=pk).select_related(
                 "vulnerability"
             ),
@@ -675,3 +754,80 @@ def export_finding_history(request):
             ]
         )
     return response
+
+
+@login_required
+@permission_required(INVENTORY_READ_PERMISSIONS, raise_exception=True)
+@require_GET
+def risk_analysis(request):
+    """Requisito 4: invertibilidade verificada antes, risco próprio e efetivo de todos."""
+    scenario = request.GET.get("cenario", "")
+    if scenario not in analysis.SCENARIOS:
+        scenario = ""
+    result = analysis.risk_analysis(_analysis_repository(scenario))
+    return render(
+        request,
+        "inventory/analysis.html",
+        {
+            "scenario": scenario,
+            "scenarios": [
+                (key, label) for key, (label, _) in analysis.SCENARIOS.items()
+            ],
+            "result": result,
+            "numbers": {
+                "determinante": _number(result["diagnostic"].determinante),
+                "condicao": _number(result["diagnostic"].condicao),
+                "residuo": _number(result["residual"]),
+            },
+            "limit": analysis.MATRIX_DISPLAY_LIMIT,
+        },
+    )
+
+
+def _number(value):
+    """Número com 6 algarismos significativos e vírgula decimal (1,6e+16)."""
+    return "—" if value is None else f"{value:.6g}".replace(".", ",")
+
+
+def _analysis_repository(scenario):
+    """Banco real ou cenário de demonstração em memória: a regra é a mesma."""
+    from .repository import MemoryRepository
+
+    if scenario:
+        return MemoryRepository(analysis.load_scenario(scenario))
+    return SnapshotRepository()
+
+
+@login_required
+@permission_required(INVENTORY_READ_PERMISSIONS, raise_exception=True)
+@require_GET
+def risk_data(request):
+    """Risco de todos os equipamentos em JSON, para a tabela dinâmica."""
+    scenario = request.GET.get("cenario", "")
+    if scenario not in analysis.SCENARIOS:
+        scenario = ""
+    result = analysis.risk_analysis(_analysis_repository(scenario))
+    if result["error"]:
+        return JsonResponse({"error": result["error"]}, status=422)
+    return JsonResponse(
+        {
+            "total": result["total"],
+            "rows": [
+                {
+                    "id": row["equipamento"].id,
+                    "hostname": row["equipamento"].hostname,
+                    "tipo": row["equipamento"].tipo.rotulo,
+                    "lotacao": row["equipamento"].lotacao,
+                    "soma_cvss": row["soma_cvss"],
+                    "fator": row["fator"],
+                    "proprio": row["proprio"],
+                    "herdado": row["herdado"],
+                    "efetivo": row["efetivo"],
+                    "ficha_url": ""
+                    if scenario
+                    else f"/ativos/{row['equipamento'].id}/",
+                }
+                for row in result["rows"]
+            ],
+        }
+    )

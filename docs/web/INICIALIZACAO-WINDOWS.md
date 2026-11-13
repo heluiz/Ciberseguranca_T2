@@ -28,14 +28,11 @@ Se houver erro, execute `VERIFICAR-SENTINEL.cmd` na pasta do projeto e envie a m
 
 ## Mudança técnica
 
-`compose.web.local.yaml` passa a usar `manage.py runserver --noreload` com DEBUG local, hosts locais e confiança em proxy desativada. A porta publicada continua `127.0.0.1:8000`. É uma configuração de desenvolvimento; produção continua com Gunicorn, HTTPS e proxy de estáticos.
+A aplicação entrega os próprios arquivos de CSS e JavaScript (WhiteNoise), com Gunicorn, tanto no uso local quanto no servidor. `compose.web.local.yaml` apenas liga o modo local (DEBUG, hosts locais, sem proxy) e publica a porta `127.0.0.1:8000`.
 
 Também foram corrigidos R01 e R02 da revisão de sprints: dashboard/exportação completa exigem as quatro permissões de leitura, e GET das coleções REST aceita `limit` (1–100) e `offset` (0–2147483647), retornando `count` e `next_offset`. Exemplos: `/api/dependency/?limit=100&offset=0` e `?limit=100&offset=100`. A ordenação é por ID; não é um snapshot imutável entre requisições concorrentes.
 
 ## Verificação e limites
 
-- HTTP com PostgreSQL real: configuração anterior retornou 200 em saúde/login e 404 nos três arquivos CSS/JS conferidos; configuração corrigida retornou 200 em todos os cinco endereços.
-- 115 testes originais e 69 testes web/didáticos passaram; estes incluem 12 novos casos de permissões e paginação. Cobertura agregada de `inventory` + `academic`: 85%.
-- PowerShell: sintaxe conferida e cenários de orquestração com Docker/HTTP simulados executados no Linux. Isso não equivale a testar Docker Desktop ou Windows PowerShell 5.1 no computador do usuário.
-- Docker não está instalado no ambiente conectado desta conversa. O build e a execução real do Compose no Windows permanecem pendentes, assim como as demais pendências acadêmicas da revisão.
-- Não houve push, publicação ou implantação remota. O banco do computador do usuário não foi acessado.
+- O script do PowerShell teve a sintaxe conferida e os passos simulados em Linux; ele ainda não foi executado em um Windows com Docker Desktop. Se algo falhar, `VERIFICAR-SENTINEL.cmd` mostra o diagnóstico sem expor senhas.
+- Os testes e as verificações da aplicação estão em [VALIDACAO.md](VALIDACAO.md).

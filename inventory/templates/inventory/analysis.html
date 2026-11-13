@@ -1,0 +1,246 @@
+{% extends "inventory/base.html" %}
+{% load static %}
+{% block head %}
+  <script src="{% static 'inventory/risk_table.js' %}" defer></script>
+{% endblock %}
+{% block content %}
+  {% with d=result.diagnostic %}
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow cyan">MODELO LINEAR · x = b + A x</p>
+        <h1>Análise de risco<span class="cyan">.</span></h1>
+        <p class="muted">Verifica se I − A é invertível, resolve (I − A) x = b e mostra o risco próprio e o efetivo de cada equipamento.</p>
+      </div>
+      <a class="button primary" href="/mapa/">Ver no mapa →</a>
+    </div>
+    <nav class="scenario-tabs" aria-label="Conjunto de dados analisado">
+      <a href="{% url 'risk_analysis' %}" {% if not scenario %}aria-current="page"{% endif %}>Inventário cadastrado</a>
+      {% for key, label in scenarios %}
+        <a href="{% url 'risk_analysis' %}?cenario={{ key }}" {% if scenario == key %}aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+    {% if scenario %}
+      <p class="notice">Cenário de demonstração, somente leitura: nada é gravado no inventário.</p>
+    {% endif %}
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">PASSO 1 · VERIFICAÇÃO ANTES DE RESOLVER</p>
+          <h2>I − A é invertível?</h2>
+        </div>
+        {% if d.invertivel %}
+          <span class="badge cyan">INVERTÍVEL</span>
+        {% else %}
+          <span class="badge danger-badge">NÃO INVERTÍVEL</span>
+        {% endif %}
+      </div>
+      <dl class="diagnostic-list">
+        <div>
+          <dt>Ordem de I − A (equipamentos)</dt>
+          <dd>{{ d.ordem }}</dd>
+        </div>
+        <div>
+          <dt>Posto de I − A</dt>
+          <dd>{{ d.posto }}</dd>
+        </div>
+        <div>
+          <dt>Maior soma de linha de A</dt>
+          <dd>{{ d.maior_soma|floatformat:4 }}</dd>
+        </div>
+        <div>
+          <dt>Diagonal estritamente dominante</dt>
+          <dd>{{ d.dominante|yesno:"Sim,Não" }}</dd>
+        </div>
+        <div>
+          <dt>Determinante de I − A</dt>
+          <dd>{{ numbers.determinante }}</dd>
+        </div>
+        <div>
+          <dt>Número de condição</dt>
+          <dd>{{ numbers.condicao }}</dd>
+        </div>
+        {% if result.residual is not None %}
+          <div>
+            <dt>Resíduo da solução ‖(I − A) x − b‖</dt>
+            <dd>{{ numbers.residuo }}</dd>
+          </div>
+        {% endif %}
+      </dl>
+      {% if result.error %}
+        <p class="notice error" role="alert">O sistema não foi resolvido. {{ result.error }}</p>
+      {% else %}
+        <p>{{ d.motivo }}</p>
+      {% endif %}
+      {% if d.aviso %}<p class="notice">{{ d.aviso }}</p>{% endif %}
+    </section>
+    {% if result.matrices %}
+      {% with m=result.matrices %}
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">PASSO 2 · MATRIZES MONTADAS A PARTIR DOS DADOS</p>
+              <h2>M, v e A</h2>
+            </div>
+          </div>
+          <p class="muted">
+            M marca qual equipamento (linha) é afetado por qual vulnerabilidade (coluna); v é a nota CVSS de cada
+            vulnerabilidade; A guarda a fração de risco que cada equipamento (linha) herda de outro (coluna). O fator de
+            exposição F de cada tipo e o risco próprio b = F · (M v) estão na tabela do passo 3.
+          </p>
+          <div class="matrix-grid">
+            <div class="table-scroll" tabindex="0" role="region" aria-label="Matriz; role para ver todas as colunas">
+              <table class="matrix">
+                <caption>Matriz de incidência M e vetor v</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Equipamento</th>
+                    {% for name in m.vulnerabilidades %}<th scope="col">{{ name }}</th>{% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for name, row in m.M %}
+                    <tr>
+                      <th scope="row">{{ name }}</th>
+                      {% for value in row %}<td>{{ value }}</td>{% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row">v (CVSS)</th>
+                    {% for value in m.v %}<td>{{ value|floatformat:1 }}</td>{% endfor %}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div class="table-scroll" tabindex="0" role="region" aria-label="Matriz; role para ver todas as colunas">
+              <table class="matrix">
+                <caption>Matriz de dependências A (linha herda da coluna)</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Equipamento</th>
+                    {% for name in m.equipamentos %}<th scope="col">{{ name }}</th>{% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for name, row in m.A %}
+                    <tr>
+                      <th scope="row">{{ name }}</th>
+                      {% for value in row %}<td>{{ value|floatformat:"-4" }}</td>{% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="table-scroll" tabindex="0" role="region" aria-label="Matriz; role para ver todas as colunas">
+              <table class="matrix">
+                <caption>I − A (matriz do sistema)</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Equipamento</th>
+                    {% for name in m.equipamentos %}<th scope="col">{{ name }}</th>{% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for name, row in m.I_menos_A %}
+                    <tr>
+                      <th scope="row">{{ name }}</th>
+                      {% for value in row %}<td>{{ value|floatformat:"-4" }}</td>{% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      {% endwith %}
+    {% else %}
+      <p class="footnote">
+        As matrizes completas aparecem para inventários de até {{ limit }} equipamentos (este tem {{ d.ordem }}). Use os
+        cenários de demonstração acima para vê-las montadas.
+      </p>
+    {% endif %}
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">PASSO 3 · SOLUÇÃO DO SISTEMA</p>
+          <h2>Risco próprio e efetivo de cada equipamento</h2>
+        </div>
+        {% if result.total is not None %}<span class="badge">Risco total: {{ result.total|floatformat:2 }} pontos</span>{% endif %}
+      </div>
+      {% if result.error %}
+        <p class="muted">Sem solução para mostrar: o sistema foi recusado na verificação.</p>
+      {% else %}
+        <div class="filter-row">
+          <div class="filter-field filter-grow">
+            <label for="risk-filter">Filtrar por hostname ou lotação</label>
+            <input id="risk-filter" autocomplete="off" placeholder="Digite para filtrar a tabela">
+          </div>
+          <div class="filter-field">
+            <label for="risk-type">Tipo</label>
+            <select id="risk-type">
+              <option value="">Todos</option>
+            </select>
+          </div>
+        </div>
+        <p class="muted" id="risk-status" role="status">Carregando o risco dos equipamentos…</p>
+        <div class="table-scroll">
+          <table id="risk-table" data-source="{% url 'risk_data' %}{% if scenario %}?cenario={{ scenario }}{% endif %}">
+            <thead>
+              <tr>
+                <th><button type="button" class="sort-button" data-sort="hostname">Equipamento</button></th>
+                <th>Lotação</th>
+                <th><button type="button" class="sort-button" data-sort="soma_cvss">Soma CVSS (M v)</button></th>
+                <th><button type="button" class="sort-button" data-sort="fator">Fator F</button></th>
+                <th><button type="button" class="sort-button" data-sort="proprio">Próprio (b)</button></th>
+                <th><button type="button" class="sort-button" data-sort="herdado">Herdado</button></th>
+                <th aria-sort="descending"><button type="button" class="sort-button" data-sort="efetivo">Efetivo (x)</button></th>
+              </tr>
+            </thead>
+            <tbody>
+              {# Mesmo conteúdo sem JavaScript; o script assume a tabela para filtrar e ordenar. #}
+              {% for row in result.rows %}
+                <tr>
+                  <td>
+                    <strong>{{ row.equipamento.hostname }}</strong><small>{{ row.equipamento.tipo.rotulo }}</small>
+                  </td>
+                  <td>{{ row.equipamento.lotacao }}</td>
+                  <td>{{ row.soma_cvss|floatformat:1 }}</td>
+                  <td>{{ row.fator|floatformat:2 }}</td>
+                  <td>{{ row.proprio|floatformat:2 }}</td>
+                  <td>{{ row.herdado|floatformat:2 }}</td>
+                  <td><span class="risk-number">{{ row.efetivo|floatformat:2 }}</span></td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="7">Nenhum equipamento cadastrado.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="footnote">
+          Pontos do modelo, não percentuais: o risco efetivo pode passar de 100. A ordem inicial é feita no servidor por
+          Merge Sort; os cabeçalhos reordenam no navegador.
+        </p>
+      {% endif %}
+    </section>
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">GRAFO DE DEPENDÊNCIAS · BUSCA EM PROFUNDIDADE</p>
+          <h2>Ciclos de dependência</h2>
+        </div>
+        <span class="badge">{{ result.cycles|length }} encontrado(s)</span>
+      </div>
+      {% if result.cycles %}
+        <p class="muted">Cada linha é uma dependência que fecha um ciclo: o risco circula entre esses ativos. Ciclos são aceitos pelo modelo enquanto a soma das frações de cada equipamento fica abaixo de 1.</p>
+        <ul class="cycle-list">
+          {% for origin, heir in result.cycles %}<li>{{ origin.hostname }} → {{ heir.hostname }}</li>{% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Nenhum ciclo: o risco só se propaga em um sentido.</p>
+      {% endif %}
+    </section>
+  {% endwith %}
+{% endblock %}

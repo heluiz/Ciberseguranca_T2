@@ -1,3 +1,8 @@
+# Verificação da interface web a cada push e pull request:
+#   - estilo, testes do programa original e testes web com PostgreSQL real;
+#   - migrações em dia, verificação de implantação e auditoria de dependências;
+#   - o mesmo container usado no servidor da disciplina é construído,
+#     iniciado e consultado por HTTP.
 name: Verificação web PostgreSQL
 on:
   push:
@@ -37,4 +42,26 @@ jobs:
       - run: python manage.py makemigrations --check --dry-run
       - run: DJANGO_DEBUG=0 python manage.py check --deploy --fail-level WARNING
       - run: pip-audit -r requirements-web.txt
-      - run: docker build -f Dockerfile.web -t sentinel-web:ci .
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Subir como no servidor da disciplina
+        run: SENTINEL_PORT=8080 sh ops/servidor/subir.sh
+      - name: Consultar a aplicação por HTTP
+        run: |
+          curl --fail --silent http://127.0.0.1:8080/health/
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/entrar/
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/static/inventory/app.css
+      - name: Dados sobrevivem à recriação dos containers
+        run: |
+          docker compose -f compose.servidor.yaml down
+          sh ops/servidor/subir.sh
+          docker compose -f compose.servidor.yaml exec -T db \
+            psql -U sentinel_owner -d sentinel -tAc "SELECT count(*) FROM inventory_asset" | grep -qx 76
+      - name: Situação e registro de disponibilidade
+        if: always()
+        run: |
+          sh ops/servidor/verificar.sh || true
+          docker compose -f compose.servidor.yaml logs --tail 30 preparar app

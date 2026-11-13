@@ -8,6 +8,8 @@ from ficha_tecnica import CAMPOS
 
 
 class InventoryRepository(Protocol):
+    """Contrato de leitura do inventário: quem o cumpre pode alimentar as regras."""
+
     def load(self) -> Inventario: ...
 
 
@@ -69,6 +71,13 @@ def vulnerability_dict(v):
         "cwe": v.cwe,
         "vetor": v.vetor,
     }
+
+
+class SnapshotRepository:
+    """PostgreSQL com leitura consistente: as consultas rodam sob a mesma trava das escritas."""
+
+    def load(self):
+        return snapshot()
 
 
 def lock_inventory():

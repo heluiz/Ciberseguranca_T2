@@ -1,10 +1,6 @@
-# SENTINEL Web — implementação em revisão
+# SENTINEL Web — implementação
 
-A versão web usa Django 5.2 LTS, PostgreSQL, templates HTML, CSS, JavaScript, SVG e Cytoscape.js. A CLI original permanece disponível. Esta branch é local; não houve publicação nem implantação no servidor.
-
-**Atualização após a revisão de 11/11/2026:** as falhas de autorização na exportação/dashboard e de paginação REST foram corrigidas e receberam testes de regressão. A inicialização local também foi corrigida para servir CSS/JS e ganhou iniciador Windows; veja [evidências e limites](INICIALIZACAO-WINDOWS.md). O contrato de Repository ainda não permite substituir os serviços completos por um adaptador em memória. O [relatório original](REVISAO-SPRINTS-2026-11-11.md) descreve o estado anterior às correções; as demais pendências permanecem.
-
-A revisão visual segue a referência enviada pelo aluno; veja [VISUAL.md](VISUAL.md) e o vídeo real dos efeitos em `screenshots/sentinel-neon.mp4`.
+A interface web usa Django 5.2 LTS, PostgreSQL, templates HTML, CSS e JavaScript. O programa de terminal original permanece disponível e as duas interfaces usam as mesmas classes de domínio e o mesmo modelo de risco. Como executar: [EXECUTAR.md](EXECUTAR.md). O que foi verificado: [VALIDACAO.md](VALIDACAO.md).
 
 ## Funcionalidades
 
@@ -14,17 +10,26 @@ A revisão visual segue a referência enviada pelo aluno; veja [VISUAL.md](VISUA
 - Datas de detecção/correção por ocorrência, linha do tempo e exportação administrativa de histórico (veja [TRATAMENTOS.md](TRATAMENTOS.md)).
 - Tratamento por ativo; corrigida sai do risco, aceita como risco continua contando.
 - Dependências direcionadas com frações e soma abaixo de 1, protegidas também por trigger PostgreSQL.
+- Análise de risco: verificação de invertibilidade de I − A antes de resolver, risco próprio e efetivo de todos os equipamentos em tabela com filtro e ordenação, matrizes montadas (inventários pequenos), ciclos de dependência e dois cenários de demonstração somente de leitura (um conferível à mão e um singular).
+- Ficha do ativo com a origem do risco herdado e os ativos alcançados a partir dele, com número de saltos.
+- Listagens com busca por todos os campos do ativo (inclusive custodiante, ficha técnica e ID) e filtros por tipo, situação e gravidade.
 - Painel, ranking, plano de correção, relatório por setor e mapa com seleção, busca, zoom e enquadramento.
 - Importação inicial de JSON com validação, simulação, transação, reconciliação e recibo idempotente; exportação compatível.
 - Consulta local ao CISA KEV incluído no projeto. Atualização remota continua no fluxo CLI original; não há atualização automática ou URL arbitrária na web.
-- API de sessão para os quatro recursos, com CSRF, permissões por recurso e paginação; exportação completa exige as quatro permissões de leitura do inventário.
+- API REST de sessão para os quatro recursos (GET, POST, PUT, PATCH e DELETE), com CSRF, permissões por recurso e paginação, e coleção Postman com testes automáticos; exportação completa exige as quatro permissões de leitura do inventário.
 - Auditoria de mutações e autenticação; eventos de administração de usuários também têm o histórico do admin Django.
 
 ## Arquitetura
 
-`sentinel/` configura HTTP, segurança e PostgreSQL. `inventory/views.py` entrega HTML e JSON, os formulários permitem somente campos explícitos, `services.py` executa casos de uso e `repository.py` reconstrói os objetos de domínio originais. `models.py` representa o esquema relacional. `academic/` guarda os algoritmos didáticos.
+`sentinel/` configura HTTP, segurança e PostgreSQL. `inventory/views.py` entrega HTML e JSON; os formulários aceitam somente campos explícitos; `services.py` executa os casos de uso de escrita, com autorização e transação; `analysis.py` reúne os casos de uso de leitura; `repository.py` reconstrói os objetos de domínio originais; `models.py` representa o esquema relacional ([MODELO-DADOS.md](MODELO-DADOS.md)). `academic/` guarda as estruturas de dados e os algoritmos.
 
-A Factory original escolhe a subclasse de equipamento; o polimorfismo fornece o fator de exposição. O Repository possui adaptadores PostgreSQL e memória. O serviço aplica autorização e transação. O cálculo continua em `risco.ModeloRisco`: `x = b + Ax`, usando `numpy.linalg.solve`, diagnóstico de condição e conferência de resíduo.
+A fábrica original escolhe a subclasse de equipamento e o polimorfismo fornece o fator de exposição de cada tipo. O cálculo continua em `risco.ModeloRisco`: `x = b + Ax`, resolvido com `numpy.linalg.solve` depois do diagnóstico de invertibilidade, com conferência do resíduo.
+
+**Inversão de dependência.** `analysis.py` não conhece Django nem PostgreSQL: recebe um repositório, isto é, qualquer objeto com `load()` que devolva um `Inventario`. A tela de análise usa `SnapshotRepository` (banco real) para o inventário e `MemoryRepository` para os cenários de demonstração; os testes executam o mesmo caso de uso com os dois e comparam os resultados. As escritas ficam em `services.py`, sobre o ORM, porque dependem de transação, trava e histórico do PostgreSQL; essa parte não tem implementação em memória.
+
+**Algoritmos aplicados ao inventário.** O ranking de risco é ordenado pelo Merge Sort de `academic/algorithms.py`; os ativos alcançados e seus saltos vêm de uma busca em largura no grafo de dependências; os ciclos, de uma busca em profundidade. As demais estruturas (tabela hash, árvore binária de busca, lista encadeada, fila, ordenações básicas, busca binária) têm testes e medições em [MEDICOES.md](MEDICOES.md).
+
+**Arquivos estáticos.** CSS e JavaScript são coletados na construção da imagem e entregues pela própria aplicação (WhiteNoise), o que dispensa proxy no servidor da disciplina.
 
 O risco próprio e efetivo são pontos sem limite de 100. CVSS é a escala de 0,1 a 10. Setas mostram a propagação do risco pelas dependências declaradas, sem medir tráfego ou comprovar exploração. Ciclos não significam necessariamente singularidade.
 
@@ -47,8 +52,14 @@ O controle é por grupo em um inventário compartilhado. Não existe isolamento 
 
 Os logs não incluem corpo de requisição, senha, token ou conteúdo do inventário. O banco contém sementes TOTP e códigos de recuperação: proteger disco, backups e acessos administrativos. Auditoria de aplicação não é imutável contra o proprietário do banco. Avaliar retenção, rotação e armazenamento externo antes de uso institucional.
 
-## Verificações e pendências
+## Verificações e limites
 
-Os testes automatizados cobrem migração, equivalência de risco, permissões negativas, CSRF, escape HTML, API, versões, concorrência na soma das dependências, MFA, limitação de login e algoritmos. A suíte CLI original é executada separadamente.
+Os testes automatizados cobrem migração, equivalência de risco, análise de risco com banco e memória, cenário singular, filtros, permissões negativas, CSRF, escape HTML, API (inclusive PUT), versões, concorrência na soma das dependências, MFA, limitação de login, preparação da instalação e algoritmos. A suíte do programa original é executada separadamente. Os resultados estão em [VALIDACAO.md](VALIDACAO.md).
 
-Ainda exigem evidência em ambiente real: construção e execução de Docker Compose, domínio/HTTPS externo, teste de indisponibilidade/reinício, monitoramento HTTP por 24 horas, auditoria manual de acessibilidade/teclado e revisão de segurança antes da exposição pública. Docker não está disponível neste ambiente de desenvolvimento. A documentação acadêmica integral, protótipo Figma e apresentação devem ser concluídos pelo aluno; não são comprovados só pela implementação.
+Limites conhecidos:
+
+- A construção da imagem e o `docker compose` do servidor são verificados pelo GitHub Actions a cada push; as 24 horas no servidor da disciplina precisam ser comprovadas lá, com `sh ops/servidor/verificar.sh`.
+- O inventário é único e compartilhado pelas contas; não há separação por organização.
+- As escritas são serializadas por uma trava global: correto para poucos usuários simultâneos, não medido para muitos.
+- A exportação JSON leva o inventário no formato do programa original; contas, datas e histórico só vão no backup do PostgreSQL.
+- Risco efetivo é pontuação do modelo, não probabilidade de ataque; dependência declarada não comprova caminho de ataque.

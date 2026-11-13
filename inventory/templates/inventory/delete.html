@@ -1,1 +1,16 @@
-{% extends 'inventory/base.html' %}{% block content %}<section class="panel form-panel"><p class="eyebrow danger-text">CONFIRMAÇÃO DE EXCLUSÃO</p><h1>Excluir registro?</h1><p>{{ object }}</p><p class="muted">Ao excluir um ativo, seus tratamentos e dependências também serão removidos. O catálogo de vulnerabilidades permanece disponível.</p><form method="post">{% csrf_token %}<input type="hidden" name="version" value="{{ object.version }}"><div class="form-actions"><button class="button danger-button">Confirmar exclusão</button><a class="button" href="{% url 'collection' kind %}">Cancelar</a></div></form></section>{% endblock %}
+{% extends "inventory/base.html" %}
+{% block content %}
+  <section class="panel form-panel">
+    <p class="eyebrow danger-text">CONFIRMAÇÃO DE EXCLUSÃO</p>
+    <h1>Excluir registro?</h1>
+    <p>{{ object }}</p>
+    <p class="muted">Ao excluir um ativo, seus tratamentos e dependências também serão removidos. O catálogo de vulnerabilidades permanece disponível.</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="version" value="{{ object.version }}">
+      <div class="form-actions"><button class="button danger-button">Confirmar exclusão</button><a class="button"
+                                                                                                   href="{% url 'collection' kind %}">Cancelar</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}

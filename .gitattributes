@@ -1,0 +1,3 @@
+# Scripts de shell rodam em Linux (servidor e containers): sempre com fim de linha LF,
+# mesmo quando o repositório é clonado no Windows.
+*.sh text eol=lf

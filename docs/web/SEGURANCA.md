@@ -10,6 +10,7 @@ Não é auditoria independente nem certificação ASVS. Objetivo de engenharia: 
 | Usuários simultâneos → integridade | Transações, trava, versões, unicidade/FKs/checks/trigger | Teste concorrente real em PostgreSQL |
 | JSON → banco | Limites, validação do domínio, base vazia, importação atômica | Round-trip e risco equivalente |
 | Proxy → aplicação | Rede interna, cabeçalho substituído por proxy dedicado | Exige validação no servidor real |
+| Rede interna sem certificado (servidor da disciplina) | Perfil próprio com `DJANGO_HTTPS=0` explícito; lista de hosts aceitos; cookies `HttpOnly` e `SameSite`; demais controles ativos | Tráfego sem criptografia: aceitável só em rede interna; na internet usar `compose.web.yaml` |
 | App → PostgreSQL | Papel runtime sem DDL/superusuário; migração separada | Configuração Compose; validar privilégios na implantação |
 | Operador → segredos | Ambiente externo, exclusão de build/Git, MFA arquivo privado | Revisão operacional e cofre |
 | Falha de serviço → perda | Health, restart, rotação de logs, dump/restauração | Exercício de restauração; 24h ainda pendente |

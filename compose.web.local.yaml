@@ -2,9 +2,6 @@
 services:
   app:
     ports: ["127.0.0.1:8000:8000"]
-    # O servidor de desenvolvimento também entrega CSS/JS dos apps.
-    # Gunicorn permanece no Dockerfile para produção com o proxy de estáticos.
-    command: ["python", "manage.py", "runserver", "0.0.0.0:8000", "--noreload"]
     environment:
       DJANGO_DEBUG: "1"
       DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"

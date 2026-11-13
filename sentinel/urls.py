@@ -46,6 +46,8 @@ urlpatterns = [
     ),
     path("mapa/", views.graph, name="graph"),
     path("api/grafo/", views.graph_data, name="graph_data"),
+    path("analise/", views.risk_analysis, name="risk_analysis"),
+    path("api/risco/", views.risk_data, name="risk_data"),
     path("relatorios/", views.reports, name="reports"),
     path("auditoria/", views.audit_log, name="audit"),
     path("dados/", views.transfer, name="transfer"),

@@ -39,8 +39,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - static-data:/app/staticfiles
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -68,7 +66,6 @@ services:
     ports: ["80:80", "443:443"]
     volumes:
       - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
-      - static-data:/srv/static:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on: [app]
@@ -77,6 +74,5 @@ services:
     logging: *logging
 volumes:
   postgres-data:
-  static-data:
   caddy-data:
   caddy-config:

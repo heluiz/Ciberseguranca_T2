@@ -1,1 +1,23 @@
-{% extends 'inventory/base.html' %}{% block content %}<div class="page-heading"><div><p class="eyebrow cyan">RASTREABILIDADE / TRATAMENTO #{{ finding.pk }}</p><h1>Histórico do tratamento</h1><p>{{ finding.asset }} · {{ finding.vulnerability }}</p></div><a class="button" href="/registros/finding/">Voltar aos tratamentos</a></div><section class="panel"><p>Situação atual: <strong>{{ finding.get_situacao_display }}</strong></p><p>Detecção: {{ finding.detected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</p><p>Correção: {{ finding.corrected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</p><small>Horário de Brasília. Uma reabertura preserva as correções anteriores na linha do tempo.</small></section><section class="panel"><h2>Linha do tempo</h2>{% include 'inventory/history_table.html' %}</section>{% endblock %}
+{% extends "inventory/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow cyan">RASTREABILIDADE / TRATAMENTO #{{ finding.pk }}</p>
+      <h1>Histórico do tratamento</h1>
+      <p>{{ finding.asset }} · {{ finding.vulnerability }}</p>
+    </div>
+    <a class="button" href="/registros/finding/">Voltar aos tratamentos</a>
+  </div>
+  <section class="panel">
+    <p>
+      Situação atual: <strong>{{ finding.get_situacao_display }}</strong>
+    </p>
+    <p>Detecção: {{ finding.detected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</p>
+    <p>Correção: {{ finding.corrected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</p>
+    <small>Horário de Brasília. Uma reabertura preserva as correções anteriores na linha do tempo.</small>
+  </section>
+  <section class="panel">
+    <h2>Linha do tempo</h2>
+    {% include "inventory/history_table.html" %}
+  </section>
+{% endblock %}
