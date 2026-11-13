@@ -1,0 +1,33 @@
+{% extends "inventory/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow cyan">REFERÊNCIAS / BASE OFFLINE</p>
+      <h1>
+        Catálogo CISA KEV<span class="cyan">.</span>
+      </h1>
+      <p class="muted">Consulta local à base incluída no projeto. A presença no KEV não confirma que seu ativo esteja vulnerável.</p>
+    </div>
+  </div>
+  <section class="panel">
+    <form class="search-form">
+      <label for="q">Buscar CVE, fabricante ou produto</label>
+      <div class="inline">
+        <input id="q" name="q" value="{{ query }}"><button class="button">Pesquisar</button>
+      </div>
+    </form>
+    {% for item in items %}
+      <article class="cve-item">
+        <h2>{{ item.cve }}</h2>
+        <p>
+          <strong>{{ item.fabricante }} · {{ item.produto }}</strong>
+        </p>
+        <p>{{ item.nome }}</p>
+        <p class="muted">{{ item.descricao }}</p>
+        <span class="badge">CVSS {{ item.cvss|default:"Não informado" }}</span>
+      </article>
+    {% empty %}
+      <p class="muted">Digite uma referência ou produto para consultar a base.</p>
+    {% endfor %}
+  </section>
+{% endblock %}

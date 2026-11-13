@@ -1,3 +1,5 @@
+> **Interface web:** além do programa de terminal descrito abaixo, o projeto tem uma interface web (Django + PostgreSQL) que usa as mesmas classes e o mesmo modelo de risco. Veja como [executar](docs/web/EXECUTAR.md) (Windows, servidor da disciplina ou internet), a [implementação](docs/web/IMPLEMENTACAO.md), o [modelo de dados](docs/web/MODELO-DADOS.md), a [relação com as sprints](docs/web/SPRINTS.md), as [medições](docs/web/MEDICOES.md) e a [segurança](docs/web/SEGURANCA.md).
+
 # Inventário de Equipamentos e Vulnerabilidades
 
 Programa de linha de comando em Python para cadastro, consulta, atualização e

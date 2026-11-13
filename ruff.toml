@@ -16,3 +16,13 @@ convention = "pep257"
 [lint.pycodestyle]
 # PEP 8: código até 79 colunas; comentários e docstrings até 72.
 max-doc-length = 72
+
+# Declarações Django, migrações e mensagens mantêm linhas de texto inteiras.
+# O código novo usa ruff format; regras de correção e imports seguem ativas.
+[lint.per-file-ignores]
+"inventory/**/*.py" = ["D", "E501", "W505"]
+"sentinel/*.py" = ["D", "E501", "W505"]
+"tests_web/*.py" = ["D", "E501", "W505"]
+"academic/*.py" = ["D", "E501", "W505"]
+"manage.py" = ["D"]
+"ops/smoke_browser.py" = ["E402", "E501", "W505"]

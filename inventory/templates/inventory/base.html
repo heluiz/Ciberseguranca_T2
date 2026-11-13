@@ -1,0 +1,115 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="{% static 'inventory/theme.js' %}"></script>
+    <title>{% block title %}SENTINEL · Gestão de ativos e vulnerabilidades{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'inventory/app.css' %}">
+    <link rel="stylesheet" href="{% static 'inventory/neon.css' %}">
+    <link rel="stylesheet" href="{% static 'inventory/themes.css' %}">
+    <script src="{% static 'inventory/app.js' %}" defer></script>
+    {% block head %}{% endblock %}
+  </head>
+  <body class="{% if user.is_authenticated %}signed-in{% endif %}">
+    <a class="skip" href="#main">Pular para o conteúdo</a>
+    {% if user.is_authenticated %}
+      <header class="command-header">
+        <a class="command-brand" href="/">
+          <svg class="icon" aria-hidden="true">
+            <use href="/static/inventory/icons.svg#sentinel-mark" />
+          </svg>
+          <span>SENTINEL<small>Gestão de ativos e vulnerabilidades</small></span>
+        </a>
+        <form class="global-search" action="/registros/asset/" role="search">
+          <label class="sr-only" for="global-query">Buscar ativos</label>
+          <svg class="icon" aria-hidden="true">
+            <use href="/static/inventory/icons.svg#search" />
+          </svg>
+          <input id="global-query" name="q" placeholder="Buscar ativos, setores ou patrimônios…">
+          <button class="sr-only">Buscar</button>
+        </form>
+        {% include "inventory/appearance_settings.html" %}
+        <a class="header-alert" href="/registros/finding/?situacao=1" aria-label="Ver tratamentos em aberto">
+          <svg class="icon" aria-hidden="true">
+            <use href="/static/inventory/icons.svg#bell" />
+          </svg>
+          <span></span>
+        </a>
+        <div class="command-user">
+          <span class="avatar">
+            <svg class="icon" aria-hidden="true">
+              <use href="/static/inventory/icons.svg#user" />
+            </svg>
+          </span>
+          <a href="/senha/">
+            <strong>{{ user.get_short_name|default:user.username }}</strong>
+            {# Mostra o papel real da conta; nunca presume "Administrador". #}
+            <small>{% if user.is_superuser %}Superusuário{% else %}{{ user.groups.first|default:"Sem grupo" }}{% endif %}</small>
+          </a>
+          <form method="post" action="/sair/">
+            {% csrf_token %}
+            <button class="logout-button" aria-label="Sair">
+              <svg class="icon" aria-hidden="true">
+                <use href="/static/inventory/icons.svg#logout" />
+              </svg>
+            </button>
+          </form>
+        </div>
+      </header>
+      <aside class="sidebar">
+        {# Cada conta vê somente os itens que pode abrir. #}
+        <nav aria-label="Menu principal">
+          {% if perms.inventory.view_asset and perms.inventory.view_vulnerability and perms.inventory.view_finding and perms.inventory.view_dependency %}
+            {% include "inventory/nav_link.html" with url="/" icon="home" label="Visão geral" %}
+            {% include "inventory/nav_link.html" with url="/analise/" icon="chart" label="Análise de risco" %}
+          {% endif %}
+          {% if perms.inventory.view_asset %}
+            {% include "inventory/nav_link.html" with url="/mapa/" icon="graph" label="Mapa de dependências" %}
+            {% include "inventory/nav_link.html" with url="/registros/asset/" icon="layers" label="Inventário" %}
+          {% endif %}
+          {% if perms.inventory.view_vulnerability %}
+            {% include "inventory/nav_link.html" with url="/registros/vulnerability/" icon="alert" label="Vulnerabilidades" %}
+          {% endif %}
+          {% if perms.inventory.view_finding %}
+            {% include "inventory/nav_link.html" with url="/registros/finding/" icon="check" label="Tratamentos" %}
+          {% endif %}
+          {% if perms.inventory.view_dependency %}
+            {% include "inventory/nav_link.html" with url="/registros/dependency/" icon="graph" label="Dependências" %}
+          {% endif %}
+          {% if perms.inventory.view_vulnerability %}
+            {% include "inventory/nav_link.html" with url="/relatorios/" icon="file" label="Relatórios por setor" %}
+            {% include "inventory/nav_link.html" with url="/cve/" icon="search" label="Catálogo CISA KEV" %}
+          {% endif %}
+          {% if perms.inventory.view_auditevent %}
+            {% include "inventory/nav_link.html" with url="/auditoria/" icon="shield" label="Auditoria" %}
+          {% endif %}
+          {% if user.is_superuser %}
+            {% include "inventory/nav_link.html" with url="/admin/auth/user/" icon="users" label="Usuários" %}
+            {% include "inventory/nav_link.html" with url="/dados/" icon="file" label="Importação e exportação" %}
+          {% endif %}
+        </nav>
+        <div class="sidebar-art" aria-hidden="true">
+          <i></i><i></i><i></i>
+        </div>
+        <div class="sidebar-bottom">
+          <span class="status-dot"></span> Inventário persistido em PostgreSQL
+          <small>Projeto acadêmico · Cibersegurança</small>
+        </div>
+      </aside>
+    {% else %}
+      <div class="guest-appearance-settings">{% include "inventory/appearance_settings.html" %}</div>
+    {% endif %}
+    <div class="workspace {% if not user.is_authenticated %}guest{% endif %}">
+      <main id="main">
+        {% for message in messages %}<div class="notice {{ message.tags }}" role="status">{{ message }}</div>{% endfor %}
+        {% block content %}{% endblock %}
+      </main>
+      <footer>
+        SENTINEL / Gestão de ativos e vulnerabilidades<span>Modelo de risco · x = b + Ax</span>
+      </footer>
+    </div>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

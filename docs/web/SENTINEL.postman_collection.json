@@ -1,0 +1,1034 @@
+{
+  "info": {
+    "name": "SENTINEL · API REST (testes automáticos)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Ciclo completo da API: entra com usuário e senha, cria, consulta, altera (PUT e PATCH), testa os casos de erro e apaga o que criou.\n\nAntes de executar, defina as variáveis username e password (conta com grupo Analista ou superior) e, se preciso, base_url. A API usa a sessão do login e o token CSRF, que a coleção obtém sozinha."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "username",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "run",
+      "value": ""
+    },
+    {
+      "key": "form_token",
+      "value": ""
+    },
+    {
+      "key": "asset_a",
+      "value": ""
+    },
+    {
+      "key": "asset_b",
+      "value": ""
+    },
+    {
+      "key": "vuln",
+      "value": ""
+    },
+    {
+      "key": "finding",
+      "value": ""
+    },
+    {
+      "key": "dependency",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Toda alteração precisa do token CSRF, que o servidor entrega em cookie.",
+          "const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes(pm.request.method);",
+          "if (unsafe && !pm.request.headers.has('X-No-CSRF')) {",
+          "    const jar = pm.cookies.jar();",
+          "    jar.get(pm.variables.replaceIn('{{base_url}}'), 'csrftoken', (error, token) => {",
+          "        if (token) pm.request.headers.upsert({ key: 'X-CSRFToken', value: token });",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0 · Sem sessão",
+      "item": [
+        {
+          "name": "API sem login redireciona para a entrada",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/asset/",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 302', () => pm.response.to.have.status(302));",
+                  "pm.test('aponta para /entrar/', () => pm.expect(pm.response.headers.get('Location')).to.include('/entrar/'));"
+                ]
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          }
+        },
+        {
+          "name": "Saúde responde sem login",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health/",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('status ok', () => pm.expect(json.status).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1 · Entrar",
+      "item": [
+        {
+          "name": "Abrir a tela de entrada",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/entrar/",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const match = pm.response.text().match(/name=\"csrfmiddlewaretoken\" value=\"([^\"]+)\"/);",
+                  "pm.test('formulário traz o token CSRF', () => pm.expect(match).to.not.be.null);",
+                  "pm.collectionVariables.set('form_token', match[1]);",
+                  "// Sufixo novo a cada execução, para não colidir com registros existentes.",
+                  "pm.collectionVariables.set('run', Date.now().toString(36).toUpperCase());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enviar usuário e senha",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/entrar/",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "{{base_url}}/entrar/"
+              }
+            ],
+            "description": "Defina as variáveis username e password no ambiente do Postman; não grave senha na coleção.",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "{{username}}"
+                },
+                {
+                  "key": "password",
+                  "value": "{{password}}"
+                },
+                {
+                  "key": "csrfmiddlewaretoken",
+                  "value": "{{form_token}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 302', () => pm.response.to.have.status(302));",
+                  "pm.test('sessão criada', () => pm.expect(pm.cookies.has('sessionid')).to.be.true);"
+                ]
+              }
+            }
+          ],
+          "protocolProfileBehavior": {
+            "followRedirects": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Ativos (CRUD completo)",
+      "item": [
+        {
+          "name": "Listar com paginação",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/asset/?limit=2&offset=0",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('envelope de paginação', () => pm.expect(json).to.have.all.keys('results', 'limit', 'offset', 'count', 'next_offset'));",
+                  "pm.test('respeita o limite', () => pm.expect(json.results.length).to.be.at.most(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paginação inválida é recusada",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/asset/?limit=0",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar sem token CSRF é recusado",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/asset/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-No-CSRF",
+                "value": "1"
+              }
+            ],
+            "description": "A requisição leva o cabeçalho X-No-CSRF para o script da coleção não incluir o token.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hostname\": \"PM-{{run}}-A\",\n  \"tipo\": 1,\n  \"custodiante\": \"Equipe de testes\",\n  \"lotacao\": \"Laboratório\",\n  \"descricao\": \"Criado pela coleção Postman\",\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar ativo A",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/asset/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hostname\": \"PM-{{run}}-A\",\n  \"tipo\": 1,\n  \"custodiante\": \"Equipe de testes\",\n  \"lotacao\": \"Laboratório\",\n  \"descricao\": \"Criado pela coleção Postman\",\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('devolve id e versão 1', () => { pm.expect(json.id).to.be.a('number'); pm.expect(json.version).to.eql(1); });",
+                  "pm.collectionVariables.set('asset_a', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hostname repetido é recusado",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/asset/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hostname\": \"PM-{{run}}-A\",\n  \"tipo\": 1,\n  \"custodiante\": \"Equipe de testes\",\n  \"lotacao\": \"Laboratório\",\n  \"descricao\": \"Criado pela coleção Postman\",\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409 ou 422', () => pm.expect(pm.response.code).to.be.oneOf([409, 422]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campo não permitido é recusado",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/asset/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hostname\": \"PM-{{run}}-X\",\n  \"tipo\": 1,\n  \"custodiante\": \"Equipe de testes\",\n  \"lotacao\": \"Laboratório\",\n  \"descricao\": \"Criado pela coleção Postman\",\n  \"version\": 1,\n  \"is_superuser\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar ativo B",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/asset/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hostname\": \"PM-{{run}}-B\",\n  \"tipo\": 2,\n  \"custodiante\": \"Equipe de testes\",\n  \"lotacao\": \"Laboratório\",\n  \"descricao\": \"Servidor de apoio do teste\",\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('asset_b', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar ativo A",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/asset/{{asset_a}}/",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('é o registro criado', () => pm.expect(json.results[0].hostname).to.eql('PM-' + pm.collectionVariables.get('run') + '-A'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT substitui o registro inteiro",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/asset/{{asset_a}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hostname\": \"PM-{{run}}-A\",\n  \"tipo\": 1,\n  \"custodiante\": \"Equipe de testes\",\n  \"lotacao\": \"Laboratório\",\n  \"descricao\": \"Substituído por PUT\",\n  \"version\": 1,\n  \"fabricante\": \"Dell\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('versão avança para 2', () => pm.expect(json.version).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT incompleto é recusado",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/asset/{{asset_a}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 2,\n  \"descricao\": \"Só um campo\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH altera só um campo",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/asset/{{asset_a}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 2,\n  \"lotacao\": \"Sala de testes\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('versão avança para 3', () => pm.expect(pm.response.json().version).to.eql(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH com versão antiga dá conflito",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/asset/{{asset_a}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 1,\n  \"lotacao\": \"Atrasado\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Conferir o resultado das alterações",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/asset/{{asset_a}}/",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('PUT e PATCH aplicados', () => { pm.expect(json.results[0].descricao).to.eql('Substituído por PUT'); pm.expect(json.results[0].fabricante).to.eql('Dell'); pm.expect(json.results[0].lotacao).to.eql('Sala de testes'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registro inexistente",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/asset/999999999/",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 · Vulnerabilidade, tratamento e dependência",
+      "item": [
+        {
+          "name": "Criar vulnerabilidade",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/vulnerability/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"Falha de teste da coleção {{run}}\",\n  \"origem\": 1,\n  \"cvss\": \"7.5\",\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('vuln', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CVSS fora da faixa é recusado",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/vulnerability/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"Nota inválida\",\n  \"origem\": 1,\n  \"cvss\": \"11.0\",\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vincular vulnerabilidade ao ativo A",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/finding/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"asset\": {{asset_a}},\n  \"vulnerability\": {{vuln}},\n  \"situacao\": 1,\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('finding', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vínculo repetido é recusado",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/finding/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"asset\": {{asset_a}},\n  \"vulnerability\": {{vuln}},\n  \"situacao\": 1,\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409 ou 422', () => pm.expect(pm.response.code).to.be.oneOf([409, 422]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Marcar tratamento como corrigido",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/finding/{{finding}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 1,\n  \"situacao\": 3\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ativo A passa a depender de B",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/dependency/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": {{asset_a}},\n  \"target\": {{asset_b}},\n  \"fracao\": \"0.4\",\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('dependency', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Soma de frações igual ou acima de 1 é recusada",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/dependency/{{dependency}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 1,\n  \"fracao\": \"1.0\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Risco de todos os equipamentos",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/risco/",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const mine = json.rows.find(row => row.id === Number(pm.collectionVariables.get('asset_a')));",
+                  "pm.test('ativo criado aparece com risco próprio e efetivo', () => { pm.expect(mine).to.be.an('object'); pm.expect(mine.proprio).to.be.a('number'); pm.expect(mine.efetivo).to.be.at.least(mine.proprio); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cenário singular é recusado antes de resolver",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/risco/?cenario=singular",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('explica o motivo', () => pm.expect(pm.response.json().error).to.include('invertível'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 · Limpeza",
+      "item": [
+        {
+          "name": "Excluir dependência",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/dependency/{{dependency}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Excluir tratamento",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/finding/{{finding}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 2\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Excluir vulnerabilidade",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/vulnerability/{{vuln}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Excluir com versão errada dá conflito",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/asset/{{asset_a}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Excluir ativo A",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/asset/{{asset_a}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 3\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Excluir ativo B",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/asset/{{asset_b}}/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ativo A não existe mais",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/asset/{{asset_a}}/",
+            "header": [],
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

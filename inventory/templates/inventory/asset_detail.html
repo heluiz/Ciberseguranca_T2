@@ -1,0 +1,120 @@
+{% extends "inventory/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow cyan">FICHA COMPLETA DO ATIVO</p>
+      <h1>{{ asset.hostname }}</h1>
+      <p>{{ asset.tipo.rotulo }} · {{ asset.lotacao }}</p>
+    </div>
+    <a class="button primary" href="/mapa/?ativo={{ asset.id }}">Ver no mapa</a>
+  </div>
+  <section class="panel">
+    <h2>Identificação</h2>
+    <p>{{ asset.descricao }}</p>
+    <p>Custodiante: {{ asset.custodiante }}</p>
+    <div class="form-grid">
+      {% for label, value in asset.ficha.preenchidos %}
+        <p>
+          {{ label }}: <strong>{{ value }}</strong>
+        </p>
+      {% endfor %}
+    </div>
+    <p>Risco próprio: {{ row.proprio|floatformat:2 }} pontos · Risco efetivo: {{ row.efetivo|floatformat:2 }} pontos</p>
+  </section>
+  <section class="panel">
+    <h2>Vulnerabilidades e tratamentos</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Vulnerabilidade</th>
+            <th>CVSS</th>
+            <th>Situação</th>
+            <th>Detecção</th>
+            <th>Correção</th>
+            <th>Histórico</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for occurrence in occurrences %}
+            <tr>
+              <td>{{ occurrence.vulnerability.cve|default:occurrence.vulnerability.descricao }}</td>
+              <td>{{ occurrence.vulnerability.cvss }}</td>
+              <td>{{ occurrence.get_situacao_display }}</td>
+              <td>{{ occurrence.detected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</td>
+              <td>{{ occurrence.corrected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</td>
+              <td><a href="{% url 'finding_history' occurrence.pk %}">Histórico</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6">Nenhuma vulnerabilidade vinculada.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>De onde este ativo herda risco</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Depende de</th>
+            <th>Fração herdada</th>
+            <th>Risco efetivo da origem</th>
+            <th>Pontos herdados</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for other, fraction, effective, inherited in contributions %}
+            <tr>
+              <td><a href="{% url 'asset_detail' other.id %}">{{ other.hostname }}</a></td>
+              <td>{{ fraction|floatformat:4 }}</td>
+              <td>{{ effective|floatformat:2 }}</td>
+              <td>{{ inherited|floatformat:2 }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">Este ativo não depende de nenhum outro.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Quem é alcançado se este ativo for comprometido</h2>
+    <p class="muted">
+      Busca em largura no grafo de dependências: {{ reached|length }} ativo(s) herdam risco deste, direta ou
+      indiretamente. Saltos é a distância mais curta no grafo. São dependências declaradas, não caminhos de ataque comprovados.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Ativo alcançado</th>
+            <th>Tipo</th>
+            <th>Lotação</th>
+            <th>Saltos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in reached %}
+            <tr>
+              <td><a href="{% url 'asset_detail' item.equipamento.id %}">{{ item.equipamento.hostname }}</a></td>
+              <td>{{ item.equipamento.tipo.rotulo }}</td>
+              <td>{{ item.equipamento.lotacao }}</td>
+              <td>{{ item.saltos }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">Nenhum ativo herda risco deste.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

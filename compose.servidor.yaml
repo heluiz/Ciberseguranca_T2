@@ -1,0 +1,106 @@
+# SENTINEL web no servidor da disciplina (rede interna, sem domínio).
+#
+#   sh ops/servidor/subir.sh        cria o .env na primeira vez e sobe tudo
+#
+# Diferenças para compose.web.yaml (internet, com domínio e HTTPS):
+#   - atende por HTTP em uma única porta alta (SENTINEL_PORT, padrão 8080);
+#   - não usa proxy: a aplicação entrega os próprios arquivos estáticos;
+#   - a preparação (migrações, grupos, conta inicial, dados de exemplo)
+#     roda sozinha antes de a aplicação subir;
+#   - um container registra a disponibilidade a cada minuto.
+name: sentinel-servidor
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+x-build: &build
+  context: .
+  dockerfile: Dockerfile.web
+x-app-env: &app-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Execute sh ops/servidor/subir.sh para gerar o .env}
+  DJANGO_DEBUG: "0"
+  # Rede interna sem certificado: HTTPS desligado de forma explícita.
+  DJANGO_HTTPS: ${DJANGO_HTTPS:-0}
+  DJANGO_REQUIRE_MFA: ${DJANGO_REQUIRE_MFA:-0}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:?Informe os enderecos do servidor}
+  POSTGRES_DB: ${POSTGRES_DB:-sentinel}
+  POSTGRES_HOST: db
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sentinel}
+      POSTGRES_USER: sentinel_owner
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Defina a senha do proprietario}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_PASSWORD:?Defina a senha da aplicacao}
+    volumes:
+      # Os dados sobrevivem a reinícios e à recriação dos containers.
+      - postgres-data:/var/lib/postgresql/data
+      - ./ops/init-db.sh:/docker-entrypoint-initdb.d/01-sentinel.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+  # Executa uma vez a cada "up" e termina. Usa o proprietário do banco,
+  # o único papel que pode criar e alterar tabelas.
+  preparar:
+    build: *build
+    image: sentinel-web:servidor
+    environment:
+      <<: *app-env
+      POSTGRES_USER: sentinel_owner
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Defina a senha do proprietario}
+      SENTINEL_ADMIN_USER: ${SENTINEL_ADMIN_USER:-admin}
+      SENTINEL_ADMIN_PASSWORD: ${SENTINEL_ADMIN_PASSWORD:-}
+      SENTINEL_DEMO: ${SENTINEL_DEMO:-1}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["python", "manage.py", "bootstrap"]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+    logging: *logging
+  app:
+    build: *build
+    image: sentinel-web:servidor
+    environment:
+      <<: *app-env
+      # Papel de execução: lê e grava dados, não altera o esquema.
+      POSTGRES_USER: sentinel_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina a senha da aplicacao}
+    depends_on:
+      db:
+        condition: service_healthy
+      preparar:
+        condition: service_completed_successfully
+    ports:
+      - "${SENTINEL_PORT:-8080}:8000"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # Religa após falha ou reinício do servidor, salvo parada manual.
+    restart: unless-stopped
+    logging: *logging
+  monitor:
+    build: *build
+    image: sentinel-web:servidor
+    command: ["python", "ops/monitor.py", "http://app:8000/health/", "60"]
+    depends_on:
+      app:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    logging: *logging
+volumes:
+  postgres-data:

@@ -1,0 +1,132 @@
+{% extends "inventory/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow cyan">INVENTÁRIO / DADOS DO PROJETO</p>
+      <h1>
+        {{ title }}<span class="cyan">.</span>
+      </h1>
+      <p class="muted">{{ page.paginator.count }} registros · Alterações com validação e auditoria.</p>
+    </div>
+  {% if can_add %}<a class="button primary" href="{% url 'create' kind %}">+ Novo registro</a>
+{% endif %}
+</div>
+<section class="panel">
+  <form class="search-form" method="get">
+    <div class="filter-row">
+      <div class="filter-field filter-grow">
+        <label for="q">Buscar registros</label>
+        <input id="q"
+               name="q"
+               value="{{ query }}"
+               placeholder="{% if kind == 'asset' %}Hostname, custodiante, lotação, patrimônio, ficha técnica ou ID{% elif kind == 'vulnerability' %}CVE, CWE ou descrição{% elif kind == 'finding' %}Ativo, lotação, CVE ou descrição{% else %}Hostname de origem ou destino{% endif %}">
+      </div>
+      {% if kind == "asset" %}
+        <div class="filter-field">
+          <label for="tipo">Tipo</label>
+          <select id="tipo" name="tipo">
+            <option value="">Todos</option>
+            {% for value, label in asset_types %}
+              <option value="{{ value }}" {% if value == asset_type %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+      {% if kind == "finding" %}
+        <div class="filter-field">
+          <label for="situacao">Situação</label>
+          <select id="situacao" name="situacao">
+            <option value="">Todas</option>
+            {% for value, label in statuses %}
+              <option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+      {% if kind == "finding" or kind == "vulnerability" %}
+        <div class="filter-field">
+          <label for="gravidade">Gravidade</label>
+          <select id="gravidade" name="gravidade">
+            <option value="">Todas</option>
+            {% for value, label in severities %}
+              <option value="{{ value }}" {% if value == severity %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+      <button class="button">Buscar</button>
+      {% if query or filters %}<a class="button" href="{% url 'collection' kind %}">Limpar</a>{% endif %}
+    </div>
+  </form>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Identificação</th>
+          <th>Detalhes</th>
+          <th>Estado / valor</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for obj in page %}
+          <tr>
+            <td class="muted">#{{ obj.pk }}</td>
+            {% if kind == "asset" %}
+              <td>
+                <strong><a href="{% url 'asset_detail' obj.pk %}">{{ obj.hostname }}</a></strong><small>{{ obj.get_tipo_display }}</small>
+              </td>
+              <td>
+                {{ obj.lotacao }}<small>Custodiante: {{ obj.custodiante }}</small><small>{{ obj.descricao }}</small><small>{{ obj.fabricante }} {{ obj.modelo }} · {{ obj.sistema }} {{ obj.versao }}</small>
+              </td>
+              <td>{{ obj.patrimonio|default:'Sem patrimônio' }}</td>
+            {% elif kind == "vulnerability" %}
+              <td>
+                <strong>{{ obj.cve|default:'Falha interna' }}</strong><small>{{ obj.cwe|default:'Sem CWE' }}</small>
+              </td>
+              <td>
+                {{ obj.descricao }}<small>{{ obj.get_origem_display }}</small>
+              </td>
+              <td>
+                <span class="badge">CVSS {{ obj.cvss }}</span>
+              </td>
+            {% elif kind == "finding" %}
+              <td>{{ obj.asset }}</td>
+              <td>{{ obj.vulnerability }}</td>
+              <td>
+                <span class="badge">{{ obj.get_situacao_display }}</span><small>Detectada: {{ obj.detected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</small><small>Corrigida: {{ obj.corrected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</small>
+              </td>
+            {% else %}
+              <td>{{ obj.source }} → {{ obj.target }}</td>
+              <td>O ativo de origem herda risco do destino.</td>
+              <td>{{ obj.fracao }}</td>
+            {% endif %}
+            <td class="actions">
+            {% if kind == "finding" %}<a href="{% url 'finding_history' obj.pk %}">Histórico</a>
+        {% endif %}
+      {% if can_change %}<a href="{% url 'edit' kind obj.pk %}">Editar</a>
+    {% endif %}
+  {% if can_delete %}<a class="danger-text" href="{% url 'delete' kind obj.pk %}">Excluir</a>
+{% endif %}
+</td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="5" class="empty">Nenhum registro encontrado.</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+  <div class="pagination">
+    {% if page.has_previous %}
+      <a href="?page={{ page.previous_page_number }}&q={{ query|urlencode }}{{ filters }}">← Anterior</a>
+    {% endif %}
+    <span>Página {{ page.number }} de {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+      <a href="?page={{ page.next_page_number }}&q={{ query|urlencode }}{{ filters }}">Próxima →</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

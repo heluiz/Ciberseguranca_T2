@@ -1,0 +1,67 @@
+# Verificação da interface web a cada push e pull request:
+#   - estilo, testes do programa original e testes web com PostgreSQL real;
+#   - migrações em dia, verificação de implantação e auditoria de dependências;
+#   - o mesmo container usado no servidor da disciplina é construído,
+#     iniciado e consultado por HTTP.
+name: Verificação web PostgreSQL
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_DB: sentinel
+          POSTGRES_USER: sentinel
+          POSTGRES_PASSWORD: ci-only-not-production
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sentinel"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      DJANGO_DEBUG: "1"
+      DJANGO_SECRET_KEY: ci-only-not-production-abcdefghijklmnopqrstuvwxyz-1234567890
+      POSTGRES_DB: sentinel
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: ci-only-not-production
+      POSTGRES_HOST: 127.0.0.1
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: python testes.py
+      - run: pytest --cov=inventory --cov=academic --cov-fail-under=80
+      - run: python manage.py makemigrations --check --dry-run
+      - run: DJANGO_DEBUG=0 python manage.py check --deploy --fail-level WARNING
+      - run: pip-audit -r requirements-web.txt
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Subir como no servidor da disciplina
+        run: SENTINEL_PORT=8080 sh ops/servidor/subir.sh
+      - name: Consultar a aplicação por HTTP
+        run: |
+          curl --fail --silent http://127.0.0.1:8080/health/
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/entrar/
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/static/inventory/app.css
+      - name: Dados sobrevivem à recriação dos containers
+        run: |
+          docker compose -f compose.servidor.yaml down
+          sh ops/servidor/subir.sh
+          docker compose -f compose.servidor.yaml exec -T db \
+            psql -U sentinel_owner -d sentinel -tAc "SELECT count(*) FROM inventory_asset" | grep -qx 76
+      - name: Situação e registro de disponibilidade
+        if: always()
+        run: |
+          sh ops/servidor/verificar.sh || true
+          docker compose -f compose.servidor.yaml logs --tail 30 preparar app

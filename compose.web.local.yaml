@@ -1,0 +1,11 @@
+# Uso local: app acessível apenas neste computador; não usar no servidor público.
+services:
+  app:
+    ports: ["127.0.0.1:8000:8000"]
+    environment:
+      DJANGO_DEBUG: "1"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DJANGO_CSRF_TRUSTED_ORIGINS: ""
+      TRUST_PROXY: "0"
+  proxy:
+    profiles: [https]

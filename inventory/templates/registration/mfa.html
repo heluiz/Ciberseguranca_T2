@@ -1,0 +1,11 @@
+{% extends "inventory/base.html" %}
+{% block content %}
+  <section class="panel form-panel">
+    <h1>Verificação em duas etapas</h1>
+    <p>Informe o código do seu autenticador ou um código de recuperação.</p>
+    <form method="post">
+      {% csrf_token %}{{ form.as_p }}<button class="button primary">Verificar</button>
+    </form>
+    <p class="footnote">O dispositivo deve ser provisionado pelo administrador antes do primeiro acesso público.</p>
+  </section>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "inventory/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow cyan">ANÁLISE / AGREGAÇÃO NO POSTGRESQL</p>
+      <h1>
+        Relatórios por setor<span class="cyan">.</span>
+      </h1>
+    </div>
+    <a class="button" href="/dados/exportar/">Exportar inventário JSON →</a>
+  </div>
+  <section class="panel">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Lotação</th>
+            <th>Ativos</th>
+            <th>Falhas não corrigidas</th>
+            <th>CVSS médio não corrigido</th>
+            <th>Maior CVSS cadastrado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in summary %}
+            <tr>
+              <td>{{ r.lotacao }}</td>
+              <td>{{ r.ativos }}</td>
+              <td>{{ r.falhas }}</td>
+              <td>{{ r.media|floatformat:2|default:'—' }}</td>
+              <td>{{ r.maximo|floatformat:1|default:'—' }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5">Cadastre ativos para gerar o relatório.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

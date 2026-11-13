@@ -1,0 +1,20 @@
+{% extends "inventory/base.html" %}
+{% block content %}
+  <section class="panel">
+    <h1>Acesso restrito</h1>
+    <p>Sua conta não tem permissão para abrir esta página.</p>
+    {% if user.is_authenticated and not user.is_superuser and not user.groups.exists %}
+      <p class="muted">
+        A conta <strong>{{ user.username }}</strong> ainda não pertence a nenhum grupo (Leitor, Analista ou
+        Administrador). Peça ao administrador do SENTINEL para incluí-la em um grupo.
+      </p>
+    {% endif %}
+    <div class="inline">
+      <a class="button" href="/senha/">Trocar minha senha</a>
+      <form method="post" action="/sair/">
+        {% csrf_token %}
+        <button class="button">Sair</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}
