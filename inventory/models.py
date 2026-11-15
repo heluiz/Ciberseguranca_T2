@@ -108,6 +108,13 @@ class Finding(models.Model):
             ),
         ]
 
+    def __str__(self):
+        vulnerability = (
+            self.vulnerability.cve
+            or f"vulnerabilidade #{self.vulnerability_id}"
+        )
+        return f"{self.asset} · {vulnerability}"
+
 
 class FindingHistory(models.Model):
     """Linha do tempo preservada mesmo após exclusão da ocorrência."""
@@ -171,6 +178,40 @@ class Dependency(models.Model):
             ),
         ]
 
+    def __str__(self):
+        fraction = format(self.fracao.normalize(), "f").replace(".", ",")
+        return f"{self.source} depende de {self.target} (fração {fraction})"
+
+
+# Rótulos da auditoria em português.
+AUDIT_VERBS = {
+    "add": "Cadastro",
+    "change": "Alteração",
+    "delete": "Exclusão",
+    "view": "Consulta",
+}
+AUDIT_NOUNS = {
+    "asset": "ativo",
+    "vulnerability": "vulnerabilidade",
+    "finding": "tratamento",
+    "dependency": "dependência",
+    "auditevent": "auditoria",
+    "findinghistory": "histórico de tratamentos",
+    "importreceipt": "importação",
+}
+AUDIT_FIXED = {
+    "login": "Entrada no sistema",
+    "logout": "Saída do sistema",
+    "login_failed": "Tentativa de entrada recusada",
+    "import": "Importação do inventário (JSON)",
+}
+
+
+def describe_permission(code):
+    """'add_asset' -> 'Cadastro de ativo'."""
+    verb, _, noun = code.partition("_")
+    return f"{AUDIT_VERBS.get(verb, verb)} de {AUDIT_NOUNS.get(noun, noun)}"
+
 
 class AuditEvent(models.Model):
     actor = models.ForeignKey(
@@ -179,6 +220,24 @@ class AuditEvent(models.Model):
     occurred_at = models.DateTimeField(auto_now_add=True, db_index=True)
     action = models.CharField(max_length=64)
     target = models.CharField(max_length=80)
+
+    @property
+    def descricao(self):
+        """Ação em português, para a tela de auditoria."""
+        if self.action in AUDIT_FIXED:
+            return AUDIT_FIXED[self.action]
+        if self.action == "denied":
+            return "Acesso negado: " + describe_permission(self.target).lower()
+        return describe_permission(self.action)
+
+    @property
+    def alvo(self):
+        """Registro afetado, quando a ação se refere a um."""
+        if self.action in ("login", "logout", "login_failed", "denied"):
+            return "—"
+        if self.action == "import":
+            return f"arquivo {self.target[:12]}…"
+        return f"#{self.target}"
 
     # Sem senhas, tokens, nomes de pessoas nem conteúdo de inventário no log.
     class Meta:

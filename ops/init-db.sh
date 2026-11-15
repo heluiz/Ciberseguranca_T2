@@ -1,5 +1,9 @@
 #!/bin/sh
-set -eu
+# Cria o papel da aplicação (só lê e grava dados) no primeiro início do banco.
+# O PostgreSQL executa este arquivo, ou o carrega com "." quando ele não tem
+# permissão de execução (o Git no Windows pode perder essa permissão). Por isso
+# o arquivo não muda as opções do shell que o carrega: um erro no psql
+# (ON_ERROR_STOP) interrompe a inicialização do mesmo jeito.
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
   -v db_name="$POSTGRES_DB" -v app_password="$POSTGRES_APP_PASSWORD" <<'SQL'
 CREATE ROLE sentinel_app LOGIN PASSWORD :'app_password';

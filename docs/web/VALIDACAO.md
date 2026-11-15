@@ -1,20 +1,35 @@
 # Verificações desta versão
 
-Executadas em 13/11/2026, em Linux, com Python 3.13 e PostgreSQL 16. A integração contínua repete as verificações com Python 3.12 e PostgreSQL 17.
+Executadas em 13 e 14/11/2026, em Linux, com Python 3.13 e PostgreSQL 16. A integração contínua repete as verificações automáticas com Python 3.12 e PostgreSQL 17, e o job `container` sobe o perfil do servidor de verdade (passou no merge do Pull Request #14).
 
 | Verificação | Resultado |
 |---|---|
 | `ruff check .` | Sem apontamentos |
-| `python testes.py` (programa original) | 115 testes aprovados |
-| `pytest` (web, com PostgreSQL real) | 110 testes aprovados |
-| Cobertura de `inventory` e `academic` | 88% |
+| `python testes.py` (programa de terminal) | 115 testes aprovados |
+| `pytest` (web, com PostgreSQL real) | 132 testes aprovados |
+| Cobertura de `inventory` e `academic` | 90% |
 | `manage.py makemigrations --check` | Migrações em dia |
 | `manage.py check --deploy` | Sem apontamentos, no perfil com HTTPS e no perfil do servidor da disciplina |
 | `pip-audit -r requirements-web.txt` | Nenhuma vulnerabilidade conhecida nas dependências |
-| Coleção Postman (newman) | 34 requisições, 47 verificações aprovadas, em duas execuções seguidas |
+| Coleção Postman (newman) | 34 requisições e 47 verificações aprovadas, com o servidor de desenvolvimento e com o perfil do servidor (Gunicorn, sem DEBUG) |
 | `docs/web/consultas.sql` | Todas as consultas executam no banco de exemplo |
-| Navegador (Chromium por script) | Login, mapa, CRUD, tela de celular, filtro e ordenação da tabela de risco, sem erros de JavaScript |
-| Acessibilidade automática | Sem violações WCAG 2.1 A/AA em 11 páginas e 4 temas ([ACESSIBILIDADE.md](ACESSIBILIDADE.md)) |
+| Backup e restauração (`pg_dump`/`pg_restore`, seção 10 do README) | Restauração por cima de dados alterados e numa instalação nova; o papel da aplicação continua lendo e gravando |
+| Acessibilidade automática | Sem violações WCAG 2.1 A/AA nas telas, nos 4 temas ([ACESSIBILIDADE.md](ACESSIBILIDADE.md)) |
+
+## Revisão das telas no navegador
+
+Um roteiro no Chromium, controlado por script, percorreu todas as telas com três contas (administrador, Analista e Leitor), uma conta sem grupo e a tela de celular: 188 verificações, nenhuma falha. Inclui:
+
+- cabeçalho (busca, sino com o número real de tratamentos em aberto, troca de tema, senha, sair) e cada item do menu;
+- indicadores da visão geral, que levam às listas correspondentes (o total de ocorrências críticas bate com a lista aberta);
+- cadastro, busca, filtros, paginação, edição, cancelamento e exclusão de ativos, vulnerabilidades, tratamentos e dependências, com as recusas de dado inválido;
+- atalhos entre telas: da ficha do ativo para editar, excluir, vincular vulnerabilidade, alterar a situação e criar dependência (voltando para a ficha); da lista de vulnerabilidades para os ativos afetados; do relatório por setor para os ativos daquela lotação; do catálogo KEV para o cadastro já preenchido;
+- mapa: busca, foco, zoom, enquadrar, tela cheia, pausa dos efeitos, teclado, simulação de correção e a tabela de prioridades;
+- auditoria em português e exportação CSV, exportação JSON, validação e importação;
+- criação de conta pelo painel de usuários, troca de senha, saída e entrada;
+- o que cada perfil vê e o que é negado pelo endereço direto.
+
+Também foram conferidos: todas as telas com o inventário vazio e com um único ativo, sem erro de JavaScript; e as páginas de erro 403, 404 e 500 sem modo de depuração.
 
 ## Perfil do servidor da disciplina
 

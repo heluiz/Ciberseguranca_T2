@@ -1,19 +1,580 @@
-> **Interface web:** além do programa de terminal descrito abaixo, o projeto tem uma interface web (Django + PostgreSQL) que usa as mesmas classes e o mesmo modelo de risco. Veja como [executar](docs/web/EXECUTAR.md) (Windows, servidor da disciplina ou internet), a [implementação](docs/web/IMPLEMENTACAO.md), o [modelo de dados](docs/web/MODELO-DADOS.md), a [relação com as sprints](docs/web/SPRINTS.md), as [medições](docs/web/MEDICOES.md) e a [segurança](docs/web/SEGURANCA.md).
+# SENTINEL — Inventário de Equipamentos e Vulnerabilidades
 
-# Inventário de Equipamentos e Vulnerabilidades
-
-Programa de linha de comando em Python para cadastro, consulta, atualização e
-remoção (CRUD) de equipamentos de TI e das vulnerabilidades que os afetam, com
-**cálculo do risco de cada equipamento por álgebra linear**, um **plano de
-correção** que diz o que mais reduz o risco da rede, uma **base das CVEs
-exploradas em ataques**, explicadas em português e que funciona sem internet,
-e execução em **container Docker**.
-
-2ª atividade avaliativa (sprints 3, 4 e 5) do Bacharelado em Cibersegurança —
+2ª atividade avaliativa (Sprints 3, 4 e 5) do Bacharelado em Cibersegurança —
 FEELT/UFU, 2026/2. Continuação do Trabalho 1: os requisitos dele continuam
 valendo, e o programa foi reescrito em orientação a objetos.
 
-## Início rápido
+O projeto cadastra os equipamentos de TI e as vulnerabilidades que os afetam,
+calcula o risco de cada equipamento com álgebra linear (o risco próprio e o
+risco efetivo, depois de verificar se o sistema tem solução) e monta um plano
+que diz o que corrigir primeiro. Há duas interfaces sobre as mesmas classes e o
+mesmo modelo de risco:
+
+| Interface | O que é | Dados |
+| --- | --- | --- |
+| **Web (SENTINEL)** | Aplicação Django com login, inventário, mapa de dependências, análise de risco, catálogo de CVEs exploradas e API REST | PostgreSQL, com importação e exportação no formato JSON |
+| **Terminal** | O programa de menu original | Arquivo JSON |
+
+## Sumário
+
+- [Comandos](#comandos): tudo o que se executa, pronto para copiar e colar
+- [Interface web](#interface-web): o que tem e onde está a documentação
+- [Requisitos do Trabalho 2](#requisitos-do-trabalho-2)
+- [Estrutura](#estrutura)
+- [Programa de terminal: como executar](#programa-de-terminal-como-executar)
+- [Como usar o programa de terminal](#como-usar)
+- [Orientação a objetos](#orientação-a-objetos)
+- [O modelo de risco](#o-modelo-de-risco)
+- [Formato do arquivo de dados](#formato-do-arquivo-de-dados)
+- [Base de CVEs exploradas](#base-de-cves-exploradas)
+- [Decisões de projeto](#decisões-de-projeto)
+- [Segurança e LGPD](#segurança-e-lgpd)
+- [Normas seguidas](#normas-seguidas)
+- [Limitações conhecidas](#limitações-conhecidas)
+- [Testes](#testes)
+- [Fluxo de trabalho no Git](#fluxo-de-trabalho-no-git)
+- [Dados de exemplo](#dados-de-exemplo)
+
+## Comandos
+
+Cada bloco é para copiar e colar inteiro, na ordem. Os blocos marcados
+**PowerShell** são para o Windows; os marcados **Linux** são para o servidor
+(ou qualquer Linux). Troque só o que estiver em MAIÚSCULAS, como `SUA_SENHA`.
+
+| Quero... | Seção |
+| --- | --- |
+| Abrir a versão web no meu computador | [1. Versão web no Windows](#1-versão-web-no-windows) |
+| Colocar a versão web no servidor do docente | [2. Versão web no servidor](#2-versão-web-no-servidor) |
+| Comprovar as 24 horas no ar | [3. Comprovar as 24 horas](#3-comprovar-as-24-horas) |
+| Atualizar o servidor depois de mudar o código | [4. Atualizar o servidor](#4-atualizar-o-servidor) |
+| Ver a situação, o log, parar e religar | [5. Situação, log, parar e religar](#5-situação-log-parar-e-religar) |
+| Criar contas, trocar senha, desbloquear | [6. Contas e senhas](#6-contas-e-senhas) |
+| Abrir o programa de terminal | [7. Programa de terminal](#7-programa-de-terminal) |
+| Rodar os testes | [8. Testes](#8-testes) |
+| Testar a API | [9. API e Postman](#9-api-e-postman) |
+| Fazer e restaurar backup | [10. Backup e restauração](#10-backup-e-restauração) |
+| Enviar mudanças para o GitHub | [11. Enviar mudanças para o GitHub](#11-enviar-mudanças-para-o-github) |
+| Resolver um problema | [12. Problemas comuns](#12-problemas-comuns) |
+
+### 1. Versão web no Windows
+
+Precisa do [Git](https://git-scm.com/download/win) e do
+[Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
+instalados. Abra o Docker Desktop e espere ele terminar de iniciar.
+
+Primeira vez (baixa o projeto):
+
+**PowerShell**
+
+```powershell
+git clone https://github.com/heluiz/Ciberseguranca_T2.git C:\Projetos\SENTINEL
+```
+
+Para abrir (na primeira vez e em todas as outras):
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+.\ABRIR-SENTINEL.cmd
+```
+
+O script constrói a aplicação, sobe o banco, pede para você criar o usuário
+administrador (senha com 12 caracteres ou mais; ela não aparece enquanto você
+digita), pergunta se quer os dados de exemplo (responda `S`) e abre o
+navegador em **http://127.0.0.1:8000**. Nas próximas vezes ele só religa.
+
+Se der erro, este comando mostra o diagnóstico sem exibir senhas:
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+.\VERIFICAR-SENTINEL.cmd
+```
+
+### 2. Versão web no servidor
+
+O servidor do docente só responde de dentro da rede da UFU. Entre nele:
+
+**PowerShell**
+
+```powershell
+ssh 12621CBS200@10.0.99.150
+```
+
+Já no servidor, na primeira vez:
+
+**Linux**
+
+```bash
+git clone https://github.com/heluiz/Ciberseguranca_T2.git sentinel-web
+cd sentinel-web
+sh ops/servidor/subir.sh
+```
+
+O `subir.sh` cria o arquivo `.env` com senhas aleatórias, constrói a imagem,
+sobe o banco, prepara as tabelas, a conta `admin` e os dados de exemplo, sobe
+a aplicação e o monitor de disponibilidade e mostra os endereços. A primeira
+vez leva alguns minutos.
+
+Para ver a senha da conta `admin`:
+
+**Linux**
+
+```bash
+cd ~/sentinel-web
+grep SENTINEL_ADMIN_PASSWORD .env
+```
+
+Abra **http://10.0.99.150:8080** no navegador, entre com `admin` e troque a
+senha em seguida (clique no seu nome, no canto superior direito).
+
+Se o `subir.sh` parar com `port is already allocated` (outra pessoa já usa a
+porta 8080), escolha outra porta e rode de novo. Não apague o `.env`: o banco
+já foi criado com as senhas dele.
+
+**Linux**
+
+```bash
+cd ~/sentinel-web
+sed -i 's/^SENTINEL_PORT=.*/SENTINEL_PORT=8123/' .env
+sh ops/servidor/subir.sh
+```
+
+Tudo de uma vez, a partir do Windows (pede a senha do SSH uma vez):
+
+**PowerShell**
+
+```powershell
+ssh 12621CBS200@10.0.99.150 "git clone https://github.com/heluiz/Ciberseguranca_T2.git sentinel-web || git -C sentinel-web pull; cd sentinel-web && sh ops/servidor/subir.sh && grep -E 'SENTINEL_PORT|SENTINEL_ADMIN_PASSWORD' .env"
+```
+
+### 3. Comprovar as 24 horas
+
+**Linux**
+
+```bash
+cd ~/sentinel-web
+sh ops/servidor/verificar.sh
+```
+
+Mostra há quanto tempo cada container está no ar, quando a aplicação iniciou,
+quantas vezes reiniciou, a resposta de `/health/` e o registro de
+disponibilidade. O container `monitor` consulta a aplicação a cada minuto e
+grava uma linha por consulta, com data, hora (UTC) e o total de falhas. Para
+ver o registro inteiro:
+
+**Linux**
+
+```bash
+cd ~/sentinel-web
+docker compose -f compose.servidor.yaml logs --no-log-prefix monitor
+```
+
+O mesmo, a partir do Windows:
+
+**PowerShell**
+
+```powershell
+ssh 12621CBS200@10.0.99.150 "cd sentinel-web && sh ops/servidor/verificar.sh"
+```
+
+A aplicação e o banco usam `restart: unless-stopped`: voltam sozinhos depois de
+uma falha ou de um reinício do servidor. A contagem das 24 horas recomeça
+quando o container da aplicação é recriado (veja a seção 4).
+
+### 4. Atualizar o servidor
+
+Depois de enviar uma mudança para o GitHub e fazer o merge na `main`:
+
+**Linux**
+
+```bash
+cd ~/sentinel-web
+git pull
+sh ops/servidor/subir.sh
+```
+
+Os dados continuam (ficam no volume do banco). Se o código mudou, o container
+da aplicação é recriado e a contagem das 24 horas recomeça: faça a última
+atualização antes de começar a contar.
+
+### 5. Situação, log, parar e religar
+
+No servidor:
+
+**Linux**
+
+```bash
+cd ~/sentinel-web
+docker compose -f compose.servidor.yaml ps                 # situação
+docker compose -f compose.servidor.yaml logs --tail 50 app  # últimas linhas do log
+docker compose -f compose.servidor.yaml stop               # parar (os dados ficam)
+sh ops/servidor/subir.sh                                   # religar
+```
+
+No Windows:
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+docker compose -f compose.web.yaml -f compose.web.local.yaml ps
+docker compose -f compose.web.yaml -f compose.web.local.yaml logs --tail 50 app
+docker compose -f compose.web.yaml -f compose.web.local.yaml stop
+.\ABRIR-SENTINEL.cmd
+```
+
+Nunca use `down -v`: o `-v` apaga o banco.
+
+### 6. Contas e senhas
+
+Contas novas são criadas pela própria interface: entre como superusuário, abra
+**Usuários** no menu, clique em **Adicionar usuário** e escolha um grupo:
+
+| Grupo | Pode |
+| --- | --- |
+| Leitor | Ver tudo: inventário, vulnerabilidades, tratamentos, dependências, mapa e análise de risco |
+| Analista | O mesmo, e cadastrar, alterar e excluir |
+| Administrador | O mesmo, e ver a auditoria |
+
+Uma conta sem grupo entra, mas não vê nenhum dado.
+
+Trocar a senha de uma conta (pede a senha nova duas vezes), desbloquear depois
+de cinco senhas erradas (o bloqueio também passa sozinho em 15 minutos) e
+criar outro superusuário. No servidor:
+
+**Linux**
+
+```bash
+cd ~/sentinel-web
+docker compose -f compose.servidor.yaml exec app python manage.py changepassword admin
+docker compose -f compose.servidor.yaml exec app python manage.py axes_reset
+docker compose -f compose.servidor.yaml exec app python manage.py createsuperuser
+```
+
+No Windows:
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+docker compose -f compose.web.yaml -f compose.web.local.yaml exec app python manage.py changepassword admin
+docker compose -f compose.web.yaml -f compose.web.local.yaml exec app python manage.py axes_reset
+docker compose -f compose.web.yaml -f compose.web.local.yaml exec app python manage.py createsuperuser
+```
+
+### 7. Programa de terminal
+
+O programa de menu original, em container (com a base de exemplo):
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+docker compose up -d --build
+docker cp dados_exemplo/inventario_exemplo.json inventario:/app/dados/inventario.json
+docker restart inventario
+docker attach inventario
+```
+
+Tecle Enter para ver o menu. Para sair sem parar o programa: Ctrl+P e depois
+Ctrl+Q.
+
+Sem Docker, com o Python 3.11 ou mais novo:
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+New-Item -ItemType Directory -Force dados | Out-Null
+Copy-Item dados_exemplo\inventario_exemplo.json dados\inventario.json
+.\.venv\Scripts\python.exe main.py
+```
+
+A versão de terminal que roda no servidor do docente desde 27/10/2026:
+
+**PowerShell**
+
+```powershell
+ssh -t 12621CBS200@10.0.99.150 docker attach inventario-heluiz
+```
+
+Mais opções (Linux, comando único, detalhes do container) em
+[Programa de terminal: como executar](#programa-de-terminal-como-executar).
+
+### 8. Testes
+
+Os testes rodam sozinhos no GitHub a cada envio (aba **Actions** do
+repositório). Para rodar no seu computador, com o Python e o Docker:
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe testes.py
+.\.venv\Scripts\python.exe -m ruff check .
+```
+
+Os testes da interface web precisam de um PostgreSQL. Este bloco cria um
+temporário no Docker, roda os testes e apaga o banco no fim:
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+docker run -d --name sentinel-teste-db -e POSTGRES_USER=sentinel -e POSTGRES_PASSWORD=teste -e POSTGRES_DB=sentinel -p 127.0.0.1:5433:5432 postgres:17-bookworm
+Start-Sleep -Seconds 10
+$env:DJANGO_DEBUG = "1"
+$env:DJANGO_SECRET_KEY = "somente-para-testes-locais-0123456789-abcdefghijklmnop"
+$env:POSTGRES_USER = "sentinel"
+$env:POSTGRES_PASSWORD = "teste"
+$env:POSTGRES_HOST = "127.0.0.1"
+$env:POSTGRES_PORT = "5433"
+.\.venv\Scripts\python.exe -m pytest --cov=inventory --cov=academic
+docker rm -f sentinel-teste-db
+```
+
+No Linux:
+
+**Linux**
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python testes.py
+.venv/bin/ruff check .
+docker run -d --name sentinel-teste-db -e POSTGRES_USER=sentinel -e POSTGRES_PASSWORD=teste -e POSTGRES_DB=sentinel -p 127.0.0.1:5433:5432 postgres:17-bookworm
+sleep 10
+DJANGO_DEBUG=1 DJANGO_SECRET_KEY=somente-para-testes-locais-0123456789-abcdefghijklmnop \
+POSTGRES_USER=sentinel POSTGRES_PASSWORD=teste POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5433 \
+.venv/bin/pytest --cov=inventory --cov=academic
+docker rm -f sentinel-teste-db
+```
+
+Medições dos algoritmos e do modelo de risco (gera a tabela de
+[MEDICOES.md](docs/web/MEDICOES.md)):
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+.\.venv\Scripts\python.exe -m academic.benchmark
+```
+
+### 9. API e Postman
+
+A coleção `docs/web/SENTINEL.postman_collection.json` entra no sistema, cria,
+consulta, altera (PUT e PATCH), testa os casos de erro e apaga o que criou, com
+47 verificações. Use uma conta do grupo Analista ou o administrador.
+
+No aplicativo Postman: **Import** → escolha o arquivo → abra a coleção →
+aba **Variables** → preencha `base_url` (por exemplo `http://127.0.0.1:8000`),
+`username` e `password` → **Run**.
+
+Pela linha de comando (precisa do [Node.js](https://nodejs.org/)):
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+npx newman run docs/web/SENTINEL.postman_collection.json --env-var base_url=http://127.0.0.1:8000 --env-var username=admin --env-var password=SUA_SENHA
+```
+
+### 10. Backup e restauração
+
+Backup do banco inteiro (inventário, contas e auditoria), no servidor:
+
+**Linux**
+
+```bash
+cd ~/sentinel-web
+docker compose -f compose.servidor.yaml exec -T db pg_dump -U sentinel_owner -d sentinel -Fc > sentinel-$(date +%F).dump
+ls -lh sentinel-*.dump
+```
+
+Restaurar um backup (substitui os dados atuais pelos do arquivo). Troque
+`ARQUIVO.dump` pelo nome do arquivo:
+
+**Linux**
+
+```bash
+cd ~/sentinel-web
+docker compose -f compose.servidor.yaml stop app monitor
+docker compose -f compose.servidor.yaml exec -T db pg_restore -U sentinel_owner -d sentinel --clean --if-exists --no-owner --no-acl < ARQUIVO.dump
+sh ops/servidor/subir.sh
+```
+
+O arquivo de backup contém as contas: guarde-o em lugar protegido. Só o
+inventário, no formato JSON do programa de terminal, sai pelo menu
+**Importação e exportação** → **Baixar JSON**.
+
+### 11. Enviar mudanças para o GitHub
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+git switch -c docs/NOME-DA-MUDANCA
+git add -A
+git commit -m "DESCRICAO DA MUDANCA"
+git push -u origin docs/NOME-DA-MUDANCA
+```
+
+O `git push` mostra um endereço: abra-o, clique em **Create pull request**,
+espere a verificação ficar verde e clique em **Merge pull request**. Depois,
+atualize o servidor (seção 4). Use `feature/` para funcionalidade nova, `fix/`
+para correção e `docs/` para documentação.
+
+### 12. Problemas comuns
+
+| Sintoma | O que fazer |
+| --- | --- |
+| `Docker nao esta pronto` ou `error during connect` | Abra o Docker Desktop e espere terminar de iniciar; rode de novo |
+| `port is already allocated` no servidor | Troque a porta (seção 2) |
+| `A porta 8000 ja esta ocupada` no Windows | Feche o programa que usa a porta 8000 e rode de novo |
+| Esqueci a senha | `changepassword` (seção 6) |
+| `Conta bloqueada` depois de errar a senha | `axes_reset` (seção 6) ou espere 15 minutos |
+| A tela mostra **Acesso restrito** | A conta não está em nenhum grupo: inclua-a em Usuários (seção 6) |
+| O servidor não responde | Ele só é alcançável de dentro da rede da UFU |
+| `Existe um banco do SENTINEL, mas falta o arquivo .env` | Recupere o `.env` original. Não apague o volume: ele guarda os dados |
+
+## Interface web
+
+A interface web usa as classes do programa de terminal (`Equipamento`,
+`Vulnerabilidade`, `Inventario`, `ModeloRisco`) e guarda os dados no
+PostgreSQL. Telas:
+
+| Tela | O que faz |
+| --- | --- |
+| Visão geral | Indicadores clicáveis, diagnóstico do sistema linear, ranking de risco e as correções prioritárias |
+| Análise de risco | Verifica se I − A é invertível antes de resolver, mostra as matrizes (inventários pequenos), o risco próprio e o efetivo de todos os equipamentos (com filtro e ordenação), o plano de correção completo e os ciclos de dependência. Tem dois cenários de demonstração: o de 3 equipamentos, conferível à mão, e o singular |
+| Mapa de dependências | Grafo dos ativos, com busca, zoom, foco, simulação de correção e a origem do risco herdado |
+| Inventário, Vulnerabilidades, Tratamentos, Dependências | Cadastro, busca, filtros, edição e exclusão com confirmação; histórico de cada tratamento |
+| Ficha do ativo | Dados, vulnerabilidades, de onde herda risco e quem é alcançado a partir dele (busca em largura), com atalhos para editar, vincular falhas e criar dependências |
+| Relatórios por setor | Agregações calculadas no banco (contagem, média e máximo por lotação) |
+| Catálogo CISA KEV | Consulta às CVEs exploradas em ataques, sem internet, com cadastro no catálogo em um clique |
+| Auditoria | Entradas, alterações, exclusões e acessos negados, e o histórico dos tratamentos em CSV |
+| Importação e exportação | Validação e importação do JSON do programa de terminal; exportação no mesmo formato |
+
+Documentação da versão web:
+
+| Documento | Conteúdo |
+| --- | --- |
+| [EXECUTAR.md](docs/web/EXECUTAR.md) | Os três perfis de execução (Windows, servidor da disciplina, internet com HTTPS) em detalhe |
+| [IMPLEMENTACAO.md](docs/web/IMPLEMENTACAO.md) | Camadas, padrões de projeto, algoritmos aplicados ao inventário e limites |
+| [MODELO-DADOS.md](docs/web/MODELO-DADOS.md), [esquema.sql](docs/web/esquema.sql), [consultas.sql](docs/web/consultas.sql) | Diagrama entidade-relacionamento, script de criação das tabelas e consultas SQL (JOIN, GROUP BY, HAVING, EXPLAIN) |
+| [SPRINTS.md](docs/web/SPRINTS.md) | Onde cada cartão das Sprints 1 a 4 aparece no projeto |
+| [MEDICOES.md](docs/web/MEDICOES.md) | Tempos e crescimento dos algoritmos e do modelo de risco |
+| [SEGURANCA.md](docs/web/SEGURANCA.md), [ACESSIBILIDADE.md](docs/web/ACESSIBILIDADE.md) | Modelo de ameaças e controles; verificação WCAG 2.1 |
+| [VALIDACAO.md](docs/web/VALIDACAO.md) | O que foi testado nesta versão e o que depende do servidor |
+
+
+## Requisitos do Trabalho 2
+
+| # | Requisito | Peso | Onde está |
+| --- | --- | --- | --- |
+| 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. A classe "equipamentos" do enunciado é a `Equipamento`, no módulo `equipamentos.py`: o nome segue a convenção da PEP 8 para classes (CapWords) e está no singular, porque cada objeto é *um* equipamento. Cada equipamento tem uma `FichaTecnica` (`ficha_tecnica.py`), com fabricante, modelo, série, patrimônio, sistema e versão: composição. Os dados ficam protegidos por propriedades que conferem cada valor; veja [Orientação a objetos](#orientação-a-objetos). Na web, `inventory/repository.py` remonta esses mesmos objetos a partir do banco, e as regras de cadastro continuam nas classes. |
+| 2 | Armazenamento em JSON formado por um array de objetos (ou banco SQL) | 20% | Terminal: `armazenamento.py` grava o que `Inventario.para_dict()` monta, um array JSON na raiz, um objeto por equipamento (veja [o formato](#formato-do-arquivo-de-dados)). Web: PostgreSQL, a opção "banco SQL" do enunciado ([MODELO-DADOS.md](docs/web/MODELO-DADOS.md)), com importação e exportação no mesmo array JSON (menu Importação e exportação). |
+| 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker) e [No servidor do docente](#no-servidor-do-docente). Cumprido no servidor do docente: ligado em 27/10/2026, com 46 horas no ar na leitura de 29/10 (veja [Provas das 24 horas](#provas-das-24-horas)). Web: `Dockerfile.web` e `compose.servidor.yaml`, com reinício automático, volume do banco e monitor de disponibilidade; sobe com `sh ops/servidor/subir.sh` e se comprova com `sh ops/servidor/verificar.sh` ([Comandos 2 e 3](#2-versão-web-no-servidor)). |
+| 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu, e a 17, que usa o mesmo modelo para ordenar as correções. A matriz A fica no mesmo JSON (campo `dependencias`), e o NumPy está declarado em `requirements.txt`, que o `Dockerfile` instala. Veja [o modelo de risco](#o-modelo-de-risco). Web: tela **Análise de risco**, com a verificação de invertibilidade, as matrizes, o risco próprio e o efetivo de todos os equipamentos e o cenário singular recusado. |
+
+Os requisitos do Trabalho 1 continuam valendo, como pede o enunciado. As
+opções 1 a 10 do menu foram mantidas, com os mesmos números, as mesmas funções
+e os mesmos comandos globais:
+
+| # (T1) | Requisito | Onde está |
+| --- | --- | --- |
+| 1 | Menu e tratamento de erros | `main.py` (menu e ações) e `entrada.py` (teclado e comandos globais): entrada inválida é explicada e perguntada de novo, sem derrubar o programa |
+| 2 | Tipos de ativo num `Enum`, com código inteiro | `classificacoes.py`: `TipoEquipamento`, de 1 a 7 |
+| 3 | Cadastro gravado em arquivo | `armazenamento.py`: o arquivo JSON do requisito 2 acima |
+| 4 | Busca por ID ou por hostname | Opção 3, itens 1 e 2 |
+| 5 | Atualização | Opções 4 (equipamento) e 8 (vulnerabilidade) |
+| 6 | Exclusão, com as vulnerabilidades do equipamento | Opção 5 (`Inventario.excluir_equipamento`): vão junto os vínculos com as vulnerabilidades e as dependências que apontavam para ele, e a vulnerabilidade que fica sem nenhum equipamento sai do catálogo |
+| 7 | Vulnerabilidades com severidade e status | Opção 6; a severidade vem da nota CVSS, e o status é o `Enum` `SituacaoTratamento` |
+| 8 | Visualização das vulnerabilidades | Opções 7 (de um equipamento) e 10 (as pendentes de todos) |
+| 9 | Uso de dicionários | O `Inventario` guarda equipamentos e vulnerabilidades em `dict`, pelo id; cada equipamento guarda as suas vulnerabilidades (id → status) e as dependências (id → fração) em `dict` |
+| 10 | Repositório Git com mais de duas branches e merge | Veja [Fluxo de trabalho no Git](#fluxo-de-trabalho-no-git) |
+
+## Estrutura
+
+| Arquivo | Responsabilidade |
+| --- | --- |
+| `main.py` | Classe `Aplicacao`: o menu e as ações. Liga as demais peças. É o ponto de partida |
+| `equipamentos.py` | Classe abstrata `Equipamento`, com os dados protegidos por propriedades, as sete subclasses e o fator de exposição de cada tipo |
+| `ficha_tecnica.py` | Classe `FichaTecnica`: fabricante, modelo, número de série, patrimônio, sistema e versão de um equipamento, todos opcionais |
+| `vulnerabilidades.py` | Classe `Vulnerabilidade`: entrada do catálogo (descrição, CVE e CWE opcionais, origem, nota CVSS) |
+| `inventario.py` | Classe `Inventario`: o conjunto dos equipamentos e das vulnerabilidades e as regras entre eles (hostname e patrimônio únicos, CVE única no catálogo, cascata, dependências, buscas) |
+| `risco.py` | Classe `ModeloRisco`: monta M, v, A e b, verifica a invertibilidade (com o posto e o teorema de Rouché-Capelli), resolve o sistema e confere a solução; monta também o plano de correção, com o quanto cada correção reduz o risco total |
+| `arvore.py` | A árvore de dependências de um equipamento (opção 12), nos dois sentidos: cada equipamento aparece uma vez, sob a ligação mais específica, com as outras ligações no item e os iguais agrupados |
+| `armazenamento.py` | Classe `ArquivoInventario`: lê e grava o JSON, com gravação atômica |
+| `migracao.py` | Converte uma base do Trabalho 1 para o formato novo |
+| `base_cve.py` | Classe `BaseCVE`: a base das CVEs exploradas, com a busca por palavras, a navegação por fabricante e produto, as sugestões pela ficha técnica e a leitura e a gravação do arquivo da base |
+| `atualizacao_cve.py` | A atualização da base de CVEs: baixa o catálogo KEV e os registros oficiais das CVEs, escolhe a nota e confere tudo. É o único módulo que usa a rede |
+| `explicacao_cve.py` | A explicação de uma CVE em português, montada a partir dos dados: o vetor CVSS em frases, o nome do tipo de falha (CWE), a ação da CISA traduzida por uma tabela e a avaliação SSVC |
+| `calculadora_cvss.py` | As perguntas do CVSS (versões 3.1 e 4.0) com as explicações em português; monta o vetor e confere um vetor digitado |
+| `pergunta_cvss.py` | A pergunta da nota CVSS no cadastro e na atualização da vulnerabilidade: o número, o vetor colado ou o `calcular`, uma pergunta do CVSS de cada vez |
+| `classificacoes.py` | Enums: tipo do equipamento; origem, severidade e status da vulnerabilidade |
+| `validacao.py` | Conferência de dados vindos do arquivo |
+| `entrada.py` | Leitura do teclado e comandos globais (`voltar`, `sair`...). Único módulo com `input()` |
+| `telas.py` | Tabelas, fichas e relatórios impressos na tela |
+| `formatacao.py`, `cores.py`, `banner.py`, `surpresa.py` | Padronização de texto, cores ANSI, logotipo e a animação-surpresa, herdados do Trabalho 1 |
+| `testes.py` | Testes automáticos (`python testes.py`) |
+| `Dockerfile`, `compose.yaml`, `.dockerignore`, `requirements.txt` | Container |
+| `ruff.toml` | Regras de estilo conferidas pelo Ruff: PEP 8 e PEP 257 |
+| `.github/workflows/verificacao.yml`, `.coveragerc` | Verificação automática no GitHub (estilo, testes e imagem Docker) e configuração da medida de cobertura |
+| `base_cve/` | A base de CVEs que vem com o programa (`kev.json`) e os avisos de licença das fontes (`AVISOS.txt`) |
+| `dados_exemplo/` | Base fictícia de 76 equipamentos, com ficha técnica, CVEs, CWEs e vetores CVSS, e dois cenários pequenos: um de 3 equipamentos, resolvido à mão, e um singular |
+
+A interface web acrescenta:
+
+| Arquivo ou pasta | Responsabilidade |
+| --- | --- |
+| `sentinel/` | Configuração do Django (`settings.py`: banco, segurança, HTTPS opcional) e os endereços (`urls.py`) |
+| `inventory/models.py` | As tabelas do PostgreSQL: ativos, vulnerabilidades, tratamentos, dependências, histórico e auditoria |
+| `inventory/views.py` | Recebe cada requisição, confere a permissão e devolve a página ou o JSON da API |
+| `inventory/services.py` | Casos de uso de gravação (cadastrar, alterar, excluir, importar), em transação e com auditoria |
+| `inventory/analysis.py` | Casos de uso de leitura: análise de risco, alcance (busca em largura), ciclos (busca em profundidade) e plano de correção |
+| `inventory/repository.py` | Monta o `Inventario` do domínio a partir do banco (ou da memória, nos cenários e nos testes) |
+| `inventory/templates/`, `inventory/static/` | As telas (HTML, CSS e JavaScript) |
+| `inventory/management/commands/` | Comandos `bootstrap` (preparação da instalação), `import_inventory`, `setup_roles` e `provision_mfa` |
+| `academic/` | Estruturas e algoritmos das sprints (lista encadeada, fila, hash, árvore binária, ordenações, buscas, recursão) e as medições (`benchmark.py`) |
+| `tests_web/` | Testes com pytest e PostgreSQL real |
+| `Dockerfile.web`, `compose.servidor.yaml`, `compose.web.yaml`, `compose.web.local.yaml` | Imagem da aplicação e os três perfis: servidor da disciplina, internet com HTTPS e Windows |
+| `ops/servidor/` | `subir.sh` (sobe tudo no servidor) e `verificar.sh` (comprova as 24 horas) |
+| `ops/monitor.py`, `ops/init-db.sh`, `ops/Caddyfile` | Registro de disponibilidade, papéis do banco e o proxy HTTPS |
+| `ABRIR-SENTINEL.cmd`, `VERIFICAR-SENTINEL.cmd`, `ops/windows/start.ps1` | Abrir e diagnosticar a versão web no Windows |
+| `.github/workflows/web.yml` | Verificação automática da web: estilo, testes com PostgreSQL, checagem de implantação, dependências e o container do servidor |
+| `docs/web/` | Documentação da versão web (veja [Interface web](#interface-web)) |
+
+Só `entrada.py` chama `input()`, só `atualizacao_cve.py` usa a rede, e só
+`armazenamento.py` lê e grava a base do inventário (a conversão manual de
+`migracao.py`, executada como script, também grava o arquivo de destino; a base
+de CVEs, um arquivo à parte, é lida e gravada por `base_cve.py`). As classes do
+domínio (`Equipamento`, `FichaTecnica`, `Vulnerabilidade`, `Inventario`,
+`ModeloRisco`) não sabem de teclado, tela nem arquivo, por isso cada módulo tem
+um bloco de teste que roda sozinho (`python equipamentos.py`).
+
+## Programa de terminal: como executar
+
+O programa de terminal é de linha de comando, em Python: cadastro, consulta,
+atualização e remoção (CRUD) de equipamentos de TI e das vulnerabilidades que
+os afetam, com o cálculo do risco por álgebra linear, o plano de correção, a
+base das CVEs exploradas em ataques, explicadas em português e que funciona
+sem internet, e execução em container Docker.
+
+Há três jeitos de rodar o programa: direto no computador, com o Python; num
+container Docker no seu computador, como na apresentação; e num container no
+servidor do docente, onde ele precisa ficar 24 horas no ar (requisito 3). Lá,
+ele roda desde 27/10/2026, e as provas estão em
+[Provas das 24 horas](#provas-das-24-horas).
+
+### Início rápido
 
 Com o Docker ligado (veja [O que instalar](#o-que-instalar)), na pasta do
 projeto:
@@ -37,31 +598,6 @@ está no [Roteiro de demonstração](#roteiro-de-demonstração). Para clonar (o
 atualizar), construir, pôr a base de exemplo e abrir o programa num comando só,
 de qualquer pasta, veja [Em um comando só](#em-um-comando-só).
 
-## Sumário
-
-- [Como executar](#como-executar)
-- [Como usar](#como-usar)
-- [Requisitos do Trabalho 2](#requisitos-do-trabalho-2)
-- [Estrutura](#estrutura)
-- [Orientação a objetos](#orientação-a-objetos)
-- [O modelo de risco](#o-modelo-de-risco)
-- [Formato do arquivo de dados](#formato-do-arquivo-de-dados)
-- [Base de CVEs exploradas](#base-de-cves-exploradas)
-- [Decisões de projeto](#decisões-de-projeto)
-- [Segurança e LGPD](#segurança-e-lgpd)
-- [Normas seguidas](#normas-seguidas)
-- [Limitações conhecidas](#limitações-conhecidas)
-- [Testes](#testes)
-- [Fluxo de trabalho no Git](#fluxo-de-trabalho-no-git)
-- [Dados de exemplo](#dados-de-exemplo)
-
-## Como executar
-
-Há três jeitos de rodar o programa: direto no computador, com o Python; num
-container Docker no seu computador, como na apresentação; e num container no
-servidor do docente, onde ele precisa ficar 24 horas no ar (requisito 3). Lá,
-ele roda desde 27/10/2026, e as provas estão em
-[Provas das 24 horas](#provas-das-24-horas).
 
 ### Em um comando só
 
@@ -1032,70 +1568,6 @@ Um trecho da tela do `calcular`:
 
 As cores precisam de um terminal que interprete códigos ANSI. Com a variável de
 ambiente `NO_COLOR` definida, o programa imprime texto puro.
-
-## Requisitos do Trabalho 2
-
-| # | Requisito | Peso | Onde está |
-| --- | --- | --- | --- |
-| 1 | Classe de equipamentos; cada ativo é um objeto individual criado a partir dela | 20% | `equipamentos.py`: a classe abstrata `Equipamento` e uma subclasse por tipo (`Servidor`, `Roteador`...); `criar_equipamento()` escolhe a subclasse. A classe "equipamentos" do enunciado é a `Equipamento`, no módulo `equipamentos.py`: o nome segue a convenção da PEP 8 para classes (CapWords) e está no singular, porque cada objeto é *um* equipamento. Cada equipamento tem uma `FichaTecnica` (`ficha_tecnica.py`), com fabricante, modelo, série, patrimônio, sistema e versão: composição. Os dados ficam protegidos por propriedades que conferem cada valor; veja [Orientação a objetos](#orientação-a-objetos). |
-| 2 | Armazenamento em JSON formado por um array de objetos | 20% | `armazenamento.py` grava o que `Inventario.para_dict()` monta: um array JSON na raiz, um objeto por equipamento. Veja [o formato](#formato-do-arquivo-de-dados). |
-| 3 | Aplicação em container, funcionando por no mínimo 24 h | 45% | `Dockerfile`, `compose.yaml`, `requirements.txt`, `.dockerignore`; ajustes de container em `main.py` (`preparar_container`). Veja [Em container Docker](#em-container-docker) e [No servidor do docente](#no-servidor-do-docente). Cumprido no servidor do docente: ligado em 27/10/2026, com 46 horas no ar na leitura de 29/10 (veja [Provas das 24 horas](#provas-das-24-horas)). |
-| 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade antes de resolver; risco próprio e efetivo consultáveis | 15% | `risco.py` (`ModeloRisco`); opções 13, 14 e 15 do menu, e a 17, que usa o mesmo modelo para ordenar as correções. A matriz A fica no mesmo JSON (campo `dependencias`), e o NumPy está declarado em `requirements.txt`, que o `Dockerfile` instala. Veja [o modelo de risco](#o-modelo-de-risco). |
-
-Os requisitos do Trabalho 1 continuam valendo, como pede o enunciado. As
-opções 1 a 10 do menu foram mantidas, com os mesmos números, as mesmas funções
-e os mesmos comandos globais:
-
-| # (T1) | Requisito | Onde está |
-| --- | --- | --- |
-| 1 | Menu e tratamento de erros | `main.py` (menu e ações) e `entrada.py` (teclado e comandos globais): entrada inválida é explicada e perguntada de novo, sem derrubar o programa |
-| 2 | Tipos de ativo num `Enum`, com código inteiro | `classificacoes.py`: `TipoEquipamento`, de 1 a 7 |
-| 3 | Cadastro gravado em arquivo | `armazenamento.py`: o arquivo JSON do requisito 2 acima |
-| 4 | Busca por ID ou por hostname | Opção 3, itens 1 e 2 |
-| 5 | Atualização | Opções 4 (equipamento) e 8 (vulnerabilidade) |
-| 6 | Exclusão, com as vulnerabilidades do equipamento | Opção 5 (`Inventario.excluir_equipamento`): vão junto os vínculos com as vulnerabilidades e as dependências que apontavam para ele, e a vulnerabilidade que fica sem nenhum equipamento sai do catálogo |
-| 7 | Vulnerabilidades com severidade e status | Opção 6; a severidade vem da nota CVSS, e o status é o `Enum` `SituacaoTratamento` |
-| 8 | Visualização das vulnerabilidades | Opções 7 (de um equipamento) e 10 (as pendentes de todos) |
-| 9 | Uso de dicionários | O `Inventario` guarda equipamentos e vulnerabilidades em `dict`, pelo id; cada equipamento guarda as suas vulnerabilidades (id → status) e as dependências (id → fração) em `dict` |
-| 10 | Repositório Git com mais de duas branches e merge | Veja [Fluxo de trabalho no Git](#fluxo-de-trabalho-no-git) |
-
-## Estrutura
-
-| Arquivo | Responsabilidade |
-| --- | --- |
-| `main.py` | Classe `Aplicacao`: o menu e as ações. Liga as demais peças. É o ponto de partida |
-| `equipamentos.py` | Classe abstrata `Equipamento`, com os dados protegidos por propriedades, as sete subclasses e o fator de exposição de cada tipo |
-| `ficha_tecnica.py` | Classe `FichaTecnica`: fabricante, modelo, número de série, patrimônio, sistema e versão de um equipamento, todos opcionais |
-| `vulnerabilidades.py` | Classe `Vulnerabilidade`: entrada do catálogo (descrição, CVE e CWE opcionais, origem, nota CVSS) |
-| `inventario.py` | Classe `Inventario`: o conjunto dos equipamentos e das vulnerabilidades e as regras entre eles (hostname e patrimônio únicos, CVE única no catálogo, cascata, dependências, buscas) |
-| `risco.py` | Classe `ModeloRisco`: monta M, v, A e b, verifica a invertibilidade (com o posto e o teorema de Rouché-Capelli), resolve o sistema e confere a solução; monta também o plano de correção, com o quanto cada correção reduz o risco total |
-| `arvore.py` | A árvore de dependências de um equipamento (opção 12), nos dois sentidos: cada equipamento aparece uma vez, sob a ligação mais específica, com as outras ligações no item e os iguais agrupados |
-| `armazenamento.py` | Classe `ArquivoInventario`: lê e grava o JSON, com gravação atômica |
-| `migracao.py` | Converte uma base do Trabalho 1 para o formato novo |
-| `base_cve.py` | Classe `BaseCVE`: a base das CVEs exploradas, com a busca por palavras, a navegação por fabricante e produto, as sugestões pela ficha técnica e a leitura e a gravação do arquivo da base |
-| `atualizacao_cve.py` | A atualização da base de CVEs: baixa o catálogo KEV e os registros oficiais das CVEs, escolhe a nota e confere tudo. É o único módulo que usa a rede |
-| `explicacao_cve.py` | A explicação de uma CVE em português, montada a partir dos dados: o vetor CVSS em frases, o nome do tipo de falha (CWE), a ação da CISA traduzida por uma tabela e a avaliação SSVC |
-| `calculadora_cvss.py` | As perguntas do CVSS (versões 3.1 e 4.0) com as explicações em português; monta o vetor e confere um vetor digitado |
-| `pergunta_cvss.py` | A pergunta da nota CVSS no cadastro e na atualização da vulnerabilidade: o número, o vetor colado ou o `calcular`, uma pergunta do CVSS de cada vez |
-| `classificacoes.py` | Enums: tipo do equipamento; origem, severidade e status da vulnerabilidade |
-| `validacao.py` | Conferência de dados vindos do arquivo |
-| `entrada.py` | Leitura do teclado e comandos globais (`voltar`, `sair`...). Único módulo com `input()` |
-| `telas.py` | Tabelas, fichas e relatórios impressos na tela |
-| `formatacao.py`, `cores.py`, `banner.py`, `surpresa.py` | Padronização de texto, cores ANSI, logotipo e a animação-surpresa, herdados do Trabalho 1 |
-| `testes.py` | Testes automáticos (`python testes.py`) |
-| `Dockerfile`, `compose.yaml`, `.dockerignore`, `requirements.txt` | Container |
-| `ruff.toml` | Regras de estilo conferidas pelo Ruff: PEP 8 e PEP 257 |
-| `.github/workflows/verificacao.yml`, `.coveragerc` | Verificação automática no GitHub (estilo, testes e imagem Docker) e configuração da medida de cobertura |
-| `base_cve/` | A base de CVEs que vem com o programa (`kev.json`) e os avisos de licença das fontes (`AVISOS.txt`) |
-| `dados_exemplo/` | Base fictícia de 76 equipamentos, com ficha técnica, CVEs, CWEs e vetores CVSS, e dois cenários pequenos: um de 3 equipamentos, resolvido à mão, e um singular |
-
-Só `entrada.py` chama `input()`, só `atualizacao_cve.py` usa a rede, e só
-`armazenamento.py` lê e grava a base do inventário (a conversão manual de
-`migracao.py`, executada como script, também grava o arquivo de destino; a base
-de CVEs, um arquivo à parte, é lida e gravada por `base_cve.py`). As classes do
-domínio (`Equipamento`, `FichaTecnica`, `Vulnerabilidade`, `Inventario`,
-`ModeloRisco`) não sabem de teclado, tela nem arquivo, por isso cada módulo tem
-um bloco de teste que roda sozinho (`python equipamentos.py`).
 
 ## Orientação a objetos
 
@@ -2187,6 +2659,13 @@ cada uma foi aplicada e os desvios escolhidos de propósito.
 
 ## Testes
 
+Os comandos para rodar tudo estão em [Comandos 8](#8-testes). A interface web
+tem mais 132 testes com pytest e PostgreSQL real (análise de risco com banco e
+com memória, cenário singular, filtros, permissões, CSRF, API com PUT e PATCH,
+concorrência, preparação da instalação e os algoritmos), com 90% de cobertura
+de `inventory` e `academic`; o que foi verificado está em
+[VALIDACAO.md](docs/web/VALIDACAO.md). Os testes do programa de terminal:
+
 ```
 python testes.py
 ```
@@ -2318,6 +2797,7 @@ histórico mesmo quando não há conflito:
 | `fix/` | Correção de defeito | `fix/normas-oficiais`, `fix/barras-do-risco` |
 | `docs/` | Documentação | `docs/revisao-requisitos`, `docs/normas-seguidas`, `docs/instrucoes-de-execucao`, `docs/revisao-final`, `docs/roteiro-do-servidor`, `docs/comando-unico`, `docs/servidor-implantado` |
 | `ci/` | Integração contínua e container | `ci/verificacao-automatica`, `ci/python-3.14-e-container-seguro` |
+| `work/` | Integração grande, revisada por partes antes do merge | `work/sentinel-web` (a interface web, Pull Request #14) |
 
 `git log --graph --oneline --all` mostra as branches e os merges.
 
@@ -2331,6 +2811,13 @@ constrói a imagem Docker e roda, dentro dela e com o sistema de arquivos só pa
 leitura, o autoteste do modelo de risco. O token do workflow só pode ler o
 repositório (`permissions: contents: read`), como recomenda a documentação de
 segurança do GitHub. O resultado aparece na aba Actions do repositório.
+
+A interface web tem um segundo workflow, `.github/workflows/web.yml`, com dois
+jobs: `web` (Ruff, os testes do terminal, o pytest com PostgreSQL e cobertura
+mínima de 80%, migrações em dia, `check --deploy` e auditoria das
+dependências) e `container` (sobe o `compose.servidor.yaml` como no servidor,
+consulta a aplicação por HTTP e confere que os dados sobrevivem à recriação dos
+containers).
 
 ## Dados de exemplo
 

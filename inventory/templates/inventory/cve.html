@@ -16,18 +16,38 @@
         <input id="q" name="q" value="{{ query }}"><button class="button">Pesquisar</button>
       </div>
     </form>
-    {% for item in items %}
-      <article class="cve-item">
-        <h2>{{ item.cve }}</h2>
-        <p>
-          <strong>{{ item.fabricante }} · {{ item.produto }}</strong>
-        </p>
-        <p>{{ item.nome }}</p>
-        <p class="muted">{{ item.descricao }}</p>
-        <span class="badge">CVSS {{ item.cvss|default:"Não informado" }}</span>
-      </article>
+    {% for row in rows %}
+      {% with item=row.item %}
+        <article class="cve-item">
+          <h2>{{ item.cve }}</h2>
+          <p>
+            <strong>{{ item.fabricante }} · {{ item.produto }}</strong>
+          </p>
+          <p>{{ item.nome }}</p>
+          <p class="muted">{{ item.descricao }}</p>
+          <p class="muted">
+            Incluída no KEV em {{ item.adicionada }} · prazo de correção {{ item.prazo }}
+            {% if item.ransomware %}· usada em campanhas de ransomware{% endif %}
+            {% if item.cwes %}· {{ item.cwes|join:", " }}{% endif %}
+          </p>
+          <div class="inline">
+            <span class="badge">CVSS {{ item.cvss|default:"Não informado" }}</span>
+            {% if row.registered %}
+              <a class="button" href="{% url 'collection' 'finding' %}?vulnerability={{ row.registered }}">Já está no catálogo · ver ativos afetados</a>
+              {% if can_link %}<a class="button" href="{% url 'create' 'finding' %}?vulnerability={{ row.registered }}&amp;voltar={{ request.get_full_path|urlencode }}">Vincular a um ativo</a>{% endif %}
+            {% elif can_add %}
+              <a class="button primary" href="{% url 'create' 'vulnerability' %}?{{ row.prefill }}">Cadastrar no catálogo</a>
+            {% endif %}
+            {% for link in item.links|slice:":1" %}
+              <a href="{{ link }}" rel="noopener noreferrer" target="_blank">Detalhes no NVD ↗</a>
+            {% endfor %}
+          </div>
+        </article>
+      {% endwith %}
     {% empty %}
-      <p class="muted">Digite uma referência ou produto para consultar a base.</p>
+      <p class="muted">
+        {% if query %}Nenhuma CVE da base corresponde a "{{ query }}".{% else %}Digite uma referência ou produto para consultar a base.{% endif %}
+      </p>
     {% endfor %}
   </section>
 {% endblock %}

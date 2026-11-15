@@ -11,7 +11,10 @@ A interface web usa Django 5.2 LTS, PostgreSQL, templates HTML, CSS e JavaScript
 - Tratamento por ativo; corrigida sai do risco, aceita como risco continua contando.
 - Dependências direcionadas com frações e soma abaixo de 1, protegidas também por trigger PostgreSQL.
 - Análise de risco: verificação de invertibilidade de I − A antes de resolver, risco próprio e efetivo de todos os equipamentos em tabela com filtro e ordenação, matrizes montadas (inventários pequenos), ciclos de dependência e dois cenários de demonstração somente de leitura (um conferível à mão e um singular).
-- Ficha do ativo com a origem do risco herdado e os ativos alcançados a partir dele, com número de saltos.
+- Ficha do ativo com a origem do risco herdado e os ativos alcançados a partir dele, com número de saltos, e atalhos para editar, excluir, vincular vulnerabilidade, alterar a situação de um tratamento e criar dependência; depois de salvar, volta para a ficha.
+- Catálogo CISA KEV que cadastra a CVE no catálogo com os dados já preenchidos e mostra quando ela já está cadastrada.
+- Indicadores da visão geral e nomes de ativos em todas as telas levam às páginas correspondentes; o sino do cabeçalho mostra o número real de tratamentos em aberto.
+- Confirmações de exclusão que dizem o que mais será removido; auditoria descrita em português.
 - Listagens com busca por todos os campos do ativo (inclusive custodiante, ficha técnica e ID) e filtros por tipo, situação e gravidade.
 - Painel, ranking, plano de correção, relatório por setor e mapa com seleção, busca, zoom e enquadramento.
 - Importação inicial de JSON com validação, simulação, transação, reconciliação e recibo idempotente; exportação compatível.

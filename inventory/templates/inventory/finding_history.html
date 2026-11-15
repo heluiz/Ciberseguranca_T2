@@ -6,7 +6,10 @@
       <h1>Histórico do tratamento</h1>
       <p>{{ finding.asset }} · {{ finding.vulnerability }}</p>
     </div>
-    <a class="button" href="/registros/finding/">Voltar aos tratamentos</a>
+    <div class="inline">
+      <a class="button" href="{% url 'asset_detail' finding.asset_id %}">Ficha do ativo</a>
+      <a class="button" href="/registros/finding/">Voltar aos tratamentos</a>
+    </div>
   </div>
   <section class="panel">
     <p>

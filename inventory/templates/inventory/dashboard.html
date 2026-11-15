@@ -11,13 +11,13 @@
     <a class="button primary" href="/mapa/">Explorar mapa →</a>
   </div>
   <div class="metrics">
-    <article class="metric"><span>Ativos no inventário</span><strong>{{ asset_count }}</strong><small>{{ dependency_count }} dependências cadastradas</small><b>▣</b>
+    <article class="metric"><a class="metric-link" href="/registros/asset/">Ativos no inventário</a><strong>{{ asset_count }}</strong><small>{{ dependency_count }} dependências cadastradas</small><b>▣</b>
     </article>
-    <article class="metric purple"><span>Vulnerabilidades no catálogo</span><strong>{{ vuln_count }}</strong><small>Falhas únicas e compartilháveis</small><b>◇</b>
+    <article class="metric purple"><a class="metric-link" href="/registros/vulnerability/">Vulnerabilidades no catálogo</a><strong>{{ vuln_count }}</strong><small>Falhas únicas e compartilháveis</small><b>◇</b>
     </article>
-    <article class="metric danger"><span>Ocorrências críticas</span><strong>{{ critical_count }}</strong><small>{{ open_count }} ocorrências em aberto ou tratamento</small><b>!</b>
+    <article class="metric danger"><a class="metric-link" href="/registros/finding/?gravidade=4&amp;situacao=pendentes">Ocorrências críticas</a><strong>{{ critical_count }}</strong><small>{{ open_count }} ocorrências em aberto ou tratamento</small><b>!</b>
     </article>
-    <article class="metric"><span>Risco efetivo total</span><strong>{{ total|floatformat:2|default:'—' }}</strong><small>Pontos do modelo · sem limite de 100</small><b>→</b>
+    <article class="metric"><a class="metric-link" href="/analise/">Risco efetivo total</a><strong>{{ total|floatformat:2|default:'—' }}</strong><small>Pontos do modelo · sem limite de 100</small><b>→</b>
     </article>
   </div>
   <div class="dashboard-grid">
@@ -84,7 +84,7 @@
             {% for r in ranking %}
               <tr>
                 <td>
-                  <strong>{{ r.equipamento.hostname }}</strong><small>{{ r.equipamento.tipo.rotulo }}</small>
+                  <strong><a href="{% url 'asset_detail' r.equipamento.id %}">{{ r.equipamento.hostname }}</a></strong><small>{{ r.equipamento.tipo.rotulo }}</small>
                 </td>
                 <td>{{ r.proprio|floatformat:2 }}</td>
                 <td>
@@ -106,7 +106,7 @@
           <p class="eyebrow">PLANO DE CORREÇÃO</p>
           <h2>Onde agir primeiro</h2>
         </div>
-        <span class="badge">Redução estimada pelo modelo</span>
+        <a href="/analise/#plano">Ver plano completo →</a>
       </div>
       <div class="table-scroll">
         <table>
@@ -121,7 +121,7 @@
           <tbody>
             {% for c in plan %}
               <tr>
-                <td>{{ c.equipamento.hostname }}</td>
+                <td><a href="{% url 'asset_detail' c.equipamento.id %}">{{ c.equipamento.hostname }}</a></td>
                 <td>{{ c.vulnerabilidade.cve|default:c.vulnerabilidade.descricao }}</td>
                 <td>{{ c.vulnerabilidade.cvss|floatformat:1 }}</td>
                 <td class="cyan">↓ {{ c.reducao|floatformat:2 }} pontos</td>

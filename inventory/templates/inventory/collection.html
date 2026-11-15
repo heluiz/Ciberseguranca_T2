@@ -7,6 +7,7 @@
         {{ title }}<span class="cyan">.</span>
       </h1>
       <p class="muted">{{ page.paginator.count }} registros · Alterações com validação e auditoria.</p>
+      {% if exact_label %}<p class="notice">Mostrando somente: {{ exact_label }}. <a href="{% url 'collection' kind %}">Ver todos</a></p>{% endif %}
     </div>
   {% if can_add %}<a class="button primary" href="{% url 'create' kind %}">+ Novo registro</a>
 {% endif %}
@@ -37,6 +38,7 @@
           <label for="situacao">Situação</label>
           <select id="situacao" name="situacao">
             <option value="">Todas</option>
+            <option value="{{ pending }}" {% if status == pending %}selected{% endif %}>Não corrigidas (contam no risco)</option>
             {% for value, label in statuses %}
               <option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
@@ -54,8 +56,9 @@
           </select>
         </div>
       {% endif %}
+      {% if exact_filter %}<input type="hidden" name="{{ exact_filter.0 }}" value="{{ exact_filter.1 }}">{% endif %}
       <button class="button">Buscar</button>
-      {% if query or filters %}<a class="button" href="{% url 'collection' kind %}">Limpar</a>{% endif %}
+      {% if query or filters or exact_filter %}<a class="button" href="{% url 'collection' kind %}">Limpar</a>{% endif %}
     </div>
   </form>
   <div class="table-scroll">
@@ -92,33 +95,35 @@
                 <span class="badge">CVSS {{ obj.cvss }}</span>
               </td>
             {% elif kind == "finding" %}
-              <td>{{ obj.asset }}</td>
+              <td><a href="{% url 'asset_detail' obj.asset_id %}">{{ obj.asset }}</a></td>
               <td>{{ obj.vulnerability }}</td>
               <td>
                 <span class="badge">{{ obj.get_situacao_display }}</span><small>Detectada: {{ obj.detected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</small><small>Corrigida: {{ obj.corrected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</small>
               </td>
             {% else %}
-              <td>{{ obj.source }} → {{ obj.target }}</td>
+              <td><a href="{% url 'asset_detail' obj.source_id %}">{{ obj.source }}</a> → <a href="{% url 'asset_detail' obj.target_id %}">{{ obj.target }}</a></td>
               <td>O ativo de origem herda risco do destino.</td>
               <td>{{ obj.fracao }}</td>
             {% endif %}
             <td class="actions">
-            {% if kind == "finding" %}<a href="{% url 'finding_history' obj.pk %}">Histórico</a>
-        {% endif %}
-      {% if can_change %}<a href="{% url 'edit' kind obj.pk %}">Editar</a>
-    {% endif %}
-  {% if can_delete %}<a class="danger-text" href="{% url 'delete' kind obj.pk %}">Excluir</a>
-{% endif %}
-</td>
-</tr>
-{% empty %}
-<tr>
-  <td colspan="5" class="empty">Nenhum registro encontrado.</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
+              {% if kind == "finding" %}<a href="{% url 'finding_history' obj.pk %}">Histórico</a>{% endif %}
+              {% if kind == "vulnerability" %}
+                <a href="{% url 'collection' 'finding' %}?vulnerability={{ obj.pk }}">Ativos afetados</a>
+                {% if obj.cve %}<a href="https://nvd.nist.gov/vuln/detail/{{ obj.cve }}" target="_blank" rel="noopener noreferrer">NVD ↗</a>{% endif %}
+              {% endif %}
+              {% if kind == "asset" %}<a href="{% url 'asset_detail' obj.pk %}">Ficha</a>{% endif %}
+              {% if can_change %}<a href="{% url 'edit' kind obj.pk %}">Editar</a>{% endif %}
+              {% if can_delete %}<a class="danger-text" href="{% url 'delete' kind obj.pk %}">Excluir</a>{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5" class="empty">Nenhum registro encontrado.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   <div class="pagination">
     {% if page.has_previous %}
       <a href="?page={{ page.previous_page_number }}&q={{ query|urlencode }}{{ filters }}">← Anterior</a>

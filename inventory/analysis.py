@@ -82,7 +82,7 @@ def risk_analysis(repository, order="efetivo"):
     inventory = repository.load()
     model = ModeloRisco(inventory)
     diagnostic = model.diagnosticar()
-    rows, error, total, residual = [], "", None, None
+    rows, error, total, residual, plan = [], "", None, None, []
     try:
         # Merge Sort próprio (estável) ordena o ranking de prioridades.
         rows = merge_sort(
@@ -100,6 +100,7 @@ def risk_analysis(repository, order="efetivo"):
             key=SORT_KEYS.get(order, SORT_KEYS["efetivo"]),
         )
         total, residual = model.risco_total(), model.residuo
+        plan = model.plano_de_correcao()
     except SistemaSingularError as exc:
         error = str(exc)
     return {
@@ -110,6 +111,7 @@ def risk_analysis(repository, order="efetivo"):
         "error": error,
         "total": total,
         "residual": residual,
+        "plan": plan,
         "cycles": dependency_cycles(inventory),
         "matrices": matrices(model)
         if len(model.equipamentos) <= MATRIX_DISPLAY_LIMIT

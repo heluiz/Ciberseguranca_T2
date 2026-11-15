@@ -7,11 +7,16 @@ from django.db import connection, DatabaseError, IntegrityError, transaction
 from django.db.models import Count, Avg, Max, Q
 from django.http import JsonResponse, HttpResponse, Http404
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET
 from django_otp.forms import OTPTokenForm
 from django_otp import login as otp_login
+from urllib.parse import urlencode
+
 from classificacoes import (
     NivelGravidade,
+    OrigemVulnerabilidade,
     SituacaoTratamento,
     TipoEquipamento,
 )
@@ -61,12 +66,68 @@ SEVERITY_RANGES = {
 }
 
 
+# Valor especial do filtro de situação: tudo menos "Corrigida".
+PENDING = "pendentes"
+SINGULAR = {
+    "asset": "este ativo",
+    "vulnerability": "esta vulnerabilidade",
+    "finding": "este tratamento",
+    "dependency": "esta dependência",
+}
+
+
+def plural(count, one, many):
+    """'1 tratamento' / '3 tratamentos'."""
+    return f"{count} {one if count == 1 else many}"
+
+
+def deletion_impact(kind, obj):
+    """Texto de confirmação: o que mais some junto com o registro."""
+    if kind == "asset":
+        findings = Finding.objects.filter(asset=obj).count()
+        dependencies = Dependency.objects.filter(
+            Q(source=obj) | Q(target=obj)
+        ).count()
+        return (
+            f"Também serão removidos {plural(findings, 'tratamento', 'tratamentos')} "
+            f"e {plural(dependencies, 'dependência', 'dependências')} deste ativo. "
+            "As vulnerabilidades do catálogo e o histórico dos tratamentos permanecem."
+        )
+    if kind == "vulnerability":
+        findings = Finding.objects.filter(vulnerability=obj).count()
+        return (
+            f"Também serão removidos {plural(findings, 'vínculo', 'vínculos')} "
+            "desta vulnerabilidade com ativos (tratamentos). O histórico dos "
+            "tratamentos permanece."
+        )
+    if kind == "finding":
+        return (
+            "Só o vínculo entre o ativo e a vulnerabilidade é removido. O ativo, "
+            "a vulnerabilidade e o histórico permanecem."
+        )
+    return "O ativo de origem deixa de herdar risco do destino. Nenhum ativo é removido."
+
+
 def choice_filter(request, name, enum):
     """Valor inteiro de um filtro de lista, ou None se ausente/inválido."""
     try:
         return enum(int(request.GET.get(name, ""))).value
     except ValueError:
         return None
+
+
+def safe_back(request):
+    """Endereço interno para onde voltar (parâmetro "voltar"), ou vazio.
+
+    Aceita apenas caminhos do próprio site, para o parâmetro não servir de
+    redirecionamento para fora.
+    """
+    target = request.POST.get("voltar") or request.GET.get("voltar") or ""
+    if url_has_allowed_host_and_scheme(target, allowed_hosts=None) and (
+        target.startswith("/") and not target.startswith("//")
+    ):
+        return target
+    return ""
 
 
 class SignIn(LoginView):
@@ -140,11 +201,19 @@ def collection(request, kind):
     authorize(request.user, "view_" + kind)
     query = request.GET.get("q", "").strip()[:150]
     objects = MODELS[kind].objects.all().order_by("pk")
-    asset_type = severity = status = None
+    asset_type = severity = status = exact_filter = exact_label = None
     if kind == "asset":
         asset_type = choice_filter(request, "tipo", TipoEquipamento)
         if asset_type:
             objects = objects.filter(tipo=asset_type)
+        # Atalho do relatório por setor: só os ativos daquela lotação.
+        sector = request.GET.get("lotacao", "").strip()[:240]
+        if sector:
+            objects = objects.filter(lotacao=sector)
+            exact_filter, exact_label = (
+                ("lotacao", sector),
+                f"lotação {sector}",
+            )
         if query:
             condition = Q()
             for field in (
@@ -176,9 +245,36 @@ def collection(request, kind):
             )
     elif kind == "finding":
         objects = objects.select_related("asset", "vulnerability")
-        status = choice_filter(request, "situacao", SituacaoTratamento)
+        if request.GET.get("situacao") == PENDING:
+            # Tudo o que ainda conta no risco: só "Corrigida" sai do modelo.
+            status = PENDING
+            objects = objects.exclude(
+                situacao=SituacaoTratamento.CORRIGIDA.value
+            )
+        else:
+            status = choice_filter(request, "situacao", SituacaoTratamento)
         severity = choice_filter(request, "gravidade", NivelGravidade)
-        if status:
+        # Atalhos "tratamentos deste ativo" e "ativos afetados por esta falha".
+        for name, model in (
+            ("asset", Asset),
+            ("vulnerability", Vulnerability),
+        ):
+            value = request.GET.get(name, "")
+            target = (
+                model.objects.filter(pk=value).first()
+                if value.isdigit()
+                else None
+            )
+            if target:
+                objects = objects.filter(**{name: target})
+                exact_filter = (name, target.pk)
+                exact_label = (
+                    f"ativo {target}"
+                    if name == "asset"
+                    else f"vulnerabilidade {target}"
+                )
+                break
+        if status and status != PENDING:
             objects = objects.filter(situacao=status)
         if severity:
             low, high = SEVERITY_RANGES[severity]
@@ -216,16 +312,20 @@ def collection(request, kind):
             "asset_types": [(t.value, t.rotulo) for t in TipoEquipamento],
             "severities": [(g.value, g.rotulo) for g in NivelGravidade],
             "statuses": [(x.value, x.rotulo) for x in SituacaoTratamento],
+            "pending": PENDING,
             # Mantém busca e filtros ao trocar de página.
             "filters": "".join(
-                f"&{name}={value}"
+                "&" + urlencode({name: value})
                 for name, value in (
                     ("tipo", asset_type),
                     ("gravidade", severity),
                     ("situacao", status),
+                    exact_filter or ("", None),
                 )
                 if value
             ),
+            "exact_filter": exact_filter,
+            "exact_label": exact_label,
             "can_add": request.user.has_perm("inventory.add_" + kind),
             "can_change": request.user.has_perm("inventory.change_" + kind),
             "can_delete": request.user.has_perm("inventory.delete_" + kind),
@@ -239,13 +339,24 @@ def edit(request, kind, pk=None):
         raise Http404
     authorize(request.user, ("change_" if pk else "add_") + kind)
     obj = get_object_or_404(MODELS[kind], pk=pk) if pk else None
-    form = FORMS[kind](request.POST or None, instance=obj)
+    # Atalhos de outras telas (ficha do ativo, catálogo KEV) abrem o cadastro
+    # já preenchido. Só campos do próprio formulário são aceitos, e nada é
+    # gravado antes de o usuário conferir e salvar.
+    initial = None
+    if not pk and request.method == "GET":
+        initial = {
+            name: request.GET[name][:2000]
+            for name in FORMS[kind]._meta.fields
+            if name != "version" and request.GET.get(name)
+        }
+    form = FORMS[kind](request.POST or None, instance=obj, initial=initial)
+    back = safe_back(request)
     status = 200
     if request.method == "POST" and form.is_valid():
         try:
             save_entity(request.user, kind, form.cleaned_data, pk)
             messages.success(request, "Registro salvo com segurança.")
-            return redirect("collection", kind=kind)
+            return redirect(back or reverse("collection", args=[kind]))
         except Conflict as error:
             form.add_error(None, str(error))
             status = 409
@@ -264,6 +375,7 @@ def edit(request, kind, pk=None):
             "title": TITLES[kind],
             "kind": kind,
             "editing": bool(pk),
+            "back": back,
         },
         status=status,
     )
@@ -284,17 +396,25 @@ def remove(request, kind, pk):
                 request,
                 "Registro excluído. A ação foi registrada na auditoria.",
             )
+            # A página de origem pode ser a ficha do próprio registro, que
+            # deixou de existir: depois de excluir, sempre a lista.
             return redirect("collection", kind=kind)
         except ValueError as error:
             messages.error(request, str(error))
-            return render(
-                request,
-                "inventory/delete.html",
-                {"object": obj, "kind": kind},
-                status=409,
-            )
+            status = 409
+    else:
+        status = 200
     return render(
-        request, "inventory/delete.html", {"object": obj, "kind": kind}
+        request,
+        "inventory/delete.html",
+        {
+            "object": obj,
+            "kind": kind,
+            "label": SINGULAR[kind],
+            "impact": deletion_impact(kind, obj),
+            "back": safe_back(request),
+        },
+        status=status,
     )
 
 
@@ -503,7 +623,44 @@ def cve_search(request):
     if warning:
         messages.warning(request, warning)
     items = base.buscar(q)[:30] if q else []
-    return render(request, "inventory/cve.html", {"items": items, "query": q})
+    registered = dict(
+        Vulnerability.objects.filter(
+            cve__in=[item.cve for item in items]
+        ).values_list("cve", "pk")
+    )
+    rows = []
+    for item in items:
+        # Endereço do cadastro já preenchido com os dados do catálogo.
+        prefill = urlencode(
+            {
+                "cve": item.cve,
+                "descricao": f"{item.fabricante} {item.produto}: {item.nome}"[
+                    :2000
+                ],
+                "origem": OrigemVulnerabilidade.FALTA_ATUALIZACAO.value,
+                "cvss": item.cvss or "",
+                "cwe": item.cwes[0] if item.cwes else "",
+                "vetor": item.vetor or "",
+                "voltar": request.get_full_path(),
+            }
+        )
+        rows.append(
+            {
+                "item": item,
+                "registered": registered.get(item.cve),
+                "prefill": prefill,
+            }
+        )
+    return render(
+        request,
+        "inventory/cve.html",
+        {
+            "rows": rows,
+            "query": q,
+            "can_add": request.user.has_perm("inventory.add_vulnerability"),
+            "can_link": request.user.has_perm("inventory.add_finding"),
+        },
+    )
 
 
 @login_required
@@ -637,6 +794,15 @@ def asset_detail(request, pk):
             "findings": inv.vulnerabilidades_do(pk),
             "contributions": model.contribuicoes(pk),
             "reached": analysis.reachability(inv, pk),
+            "can_change": request.user.has_perm("inventory.change_asset"),
+            "can_delete": request.user.has_perm("inventory.delete_asset"),
+            "can_add_finding": request.user.has_perm("inventory.add_finding"),
+            "can_change_finding": request.user.has_perm(
+                "inventory.change_finding"
+            ),
+            "can_add_dependency": request.user.has_perm(
+                "inventory.add_dependency"
+            ),
             "occurrences": Finding.objects.filter(asset_id=pk).select_related(
                 "vulnerability"
             ),

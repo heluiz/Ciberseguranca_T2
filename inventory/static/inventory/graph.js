@@ -97,7 +97,7 @@ async function startGraph() {
       const link = html('a','',fix.asset); link.href = '/ativos/'+fix.asset_id+'/'; assetCell.append(link);
       row.append(assetCell, html('td','priority-vuln',fix.vulnerability));
       const actionCell = html('td','');
-      const action = html('a','','Revisar tratamento →'); action.href='/registros/finding/?q='+encodeURIComponent(fix.asset);
+      const action = html('a','','Revisar tratamento →'); action.href='/registros/finding/?asset='+encodeURIComponent(fix.asset_id);
       actionCell.append(action); row.append(actionCell,html('td','priority-reduction','↓ −'+fmt(fix.reducao)+' pontos'));
       tbody.append(row);
     }

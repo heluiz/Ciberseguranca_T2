@@ -257,3 +257,110 @@ def test_asset_sheet_shows_inheritance_and_reach(admin_client):
     text = admin_client.get(f"/ativos/{bank.pk}/").content.decode()
     assert "Quem é alcançado" in text and "ESTACAO-01" in text
     assert "De onde este ativo herda risco" in text
+
+
+def test_shortcuts_prefill_forms_and_return_to_origin(admin_client):
+    import_json(EXAMPLE)
+    asset = Asset.objects.get(hostname="ESTACAO-01")
+    sheet = f"/ativos/{asset.pk}/"
+    page = admin_client.get(sheet).content.decode()
+    assert f"/registros/finding/novo/?asset={asset.pk}" in page
+    assert f"/registros/dependency/novo/?source={asset.pk}" in page
+    assert f"/registros/asset/{asset.pk}/?voltar=" in page
+    form = admin_client.get(
+        f"/registros/finding/novo/?asset={asset.pk}&voltar={sheet}"
+    )
+    assert form.context["form"].initial["asset"] == str(asset.pk)
+    assert f'name="voltar" value="{sheet}"' in form.content.decode()
+    # Salvar a partir do atalho volta para a ficha, não para a lista.
+    current = admin_client.get(f"/api/asset/{asset.pk}/").json()["results"][0]
+    data = {k: v for k, v in current.items() if k != "id" and v is not None}
+    data.update(lotacao="Sala nova", voltar=sheet)
+    saved = admin_client.post(f"/registros/asset/{asset.pk}/", data)
+    assert saved.status_code == 302 and saved["Location"] == sheet
+    # O parâmetro não serve para mandar o usuário para outro site.
+    for outside in (
+        "https://exemplo.invalid/",
+        "//exemplo.invalid/",
+        "javascript:alert(1)",
+    ):
+        form = admin_client.get(f"/registros/asset/novo/?voltar={outside}")
+        assert form.context["back"] == ""
+        assert "exemplo.invalid" not in form.content.decode()
+    # Valores iniciais não gravam nada e campos fora do formulário são ignorados.
+    before = Asset.objects.count()
+    form = admin_client.get(
+        "/registros/asset/novo/?hostname=PC-X&is_superuser=1"
+    )
+    assert form.context["form"].initial == {"hostname": "PC-X"}
+    assert Asset.objects.count() == before
+
+
+def test_exact_filters_for_asset_and_vulnerability(admin_client):
+    import_json(EXAMPLE)
+    from inventory.models import Finding, Vulnerability
+
+    server = Asset.objects.get(hostname="SERVIDOR-01")
+    page = admin_client.get(f"/registros/finding/?asset={server.pk}")
+    found = list(page.context["page"].paginator.object_list)
+    assert found and all(f.asset_id == server.pk for f in found)
+    assert len(found) == Finding.objects.filter(asset=server).count()
+    assert "Mostrando somente" in page.content.decode()
+    vuln = Vulnerability.objects.first()
+    page = admin_client.get(f"/registros/finding/?vulnerability={vuln.pk}")
+    found = list(page.context["page"].paginator.object_list)
+    assert found and all(f.vulnerability_id == vuln.pk for f in found)
+    # Identificador inexistente ou inválido não quebra: mostra tudo.
+    for bad in ("999999", "abc"):
+        page = admin_client.get(f"/registros/finding/?asset={bad}")
+        assert page.status_code == 200
+        assert page.context["page"].paginator.count == Finding.objects.count()
+    listing = admin_client.get("/registros/vulnerability/").content.decode()
+    assert f"/registros/finding/?vulnerability={vuln.pk}" in listing
+
+
+def test_kev_catalog_offers_registration(admin_client, reader_client):
+    page = admin_client.get("/cve/?q=CVE-2021-44228")
+    text = page.content.decode()
+    assert "Cadastrar no catálogo" in text and "Detalhes no NVD" in text
+    row = page.context["rows"][0]
+    form = admin_client.get("/registros/vulnerability/novo/?" + row["prefill"])
+    initial = form.context["form"].initial
+    assert initial["cve"] == "CVE-2021-44228" and initial["cvss"] == "10.0"
+    assert (
+        initial["vetor"].startswith("CVSS:3.1/") and initial["cwe"] == "CWE-20"
+    )
+    data = dict(initial, version=1, voltar=form.context["back"])
+    saved = admin_client.post("/registros/vulnerability/novo/", data)
+    assert saved.status_code == 302 and saved["Location"].startswith(
+        "/cve/?q="
+    )
+    again = admin_client.get("/cve/?q=CVE-2021-44228").content.decode()
+    assert (
+        "Já está no catálogo" in again and "Cadastrar no catálogo" not in again
+    )
+    # Quem só lê não recebe o botão de cadastro.
+    assert (
+        "Cadastrar no catálogo"
+        not in reader_client.get("/cve/?q=CVE-2019-0708").content.decode()
+    )
+    assert (
+        "Nenhuma CVE da base"
+        in admin_client.get("/cve/?q=zzzz-nada").content.decode()
+    )
+
+
+def test_validate_only_works_with_filled_inventory_and_plan_is_complete():
+    import_json(EXAMPLE)
+    message = import_json(FULL, dry_run=True)
+    assert "76 ativos" in message and "inventário vazio" in message
+    assert Asset.objects.count() == 3
+    with pytest.raises(ValueError):
+        import_json(FULL)
+    result = analysis.risk_analysis(SnapshotRepository())
+    assert len(result["plan"]) == 4
+    assert sum(fix.reducao for fix in result["plan"]) == pytest.approx(
+        result["total"]
+    )
+    reductions = [fix.reducao for fix in result["plan"]]
+    assert reductions == sorted(reductions, reverse=True)

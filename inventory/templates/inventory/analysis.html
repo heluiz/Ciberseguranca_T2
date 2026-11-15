@@ -202,7 +202,7 @@
               {% for row in result.rows %}
                 <tr>
                   <td>
-                    <strong>{{ row.equipamento.hostname }}</strong><small>{{ row.equipamento.tipo.rotulo }}</small>
+                    <strong>{% if scenario %}{{ row.equipamento.hostname }}{% else %}<a href="{% url 'asset_detail' row.equipamento.id %}">{{ row.equipamento.hostname }}</a>{% endif %}</strong><small>{{ row.equipamento.tipo.rotulo }}</small>
                   </td>
                   <td>{{ row.equipamento.lotacao }}</td>
                   <td>{{ row.soma_cvss|floatformat:1 }}</td>
@@ -225,6 +225,47 @@
         </p>
       {% endif %}
     </section>
+    {% if result.plan %}
+      <section class="panel" id="plano">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">PLANO DE CORREÇÃO · {{ result.plan|length }} CORREÇÕES POSSÍVEIS</p>
+            <h2>Onde agir primeiro</h2>
+          </div>
+        </div>
+        <p class="muted">Cada linha é uma vulnerabilidade ainda não corrigida em um equipamento, ordenada pela queda que a correção causa no risco total (inclui o efeito sobre quem herda risco dele).</p>
+        <div class="table-scroll plan-scroll" tabindex="0" role="region" aria-label="Plano de correção; role para ver todas as linhas">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Equipamento</th>
+                <th>Vulnerabilidade</th>
+                <th>CVSS</th>
+                <th>Redução do risco total</th>
+                {% if not scenario %}<th>Ação</th>{% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for fix in result.plan %}
+                <tr>
+                  <td>{{ forloop.counter }}</td>
+                  <td>
+                    {% if scenario %}{{ fix.equipamento.hostname }}{% else %}<a href="{% url 'asset_detail' fix.equipamento.id %}">{{ fix.equipamento.hostname }}</a>{% endif %}
+                  </td>
+                  <td>{{ fix.vulnerabilidade.cve|default:fix.vulnerabilidade.descricao }}</td>
+                  <td>{{ fix.vulnerabilidade.cvss|floatformat:1 }}</td>
+                  <td class="cyan">↓ {{ fix.reducao|floatformat:2 }} pontos</td>
+                  {% if not scenario %}
+                    <td><a href="{% url 'collection' 'finding' %}?asset={{ fix.equipamento.id }}">Abrir tratamentos →</a></td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
     <section class="panel">
       <div class="panel-heading">
         <div>
@@ -236,7 +277,11 @@
       {% if result.cycles %}
         <p class="muted">Cada linha é uma dependência que fecha um ciclo: o risco circula entre esses ativos. Ciclos são aceitos pelo modelo enquanto a soma das frações de cada equipamento fica abaixo de 1.</p>
         <ul class="cycle-list">
-          {% for origin, heir in result.cycles %}<li>{{ origin.hostname }} → {{ heir.hostname }}</li>{% endfor %}
+          {% for origin, heir in result.cycles %}
+            <li>
+              {% if scenario %}{{ origin.hostname }} → {{ heir.hostname }}{% else %}<a href="{% url 'asset_detail' origin.id %}">{{ origin.hostname }}</a> → <a href="{% url 'asset_detail' heir.id %}">{{ heir.hostname }}</a>{% endif %}
+            </li>
+          {% endfor %}
         </ul>
       {% else %}
         <p class="muted">Nenhum ciclo: o risco só se propaga em um sentido.</p>

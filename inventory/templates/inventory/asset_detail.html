@@ -6,7 +6,11 @@
       <h1>{{ asset.hostname }}</h1>
       <p>{{ asset.tipo.rotulo }} · {{ asset.lotacao }}</p>
     </div>
-    <a class="button primary" href="/mapa/?ativo={{ asset.id }}">Ver no mapa</a>
+    <div class="inline">
+      <a class="button primary" href="/mapa/?ativo={{ asset.id }}">Ver no mapa</a>
+      {% if can_change %}<a class="button" href="{% url 'edit' 'asset' asset.id %}?voltar={{ request.path|urlencode }}">Editar</a>{% endif %}
+      {% if can_delete %}<a class="button danger-text" href="{% url 'delete' 'asset' asset.id %}?voltar={{ request.path|urlencode }}">Excluir</a>{% endif %}
+    </div>
   </div>
   <section class="panel">
     <h2>Identificação</h2>
@@ -22,7 +26,13 @@
     <p>Risco próprio: {{ row.proprio|floatformat:2 }} pontos · Risco efetivo: {{ row.efetivo|floatformat:2 }} pontos</p>
   </section>
   <section class="panel">
-    <h2>Vulnerabilidades e tratamentos</h2>
+    <div class="panel-heading">
+      <h2>Vulnerabilidades e tratamentos</h2>
+      <div class="inline">
+        <a class="button" href="{% url 'collection' 'finding' %}?asset={{ asset.id }}">Abrir na lista de tratamentos</a>
+        {% if can_add_finding %}<a class="button primary" href="{% url 'create' 'finding' %}?asset={{ asset.id }}&amp;voltar={{ request.path|urlencode }}">+ Vincular vulnerabilidade</a>{% endif %}
+      </div>
+    </div>
     <div class="table-scroll">
       <table>
         <thead>
@@ -32,7 +42,7 @@
             <th>Situação</th>
             <th>Detecção</th>
             <th>Correção</th>
-            <th>Histórico</th>
+            <th>Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -43,7 +53,9 @@
               <td>{{ occurrence.get_situacao_display }}</td>
               <td>{{ occurrence.detected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</td>
               <td>{{ occurrence.corrected_at|date:'d/m/Y H:i:s'|default:'Não informada' }}</td>
-              <td><a href="{% url 'finding_history' occurrence.pk %}">Histórico</a>
+              <td class="actions">
+                <a href="{% url 'finding_history' occurrence.pk %}">Histórico</a>
+                {% if can_change_finding %}<a href="{% url 'edit' 'finding' occurrence.pk %}?voltar={{ request.path|urlencode }}">Alterar situação</a>{% endif %}
               </td>
             </tr>
           {% empty %}
@@ -56,7 +68,10 @@
     </div>
   </section>
   <section class="panel">
-    <h2>De onde este ativo herda risco</h2>
+    <div class="panel-heading">
+      <h2>De onde este ativo herda risco</h2>
+      {% if can_add_dependency %}<a class="button" href="{% url 'create' 'dependency' %}?source={{ asset.id }}&amp;voltar={{ request.path|urlencode }}">+ Nova dependência</a>{% endif %}
+    </div>
     <div class="table-scroll">
       <table>
         <thead>
