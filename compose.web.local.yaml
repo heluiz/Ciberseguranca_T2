@@ -1,9 +1,14 @@
 # Uso local: app acessível apenas neste computador; não usar no servidor público.
+# Mesmas opções do servidor da disciplina: sem DEBUG (páginas de erro do
+# próprio sistema, nunca o código-fonte), HTTP sem certificado e sem segundo
+# fator, porque o endereço só existe nesta máquina.
 services:
   app:
     ports: ["127.0.0.1:8000:8000"]
     environment:
-      DJANGO_DEBUG: "1"
+      DJANGO_DEBUG: "0"
+      DJANGO_HTTPS: "0"
+      DJANGO_REQUIRE_MFA: "0"
       DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
       DJANGO_CSRF_TRUSTED_ORIGINS: ""
       TRUST_PROXY: "0"

@@ -7,6 +7,7 @@ Verificação automática com o axe-core, regras WCAG 2.0 e 2.1 níveis A e AA, 
 | Páginas | Temas | Resultado |
 |---|---|---|
 | Entrada, visão geral, análise de risco (com matrizes), inventário, tratamentos, formulário de ativo, ficha do ativo, mapa, relatórios, auditoria e catálogo KEV | Os quatro temas da interface | Nenhuma violação nas 11 páginas, em cada tema |
+| Telas alteradas na revisão de 14/11: visão geral (indicadores clicáveis), análise com o plano completo, listas filtradas, ficha do ativo com atalhos, confirmação de exclusão, cadastro preenchido por atalho, catálogo KEV, auditoria, relatórios, histórico e importação | Os quatro temas | Nenhuma violação depois de sublinhar o link dentro dos avisos |
 
 Também foi conferido por script, em tela de 390 px de largura, que a visão geral, a análise de risco, o inventário, os tratamentos e a ficha do ativo não geram rolagem horizontal da página.
 

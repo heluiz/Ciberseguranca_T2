@@ -17,7 +17,7 @@
             <th>Horário</th>
             <th>Conta</th>
             <th>Ação</th>
-            <th>Identificador</th>
+            <th>Registro</th>
           </tr>
         </thead>
         <tbody>
@@ -25,8 +25,8 @@
             <tr>
               <td>{{ e.occurred_at|date:'d/m/Y H:i:s' }}</td>
               <td>{{ e.actor|default:'Operação local' }}</td>
-              <td>{{ e.action }}</td>
-              <td>{{ e.target }}</td>
+              <td>{{ e.descricao }}</td>
+              <td>{{ e.alvo }}</td>
             </tr>
           {% empty %}
             <tr>

@@ -24,7 +24,7 @@
         <tbody>
           {% for r in summary %}
             <tr>
-              <td>{{ r.lotacao }}</td>
+              <td><a href="{% url 'collection' 'asset' %}?lotacao={{ r.lotacao|urlencode }}">{{ r.lotacao }}</a></td>
               <td>{{ r.ativos }}</td>
               <td>{{ r.falhas }}</td>
               <td>{{ r.media|floatformat:2|default:'—' }}</td>

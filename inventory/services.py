@@ -293,12 +293,24 @@ def import_json(content, user=None, dry_run=False):
         lock_inventory()
         if ImportReceipt.objects.filter(digest=digest).exists():
             return "Arquivo já importado; nenhuma alteração."
-        if Asset.objects.exists() or Vulnerability.objects.exists():
+        occupied = Asset.objects.exists() or Vulnerability.objects.exists()
+        if dry_run:
+            # Validar não grava nada, então vale também com o inventário preenchido.
+            note = (
+                " O arquivo é válido, mas só pode ser importado em um inventário vazio."
+                if occupied
+                else " Nada foi gravado."
+            )
+            return (
+                f"Validação concluída: {len(inv.todos())} ativos, "
+                f"risco total {model.risco_total():.2f} pontos.{note}".replace(
+                    ".", ",", 1
+                )
+            )
+        if occupied:
             raise ValueError(
                 "A importação inicial exige uma base vazia para preservar IDs sem sobrescrever dados."
             )
-        if dry_run:
-            return f"Validação concluída: {len(inv.todos())} ativos, risco total {model.risco_total():.6f}."
         for equipment in inv:
             assign_asset(Asset(pk=equipment.id), equipment)
         for vuln in inv.vulnerabilidades():

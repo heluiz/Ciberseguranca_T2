@@ -22,6 +22,7 @@
           </svg>
           <span>SENTINEL<small>Gestão de ativos e vulnerabilidades</small></span>
         </a>
+        {% if perms.inventory.view_asset %}
         <form class="global-search" action="/registros/asset/" role="search">
           <label class="sr-only" for="global-query">Buscar ativos</label>
           <svg class="icon" aria-hidden="true">
@@ -30,13 +31,19 @@
           <input id="global-query" name="q" placeholder="Buscar ativos, setores ou patrimônios…">
           <button class="sr-only">Buscar</button>
         </form>
+        {% endif %}
         {% include "inventory/appearance_settings.html" %}
-        <a class="header-alert" href="/registros/finding/?situacao=1" aria-label="Ver tratamentos em aberto">
-          <svg class="icon" aria-hidden="true">
-            <use href="/static/inventory/icons.svg#bell" />
-          </svg>
-          <span></span>
-        </a>
+        {% if perms.inventory.view_finding %}
+          {# O número é real: tratamentos com situação Aberta. Sem pendências, não há marca. #}
+          <a class="header-alert"
+             href="/registros/finding/?situacao=1"
+             aria-label="Tratamentos em aberto: {{ open_findings|default:0 }}">
+            <svg class="icon" aria-hidden="true">
+              <use href="/static/inventory/icons.svg#bell" />
+            </svg>
+            {% if open_findings %}<span class="alert-count" aria-hidden="true">{{ open_findings }}</span>{% endif %}
+          </a>
+        {% endif %}
         <div class="command-user">
           <span class="avatar">
             <svg class="icon" aria-hidden="true">

@@ -1,6 +1,6 @@
 # Relação entre as sprints e o projeto
 
-Resumo de onde cada cartão das Sprints 3 e 4 aparece no código. As Sprints 1 e 2 (fundamentos de Python, CRUD, enumerações, validações, persistência e Git) estão no programa de terminal original e em `testes.py`. A leitura detalhada dos 79 cartões, feita antes destas mudanças, está em [REVISAO-SPRINTS-2026-11-11.md](REVISAO-SPRINTS-2026-11-11.md).
+Resumo de onde cada cartão das Sprints 1 a 4 aparece no projeto. O programa de terminal (arquivos na raiz) e a versão web (`inventory/`, `sentinel/`, `academic/`) usam as mesmas classes de domínio.
 
 O enunciado do Trabalho 2 cobre as Sprints 3, 4 e 5; o quadro consultado tinha cartões até a Sprint 4.
 
@@ -12,6 +12,36 @@ O enunciado do Trabalho 2 cobre as Sprints 3, 4 e 5; o quadro consultado tinha c
 | 2 | Armazenamento em arquivo ou banco SQL, em lista de objetos JSON | Terminal: `armazenamento.py` (arquivo JSON). Web: PostgreSQL, com importação e exportação no mesmo formato JSON (`/dados/`) |
 | 3 | Container em execução por 24 horas | `Dockerfile` + `compose.yaml` (terminal) e `Dockerfile.web` + `compose.servidor.yaml` (web); comprovação com `sh ops/servidor/verificar.sh` |
 | 4 | Risco efetivo pelo modelo linear, verificando a invertibilidade | `risco.py`; na web, tela **Análise de risco** (`/analise/`), com o cenário conferível à mão e o cenário singular |
+
+## Sprint 1
+
+| Cartão | Onde está |
+|---|---|
+| 01 a 03 — Requisitos e critérios de aceitação | README, seção "Requisitos do Trabalho 2"; critérios escritos como testes em `testes.py` e `tests_web/` |
+| 04 e 05 — Primeiro programa, variáveis e tipos | `main.py` (terminal) e `manage.py` (web); tipos conferidos nas propriedades de `equipamentos.py` e nos campos de `inventory/models.py` |
+| 06 — Entrada e saída | `entrada.py` (o único módulo que chama `input()`) e `telas.py` |
+| 07 e 08 — Condicionais e repetição | Laço do menu em `main.py`; perguntas repetidas até a resposta ser válida em `entrada.py` |
+| 09 — Funções | Funções curtas com docstring em todos os módulos |
+| 10 a 13 — Listas, tuplas, sets, dicionários e enumerações | `Inventario` (dicionários por id), `classificacoes.py` (`IntEnum` dos tipos e situações) |
+| 14 — Persistência em arquivos | `armazenamento.py` (JSON com gravação atômica); na web, importação e exportação no mesmo formato |
+| 15 — Tratamento de erros | Exceções do domínio, `validacao.py` e o isolamento em `main.py`; na web, erros de formulário e respostas 4xx da API |
+| 16 a 19 — Git, branches e pull requests | Histórico público com 14 pull requests integrados após a verificação automática |
+| 20 — Revisão | Não tem entregável próprio |
+
+## Sprint 2
+
+| Cartão | Onde está |
+|---|---|
+| 01 e 02 — Boas práticas, classes e funções | Ruff; classes de domínio; camadas separadas |
+| 03 — CRUD | Terminal: opções 1 a 12. Web: Inventário, Vulnerabilidades, Tratamentos e Dependências, e a API REST |
+| 04, 06 e 07 — Requisitos, critérios e especificação | README e `docs/web/` (modelo de dados, segurança, execução); os critérios estão nos testes automáticos |
+| 05 — Regras e validações | Domínio, formulários (`inventory/forms.py`), serviço (`inventory/services.py`) e restrições do banco |
+| 08 a 11 — Cadastro, busca, atualização e exclusão de ativos | Opções 1 a 5; na web, formulários com controle de versão e exclusão com confirmação |
+| 12 a 14 — Vulnerabilidades | CVSS, CVE e CWE; catálogo KEV offline; filtros por situação e gravidade |
+| 15 — Dicionários (hashmaps) | Buscas por id em O(1); `ChainedHash` em `academic/algorithms.py` |
+| 16 e 17 — Branches e colaboração | Uma branch por mudança, pull request e merge após a CI |
+| 18 — Testes e correções | `testes.py` (115 testes) e `tests_web/` (132 testes); seção "Defeitos encontrados e corrigidos" do README |
+| 19 — Entrega do Trabalho 1 | Entregue em 25/09/2026; `migracao.py` converte o arquivo do Trabalho 1 |
 
 ## Sprint 3
 

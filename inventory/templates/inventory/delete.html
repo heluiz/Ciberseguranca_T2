@@ -2,14 +2,16 @@
 {% block content %}
   <section class="panel form-panel">
     <p class="eyebrow danger-text">CONFIRMAÇÃO DE EXCLUSÃO</p>
-    <h1>Excluir registro?</h1>
-    <p>{{ object }}</p>
-    <p class="muted">Ao excluir um ativo, seus tratamentos e dependências também serão removidos. O catálogo de vulnerabilidades permanece disponível.</p>
+    <h1>Excluir {{ label }}?</h1>
+    <p><strong>{{ object }}</strong></p>
+    <p class="muted">{{ impact }}</p>
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="version" value="{{ object.version }}">
-      <div class="form-actions"><button class="button danger-button">Confirmar exclusão</button><a class="button"
-                                                                                                   href="{% url 'collection' kind %}">Cancelar</a>
+      {% if back %}<input type="hidden" name="voltar" value="{{ back }}">{% endif %}
+      <div class="form-actions">
+        <button class="button danger-button">Confirmar exclusão</button>
+        <a class="button" href="{% if back %}{{ back }}{% else %}{% url 'collection' kind %}{% endif %}">Cancelar</a>
       </div>
     </form>
   </section>
