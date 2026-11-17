@@ -48,7 +48,7 @@ Mostra há quanto tempo cada container está no ar, quando a aplicação iniciou
 docker compose -f compose.servidor.yaml logs monitor
 ```
 
-A aplicação e o banco usam `restart: unless-stopped`: voltam sozinhos após uma falha ou o reinício do servidor. Os dados ficam no volume `sentinel-servidor_postgres-data` e sobrevivem à recriação dos containers.
+A aplicação e o banco usam `restart: unless-stopped`: voltam sozinhos após uma falha ou o reinício do servidor. Os dados ficam no volume `heluiz-12621cbs200-web_postgres-data` e sobrevivem à recriação dos containers.
 
 ### Comandos úteis
 

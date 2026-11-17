@@ -8,7 +8,9 @@
 #   - a preparação (migrações, grupos, conta inicial, dados de exemplo)
 #     roda sozinha antes de a aplicação subir;
 #   - um container registra a disponibilidade a cada minuto.
-name: sentinel-servidor
+# Nome do projeto: primeiro nome e matrícula, como pede a disciplina. Os
+# containers ficam heluiz-12621cbs200-web-app-1, -db-1, -monitor-1 e -preparar-1.
+name: heluiz-12621cbs200-web
 x-logging: &logging
   driver: json-file
   options:

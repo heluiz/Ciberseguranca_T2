@@ -14,7 +14,7 @@ segredo() {
 }
 
 if [ ! -f .env ]; then
-    if docker volume ls --format '{{.Name}}' | grep -qx 'sentinel-servidor_postgres-data'; then
+    if docker volume ls --format '{{.Name}}' | grep -qx 'heluiz-12621cbs200-web_postgres-data'; then
         echo "Existe um banco do SENTINEL, mas falta o arquivo .env." >&2
         echo "Recupere o .env original; uma senha nova nao abriria esse banco." >&2
         exit 1
