@@ -300,7 +300,7 @@ A versão de terminal que roda no servidor do docente desde 27/10/2026:
 **PowerShell**
 
 ```powershell
-ssh -t 12621CBS200@10.0.99.150 docker attach inventario-heluiz
+ssh -t 12621CBS200@10.0.99.150 docker attach heluiz-12621cbs200
 ```
 
 Mais opções (Linux, comando único, detalhes do container) em
@@ -912,7 +912,7 @@ interrupção, como mostram as [Provas das 24 horas](#provas-das-24-horas).
 | Versão | Commit `abae5ec`, a `main` depois do Pull Request #12 |
 | Imagem | `inventario-heluiz:1.0`, construída no próprio servidor (277 MB) |
 | Volume | `inventario-heluiz-dados`, com a base de exemplo, que é fictícia |
-| Container | `inventario-heluiz`, ligado com `--restart unless-stopped`, `--read-only` e `--security-opt no-new-privileges`; roda com o usuário `inventario` e não publica nenhuma porta |
+| Container | `heluiz-12621cbs200` (nome e matrícula; chamava-se `inventario-heluiz` até 17/11/2026, quando foi renomeado com `docker rename`, sem desligar), ligado com `--restart unless-stopped`, `--read-only` e `--security-opt no-new-privileges`; roda com o usuário `inventario` e não publica nenhuma porta |
 | Acesso | Por SSH, com chave e o atalho `ufu`; a senha inicial foi trocada |
 | Registro | Uma linha por hora em `uptime_inventario.log`, gravada pelo `cron` do servidor |
 
@@ -928,11 +928,11 @@ no macOS, no terminal):
 
 ```
 ssh ufu                                            # entra no servidor; exit sai
-ssh ufu docker ps --filter name=inventario-heluiz  # o container está no ar?
-ssh ufu "date; docker inspect -f '{{.State.StartedAt}}' inventario-heluiz"
+ssh ufu docker ps --filter name=heluiz-12621cbs200  # o container está no ar?
+ssh ufu "date; docker inspect -f '{{.State.StartedAt}}' heluiz-12621cbs200"
 ssh ufu tail -n 5 uptime_inventario.log            # as últimas horas do registro
 scp ufu:uptime_inventario.log .                    # traz uma cópia do registro
-ssh -t ufu docker attach inventario-heluiz         # abre o menu do programa
+ssh -t ufu docker attach heluiz-12621cbs200         # abre o menu do programa
 ```
 
 O terceiro comando mostra a hora do servidor e o momento em que o container
@@ -960,8 +960,8 @@ usuário e a senha, sem criar chave nem atalho nele:
 
 ```
 ssh usuario@endereco-do-servidor
-ssh usuario@endereco-do-servidor docker ps --filter name=inventario-heluiz
-ssh -t usuario@endereco-do-servidor docker attach inventario-heluiz
+ssh usuario@endereco-do-servidor docker ps --filter name=heluiz-12621cbs200
+ssh -t usuario@endereco-do-servidor docker attach heluiz-12621cbs200
 ```
 
 A senha é pedida a cada comando, não aparece enquanto é digitada e nunca vai na
@@ -1208,7 +1208,7 @@ docker rm semente-heluiz
 **6. Ligar o container.**
 
 ```
-docker run -dit --name inventario-heluiz --restart unless-stopped \
+docker run -dit --name heluiz-12621cbs200 --restart unless-stopped \
   --read-only --security-opt no-new-privileges \
   -v inventario-heluiz-dados:/app/dados inventario-heluiz:1.0
 ```
@@ -1219,12 +1219,12 @@ não abre nenhuma porta de rede, por isso não há nada a liberar no firewall.
 **7. Conferir e sair.**
 
 ```
-docker ps --filter name=inventario-heluiz
+docker ps --filter name=heluiz-12621cbs200
 ```
 
 O `STATUS` mostra `Up` e, depois de um minuto, `(healthy)`. Para ver o menu,
-`docker attach inventario-heluiz` e Enter (do seu computador, direto:
-`ssh -t ufu docker attach inventario-heluiz`); para sair dele sem parar o
+`docker attach heluiz-12621cbs200` e Enter (do seu computador, direto:
+`ssh -t ufu docker attach heluiz-12621cbs200`); para sair dele sem parar o
 programa, Ctrl+P e depois Ctrl+Q, no PowerShell ou no Windows Terminal (no
 terminal do VS Code, o Ctrl+P não chega ao Docker). Por fim, `exit` fecha a
 conexão, e o container continua rodando. O `docker attach` não é preciso para
@@ -1244,7 +1244,7 @@ criado. Na apresentação, se for mostrar o container do servidor, entre com
 comando mostra o estado do container e o acrescenta a um arquivo:
 
 ```
-ssh ufu "date; docker ps --filter name=inventario-heluiz; docker inspect -f 'Ligado em {{.State.StartedAt}} (UTC) | religado {{.RestartCount}} vez(es) | {{.State.Health.Status}}' inventario-heluiz" | Tee-Object -Append -FilePath $HOME\evidencias_24h.txt
+ssh ufu "date; docker ps --filter name=heluiz-12621cbs200; docker inspect -f 'Ligado em {{.State.StartedAt}} (UTC) | religado {{.RestartCount}} vez(es) | {{.State.Health.Status}}' heluiz-12621cbs200" | Tee-Object -Append -FilePath $HOME\evidencias_24h.txt
 ```
 
 No Linux e no macOS, troque o fim por `| tee -a ~/evidencias_24h.txt`. De um
@@ -1262,7 +1262,7 @@ bloco inteiro no servidor:
 
 ```
 (crontab -l 2>/dev/null; cat <<'EOF'
-0 * * * * echo "$(date -Is) $(docker ps -a --filter name=inventario-heluiz --format '{{.Status}}' 2>&1)" >> $HOME/uptime_inventario.log
+0 * * * * echo "$(date -Is) $(docker ps -a --filter name=heluiz-12621cbs200 --format '{{.Status}}' 2>&1)" >> $HOME/uptime_inventario.log
 EOF
 ) | crontab -
 crontab -l
@@ -1300,8 +1300,8 @@ espaço:
 cd ~/Ciberseguranca_T2
 git pull
 docker build -t inventario-heluiz:1.1 .
-docker rm -f inventario-heluiz
-docker run -dit --name inventario-heluiz --restart unless-stopped \
+docker rm -f heluiz-12621cbs200
+docker run -dit --name heluiz-12621cbs200 --restart unless-stopped \
   --read-only --security-opt no-new-privileges \
   -v inventario-heluiz-dados:/app/dados inventario-heluiz:1.1
 docker rmi inventario-heluiz:1.0
@@ -1313,8 +1313,8 @@ Os dados continuam no volume, e a contagem das 24 horas recomeça.
 guarde uma cópia dos dados e libere o espaço do servidor:
 
 ```
-docker cp inventario-heluiz:/app/dados/inventario.json ~/inventario_servidor.json
-docker rm -f inventario-heluiz
+docker cp heluiz-12621cbs200:/app/dados/inventario.json ~/inventario_servidor.json
+docker rm -f heluiz-12621cbs200
 docker rmi inventario-heluiz:1.0
 docker volume rm inventario-heluiz-dados
 crontab -r
@@ -1379,7 +1379,7 @@ Docker não aceita senha nem usa o `sudo`.
 | `WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!` | A chave do servidor não é mais a da primeira conexão: ou o servidor foi reinstalado, ou alguém se pôs no meio da conexão (ataque *man-in-the-middle*) | Não continue: pergunte ao docente se o servidor mudou. Só depois, `ssh-keygen -R endereco-do-servidor` apaga a chave antiga, e a próxima conexão pergunta de novo |
 | `no space left on device`, no `docker build` do servidor | O disco do servidor acabou | Avise o docente. Não rode nenhum `prune`: ele apagaria também o que é dos colegas |
 | `ssh: Could not resolve hostname ufu` | O atalho `ufu` só existe no computador em que foi criado, no passo 2 de [Implantar, passo a passo](#implantar-passo-a-passo) | Use `ssh usuario@endereco-do-servidor`, ou crie o atalho neste computador (veja [Acessar o servidor](#acessar-o-servidor)) |
-| `the input device is not a TTY`, no `ssh ufu docker attach ...` | Sem o `-t`, o SSH não dá terminal ao comando, e o `docker attach` precisa de um | `ssh -t ufu docker attach inventario-heluiz` |
+| `the input device is not a TTY`, no `ssh ufu docker attach ...` | Sem o `-t`, o SSH não dá terminal ao comando, e o `docker attach` precisa de um | `ssh -t ufu docker attach heluiz-12621cbs200` |
 | O `sudo` diz que precisa de um terminal para ler a senha, no `ssh ufu sudo ...` | Pelo mesmo motivo: sem o `-t`, não há onde digitar a senha | `ssh -t ufu sudo ...` |
 | `command not found` num comando colado no servidor, com `^[[200~` ou `[200~` grudado no texto | O terminal marca o começo e o fim do texto colado (*bracketed paste*), e a marca entrou no comando | Cole uma linha de cada vez; se continuar, rode uma vez no servidor `bind 'set enable-bracketed-paste off'` |
 | `DEPRECATED: The legacy builder is deprecated`, no `docker build` do servidor | O Docker do servidor não tem o componente `buildx` e constrói com o construtor antigo | Nada: a imagem sai igual |
@@ -2895,7 +2895,7 @@ mais detalhe:
 
 | # | O que fazer | O que mostrar | Requisito |
 | --- | --- | --- | --- |
-| 1 | `docker ps` | O container `inventario` no ar (`Up`) e saudável (`(healthy)`). No servidor do docente, do computador com a chave e na rede da universidade: `ssh ufu docker ps --filter name=inventario-heluiz`, em que o `Up` mostra há quanto tempo (as provas das 24 horas estão em [Provas das 24 horas](#provas-das-24-horas)) | 3 |
+| 1 | `docker ps` | O container `inventario` no ar (`Up`) e saudável (`(healthy)`). No servidor do docente, do computador com a chave e na rede da universidade: `ssh ufu docker ps --filter name=heluiz-12621cbs200`, em que o `Up` mostra há quanto tempo (as provas das 24 horas estão em [Provas das 24 horas](#provas-das-24-horas)) | 3 |
 | 2 | `docker attach inventario` e Enter | A tela de abertura e "Base carregada: 76 equipamento(s), 88 vulnerabilidade(s).", lida do arquivo JSON | 2 |
 | 3 | Opção 7, ID `65` | O `INTEL-SRV01`: um objeto da subclasse `Servidor`, com o fator de exposição dela (1,5), a ficha técnica (Dell PowerEdge R430, Windows Server 2008 R2) e as três vulnerabilidades, uma delas o BlueKeep, aberto | 1 |
 | 4 | Opção 13 | A verificação de `I − A` antes da conta (diagonal dominante, determinante 0,98, número de condição 7,98, posto 76) e o risco próprio e o efetivo de todos: no topo, `PERICIA-SRV01` (40,61), `DRPC-SRV01` (40,01) e `INTEL-SRV01` (37,61) | 4 |
