@@ -25,6 +25,47 @@
     </div>
     <p>Risco próprio: {{ row.proprio|floatformat:2 }} pontos · Risco efetivo: {{ row.efetivo|floatformat:2 }} pontos</p>
   </section>
+  <section class="panel" id="passo-a-passo">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">RISCO PASSO A PASSO · x = b + A x</p>
+        <h2>Como o risco deste ativo foi calculado</h2>
+      </div>
+    </div>
+    <h3>Risco próprio <small class="inline-small">b = fator × (M v)</small></h3>
+    <ul class="plain-list">
+      {% for step in steps.vulnerabilidades %}
+        <li>
+          CVSS {{ step.vulnerabilidade.cvss|floatformat:1 }} · {{ step.vulnerabilidade.cve|default:step.vulnerabilidade.descricao }}
+          ({{ step.situacao.rotulo }}){% if not step.conta %} <small class="inline-small">← corrigida: não conta</small>{% endif %}
+        </li>
+      {% empty %}
+        <li class="muted">Sem vulnerabilidades registradas.</li>
+      {% endfor %}
+    </ul>
+    <dl class="diagnostic-list">
+      <div>
+        <dt>Soma das notas que contam (M v)</dt>
+        <dd>{{ steps.soma|floatformat:1 }}</dd>
+      </div>
+      <div>
+        <dt>Fator de exposição ({{ asset.tipo.rotulo }})</dt>
+        <dd>{{ steps.fator|floatformat:1 }}</dd>
+      </div>
+      <div>
+        <dt>Risco próprio b</dt>
+        <dd>{{ steps.fator|floatformat:1 }} × {{ steps.soma|floatformat:1 }} = <strong class="cyan">{{ steps.proprio|floatformat:2 }}</strong></dd>
+      </div>
+      <div>
+        <dt>Risco herdado (A x)</dt>
+        <dd>{{ steps.herdado|floatformat:2 }} <small>detalhado em "De onde este ativo herda risco"</small></dd>
+      </div>
+      <div>
+        <dt>Risco efetivo x = b + A x</dt>
+        <dd>{{ steps.proprio|floatformat:2 }} + {{ steps.herdado|floatformat:2 }} = <strong class="cyan">{{ steps.efetivo|floatformat:2 }}</strong></dd>
+      </div>
+    </dl>
+  </section>
   <section class="panel">
     <div class="panel-heading">
       <h2>Vulnerabilidades e tratamentos</h2>
@@ -65,6 +106,76 @@
           {% endfor %}
         </tbody>
       </table>
+    </div>
+  </section>
+  <section class="panel" id="sugestoes">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">BASE DE CVEs EXPLORADAS · SUGESTÕES PELA FICHA TÉCNICA</p>
+        <h2>CVEs que combinam com este ativo</h2>
+      </div>
+      <a class="button" href="{% url 'cve' %}">Abrir a base de CVEs</a>
+    </div>
+    <p class="muted">
+      Compara o fabricante, o modelo e o sistema da ficha com o fabricante e o produto de cada CVE do catálogo KEV.
+      {% if suggestion_count > suggestions|length %}Mostrando as {{ suggestions|length }} combinações mais fortes de {{ suggestion_count }}.{% endif %}
+      Confira a versão instalada antes de registrar: combinar não confirma a falha.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>CVE</th>
+            <th>Produto</th>
+            <th>CVSS</th>
+            <th>Combinou</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in suggestions %}
+            <tr>
+              <td><a href="{% url 'cve_detail' s.registro.cve %}">{{ s.registro.cve }}</a></td>
+              <td>{{ s.registro.fabricante }} · {{ s.registro.produto }}<small>{{ s.registro.nome }}</small></td>
+              <td>{{ s.registro.cvss|default:"—" }}</td>
+              <td>{{ s.palavras|join:", " }}</td>
+              <td>
+                {% if s.no_ativo %}
+                  Já registrada
+                {% elif s.vulnerabilidade and can_add_finding %}
+                  <a href="{% url 'create' 'finding' %}?asset={{ asset.id }}&amp;vulnerability={{ s.vulnerabilidade.id }}&amp;voltar={{ request.path|urlencode }}">Vincular a este ativo</a>
+                {% elif not s.vulnerabilidade and can_add_vulnerability %}
+                  <a href="{% url 'create' 'vulnerability' %}?{{ s.prefill }}">Cadastrar no catálogo</a>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="empty">
+                Nenhuma CVE combina com a ficha técnica.{% if not asset.ficha.preenchidos %} Preencha fabricante, modelo e sistema para receber sugestões.{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel" id="arvore">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">ÁRVORE DE DEPENDÊNCIAS · OS DOIS SENTIDOS</p>
+        <h2>Do que depende e quem depende deste ativo</h2>
+      </div>
+    </div>
+    <p class="muted">
+      Cada ativo alcançado aparece uma vez, sob a ligação mais específica; as outras ligações dele vêm escritas na linha.
+      Ativos iguais, sem nada abaixo, ficam juntos. ↻ marca dois ativos que dependem um do outro (ciclo).
+    </p>
+    <div>
+      {% include "inventory/tree.html" with tree=tree_down title="Do que ele depende (de quem herda risco)" empty="Não depende de nenhum ativo." up=False %}
+      {% include "inventory/tree.html" with tree=tree_up title="Quem depende dele (quem herda o risco dele)" empty="Nenhum ativo depende dele." up=True %}
     </div>
   </section>
   <section class="panel">

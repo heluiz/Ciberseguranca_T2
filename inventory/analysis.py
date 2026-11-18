@@ -27,7 +27,9 @@ SCENARIOS = {
     ),
 }
 # Acima disso as matrizes não cabem na tela; o resultado continua disponível.
-MATRIX_DISPLAY_LIMIT = 8
+# O mesmo limite do terminal (main.MAXIMO_PARA_MOSTRAR_MATRIZES), nas duas
+# dimensões: equipamentos e vulnerabilidades.
+MATRIX_DISPLAY_LIMIT = 12
 SORT_KEYS = {
     "efetivo": lambda row: (-row["efetivo"], row["equipamento"].id),
     "proprio": lambda row: (-row["proprio"], row["equipamento"].id),
@@ -114,7 +116,8 @@ def risk_analysis(repository, order="efetivo"):
         "plan": plan,
         "cycles": dependency_cycles(inventory),
         "matrices": matrices(model)
-        if len(model.equipamentos) <= MATRIX_DISPLAY_LIMIT
+        if max(len(model.equipamentos), len(model.vulnerabilidades))
+        <= MATRIX_DISPLAY_LIMIT
         else None,
     }
 

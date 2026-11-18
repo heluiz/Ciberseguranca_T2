@@ -638,14 +638,40 @@ PostgreSQL. Telas:
 | Tela | O que faz |
 | --- | --- |
 | Visão geral | Indicadores clicáveis, diagnóstico do sistema linear, ranking de risco e as correções prioritárias |
-| Análise de risco | Verifica se I − A é invertível antes de resolver, mostra as matrizes (inventários pequenos), o risco próprio e o efetivo de todos os equipamentos (com filtro e ordenação), o plano de correção completo e os ciclos de dependência. Tem dois cenários de demonstração: o de 3 equipamentos, conferível à mão, e o singular |
+| Análise de risco | Verifica se I − A é invertível antes de resolver, mostra as matrizes (até 12 equipamentos e 12 vulnerabilidades, como no terminal), o risco próprio e o efetivo de todos os equipamentos (com filtro e ordenação), o plano de correção completo e os ciclos de dependência. Cada correção do plano abre a explicação de por que ela reduz o risco e do que fazer, segundo a CISA. Tem dois cenários de demonstração: o de 3 equipamentos, conferível à mão, e o singular |
 | Mapa de dependências | Grafo dos ativos, com busca, zoom, foco, simulação de correção e a origem do risco herdado |
 | Inventário, Vulnerabilidades, Tratamentos, Dependências | Cadastro, busca, filtros, edição e exclusão com confirmação; histórico de cada tratamento |
-| Ficha do ativo | Dados, vulnerabilidades, de onde herda risco e quem é alcançado a partir dele (busca em largura), com atalhos para editar, vincular falhas e criar dependências |
+| Ficha do ativo | Dados, risco passo a passo (b = fator × M v, herdado e efetivo), vulnerabilidades, CVEs da base sugeridas pela ficha técnica, árvore de dependências nos dois sentidos (com remoção de ligação), de onde herda risco e quem é alcançado a partir dele (busca em largura) |
 | Relatórios por setor | Agregações calculadas no banco (contagem, média e máximo por lotação) |
-| Catálogo CISA KEV | Consulta às CVEs exploradas em ataques, sem internet, com cadastro no catálogo em um clique |
+| Catálogo CISA KEV | Consulta às CVEs exploradas em ataques, sem internet: busca por palavras com paginação, navegação fabricante → produto → CVEs e a página de cada CVE com a explicação em português (vetor em frases, CWE com nome, SSVC, ação da CISA traduzida, boletins), os ativos que a têm e os ativos cuja ficha combina; cadastro no catálogo em um clique |
+| Busca por CVE ou CWE | Onde aparece uma CVE ou um CWE no inventário, da falha mais grave para a menos grave |
+| Calculadora CVSS | As perguntas das métricas base do CVSS 4.0 e 3.1 em português, ou um vetor colado, com a nota oficial e o atalho para cadastrar |
 | Auditoria | Entradas, alterações, exclusões e acessos negados, e o histórico dos tratamentos em CSV |
-| Importação e exportação | Validação e importação do JSON do programa de terminal; exportação no mesmo formato |
+| Importação e exportação | Validação e importação do JSON do programa de terminal, inclusive o do Trabalho 1 (convertido como no terminal); exportação no mesmo formato |
+
+No cadastro de vulnerabilidade, a nota pode ficar em branco quando há um vetor
+(a nota é a que ele dá) ou uma CVE da base de CVEs exploradas (descrição, CWE,
+vetor e nota vêm da base, como o terminal oferece). A API continua exigindo a
+nota, como diz o contrato.
+
+### Cada opção do terminal na web
+
+| Opção do terminal | Onde está na web |
+| --- | --- |
+| 1, 2, 4 e 5 — cadastrar, listar, atualizar e excluir equipamento | Inventário (a exclusão mostra o que sai junto) |
+| 3 — buscar por ID, hostname, responsável, lotação, tipo, ficha | Busca e filtro de tipo do Inventário |
+| 3, item 7 — onde aparece uma CVE ou um CWE | Busca por CVE ou CWE; links nos CVEs e CWEs da lista de vulnerabilidades |
+| 6 a 9 — vulnerabilidades de um equipamento | Ficha do ativo, Vulnerabilidades e Tratamentos |
+| 10 — pendentes, da mais grave | Tratamentos, filtro "Não corrigidas" e gravidade; o sino do topo |
+| 11 e 12 — dependências e a árvore | Dependências; árvore nos dois sentidos, com remoção, na ficha do ativo |
+| 13 — risco de todos | Análise de risco |
+| 14 — risco de um, passo a passo | Ficha do ativo, "Como o risco deste ativo foi calculado" |
+| 15 — matrizes e verificação de I − A | Análise de risco |
+| 16 — base de CVEs: busca, navegação e sugestões | Catálogo CISA KEV e sugestões na ficha do ativo |
+| 16, item 4 — atualizar a base pela internet | Só no terminal: a versão web roda sem acesso à internet |
+| 17 — plano de correção | Análise de risco, "Por que e como corrigir" em cada linha |
+| Abrir um arquivo do Trabalho 1 | Importação e exportação |
+| Nota CVSS pelas perguntas ou pelo vetor | Calculadora CVSS e cadastro de vulnerabilidade |
 
 Documentação da versão web:
 

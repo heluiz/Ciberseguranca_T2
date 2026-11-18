@@ -1,0 +1,30 @@
+{# Uma árvore de references.tree_rows (arvore.montar achatada), com recuo por nível. #}
+<details class="tree-block" {% if tree.total <= 15 %}open{% endif %}>
+  <summary><strong>{{ title }}</strong> <small class="inline-small">{{ tree.total }} ativo(s)</small></summary>
+  <ul class="dependency-tree">
+    <li class="tree-root"><strong>{{ asset.hostname }}</strong></li>
+    {% for row in tree.rows %}
+      <li class="tree-depth-{% if row.depth > 6 %}7{% else %}{{ row.depth|add:1 }}{% endif %}">
+        <span class="tree-branch" aria-hidden="true">└─</span>
+        <span class="badge">{% widthratio row.fracao 1 100 %}%</span>
+        {% if row.ciclo %}<span title="Os dois dependem um do outro">↻</span>{% endif %}
+        {% for e in row.equipamentos %}
+          <a href="{% url 'asset_detail' e.id %}">{{ e.hostname }}</a>{% if not forloop.last %}, {% endif %}
+        {% endfor %}
+        {% if row.equipamentos|length > 1 %}<small class="inline-small">({{ row.equipamentos|length }} com as mesmas ligações)</small>{% endif %}
+        <small>
+          {% if up %}herda {{ row.fracao|floatformat:2 }} do risco de {{ row.pai.hostname }}{% else %}{{ row.pai.hostname }} herda {{ row.fracao|floatformat:2 }} do risco dele{% endif %}
+          {% for other in row.outras %}
+            · {% if up %}herda também {{ other.fracao|floatformat:2 }} de {{ other.equipamento.hostname }}{% else %}{{ other.equipamento.hostname }} também herda {{ other.fracao|floatformat:2 }} dele{% endif %}{% if other.ciclo %} ↻{% endif %}
+          {% endfor %}
+          {% if row.fora %}· {{ row.fora }} ligação(ões) abaixo aparecem em outro ramo{% endif %}
+          {% if row.remover and can_delete_dependency %}
+            · <a href="{% url 'delete' 'dependency' row.remover %}?voltar={{ request.path|urlencode }}">remover esta ligação</a>
+          {% endif %}
+        </small>
+      </li>
+    {% empty %}
+      <li class="muted">{{ empty }}</li>
+    {% endfor %}
+  </ul>
+</details>

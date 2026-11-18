@@ -20,7 +20,7 @@
         <input id="q"
                name="q"
                value="{{ query }}"
-               placeholder="{% if kind == 'asset' %}Hostname, custodiante, lotação, patrimônio, ficha técnica ou ID{% elif kind == 'vulnerability' %}CVE, CWE ou descrição{% elif kind == 'finding' %}Ativo, lotação, CVE ou descrição{% else %}Hostname de origem ou destino{% endif %}">
+               placeholder="{% if kind == 'asset' %}Hostname, custodiante, lotação, patrimônio, ficha técnica ou ID{% elif kind == 'vulnerability' %}CVE, CWE ou descrição{% elif kind == 'finding' %}Ativo, lotação, CVE, CWE ou descrição{% else %}Hostname de origem ou destino{% endif %}">
       </div>
       {% if kind == "asset" %}
         <div class="filter-field">
@@ -86,7 +86,7 @@
               <td>{{ obj.patrimonio|default:'Sem patrimônio' }}</td>
             {% elif kind == "vulnerability" %}
               <td>
-                <strong>{{ obj.cve|default:'Falha interna' }}</strong><small>{{ obj.cwe|default:'Sem CWE' }}</small>
+                <strong>{% if obj.cve %}<a href="{% url 'occurrences' %}?ref={{ obj.cve }}" title="Onde esta CVE aparece">{{ obj.cve }}</a>{% else %}Falha interna{% endif %}</strong><small>{% if obj.cwe %}<a href="{% url 'occurrences' %}?ref={{ obj.cwe }}" title="Todas as falhas deste tipo no inventário">{{ obj.cwe }}</a>{% else %}Sem CWE{% endif %}</small>
               </td>
               <td>
                 {{ obj.descricao }}<small>{{ obj.get_origem_display }}</small>
@@ -109,7 +109,7 @@
               {% if kind == "finding" %}<a href="{% url 'finding_history' obj.pk %}">Histórico</a>{% endif %}
               {% if kind == "vulnerability" %}
                 <a href="{% url 'collection' 'finding' %}?vulnerability={{ obj.pk }}">Ativos afetados</a>
-                {% if obj.cve %}<a href="https://nvd.nist.gov/vuln/detail/{{ obj.cve }}" target="_blank" rel="noopener noreferrer">NVD ↗</a>{% endif %}
+                {% if obj.cve %}<a href="{% url 'cve_detail' obj.cve %}">Explicação</a><a href="https://nvd.nist.gov/vuln/detail/{{ obj.cve }}" target="_blank" rel="noopener noreferrer">NVD ↗</a>{% endif %}
               {% endif %}
               {% if kind == "asset" %}<a href="{% url 'asset_detail' obj.pk %}">Ficha</a>{% endif %}
               {% if can_change %}<a href="{% url 'edit' kind obj.pk %}">Editar</a>{% endif %}

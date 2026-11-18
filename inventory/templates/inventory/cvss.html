@@ -1,0 +1,70 @@
+{% extends "inventory/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow cyan">REFERÊNCIAS / CVSS</p>
+      <h1>Calculadora CVSS<span class="cyan">.</span></h1>
+      <p class="muted">
+        As perguntas das métricas base do FIRST, em português, para quem não tem a nota pronta. A nota sai da fórmula oficial
+        (biblioteca cvss); o contexto do ativo entra depois, no modelo de risco.
+      </p>
+    </div>
+    <a class="button" href="{% url 'cve' %}">Base de CVEs</a>
+  </div>
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">JÁ TEM O VETOR?</p>
+        <h2>Conferir um vetor</h2>
+      </div>
+    </div>
+    <form class="search-form" method="get">
+      <label for="vetor">Vetor CVSS 4.0, 3.1 ou 3.0 (a calculadora do FIRST mostra o vetor pronto)</label>
+      <div class="inline">
+        <input id="vetor" name="vetor" value="{{ pasted }}" maxlength="256" placeholder="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H">
+        <button class="button">Calcular a nota</button>
+      </div>
+    </form>
+    {% if pasted_error %}<p class="notice error" role="alert">{{ pasted_error }}.</p>{% endif %}
+    {% if pasted_result %}
+      {% include "inventory/cvss_result.html" with r=pasted_result %}
+    {% endif %}
+  </section>
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">SEM O VETOR · {{ answered }} DE {{ questions|length }} PERGUNTAS RESPONDIDAS</p>
+        <h2>Responder às perguntas</h2>
+      </div>
+      <nav class="scenario-tabs" aria-label="Versão do CVSS">
+        {% for v in versions %}
+          <a href="?versao={{ v }}" {% if v == version %}aria-current="page"{% endif %}>CVSS {{ v }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+    {% if version == "4.0" %}
+      <p class="muted">Prefira a 4.0, a versão atual do FIRST; use a 3.1 para comparar com uma nota já publicada nessa versão.</p>
+    {% endif %}
+    <form method="get" class="cvss-form">
+      <input type="hidden" name="versao" value="{{ version }}">
+      {% for q in questions %}
+        <fieldset class="cvss-question">
+          <legend><strong>{{ q.metrica.nome }}</strong> ({{ q.metrica.codigo }}) — {{ q.metrica.pergunta }}</legend>
+          {% for option in q.metrica.opcoes %}
+            <label class="cvss-option">
+              <input type="radio" name="{{ q.metrica.codigo }}" value="{{ option.codigo }}" {% if q.escolha == option.codigo %}checked{% endif %} required>
+              <span><strong>{{ option.nome }}</strong> <small>{{ option.explicacao }}</small></span>
+            </label>
+          {% endfor %}
+        </fieldset>
+      {% endfor %}
+      <div class="form-actions">
+        <button class="button primary">Calcular a nota</button>
+        <a class="button" href="?versao={{ version }}">Limpar respostas</a>
+      </div>
+    </form>
+    {% if result %}
+      {% include "inventory/cvss_result.html" with r=result %}
+    {% endif %}
+  </section>
+{% endblock %}

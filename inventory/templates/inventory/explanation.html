@@ -1,0 +1,48 @@
+{# Explicação em português de um vetor, do SSVC e da ação da CISA (explicacao_cve.py). #}
+{% if e.sentences or e.ssvc %}
+  <h3>Em português <small class="inline-small">(montado a partir dos dados)</small></h3>
+  <dl class="explain-list">
+    {% for label, sentence in e.sentences %}
+      <div>
+        <dt>{{ label }}</dt>
+        <dd>{{ sentence }}</dd>
+      </div>
+    {% endfor %}
+    {% if e.ssvc %}
+      <div>
+        <dt>Avaliação da CISA (SSVC)</dt>
+        <dd>{{ e.ssvc }}.</dd>
+      </div>
+    {% endif %}
+  </dl>
+  {% if e.ssvc_legend %}<p class="muted">{{ e.ssvc_legend }}</p>{% endif %}
+{% endif %}
+{% if e.cwes %}
+  <h3>Tipo de falha (CWE)</h3>
+  <ul class="plain-list">
+    {% for cwe in e.cwes %}<li>{{ cwe }}</li>{% endfor %}
+  </ul>
+{% endif %}
+{% if e.action or e.bulletins or e.nvd %}
+  <h3>O que fazer, segundo a CISA</h3>
+  {% if e.action %}
+    <p>{{ e.action }}</p>
+    {% if not e.action_translated %}<p class="muted">(texto da CISA, em inglês: ele não está na tabela de traduções)</p>{% endif %}
+  {% endif %}
+  {% if e.bulletins %}
+    <p class="muted">Boletins e orientações indicados pela CISA:</p>
+    <ul class="plain-list">
+      {% for link in e.bulletins %}
+        <li><a href="{{ link }}" rel="noopener noreferrer" target="_blank">{{ link }} ↗</a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% if e.nvd %}
+    <p class="muted">Na NVD (referências e versões afetadas):</p>
+    <ul class="plain-list">
+      {% for link in e.nvd %}
+        <li><a href="{{ link }}" rel="noopener noreferrer" target="_blank">{{ link }} ↗</a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endif %}

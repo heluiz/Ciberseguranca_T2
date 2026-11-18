@@ -1,0 +1,60 @@
+{% extends "inventory/base.html" %}
+{% block content %}
+  {% with d=detail item=detail.item %}
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow cyan">PLANO DE CORREÇÃO · {{ numero }} DE {{ quantidade }}</p>
+        <h1>Correção {{ numero }}<span class="cyan">.</span></h1>
+        <p>{{ item.vulnerabilidade.descricao }}</p>
+      </div>
+      <div class="inline">
+        <a class="button" href="{% url 'risk_analysis' %}{% if scenario %}?cenario={{ scenario }}{% endif %}#plano">← Plano de correção</a>
+        {% if not scenario %}
+          <a class="button primary" href="{% url 'collection' 'finding' %}?asset={{ item.equipamento.id }}">Abrir tratamentos do ativo</a>
+        {% endif %}
+      </div>
+    </div>
+    {% if scenario %}<p class="notice">Cenário de demonstração, somente leitura: nada é gravado no inventário.</p>{% endif %}
+    <section class="panel">
+      <dl class="diagnostic-list">
+        <div>
+          <dt>Equipamento</dt>
+          <dd>{% if scenario %}{{ item.equipamento.hostname }}{% else %}<a href="{% url 'asset_detail' item.equipamento.id %}">{{ item.equipamento.hostname }}</a>{% endif %} <small>{{ item.equipamento.tipo.rotulo }}</small></dd>
+        </div>
+        <div>
+          <dt>Situação</dt>
+          <dd>{{ d.situacao.rotulo }}</dd>
+        </div>
+        <div>
+          <dt>Nota CVSS</dt>
+          <dd>{{ item.vulnerabilidade.cvss|floatformat:1 }} ({{ item.vulnerabilidade.gravidade.rotulo }})</dd>
+        </div>
+        {% if item.vulnerabilidade.cve %}
+          <div>
+            <dt>CVE</dt>
+            <dd>{% if d.registro %}<a href="{% url 'cve_detail' item.vulnerabilidade.cve %}">{{ item.vulnerabilidade.cve }}</a>{% else %}{{ item.vulnerabilidade.cve }}{% endif %}</dd>
+          </div>
+        {% endif %}
+      </dl>
+      <h2>Por que esta correção vem aqui</h2>
+      <p>
+        Reduz o risco total em <strong class="cyan">{{ item.reducao|floatformat:2 }}</strong>
+        ({{ d.percentual|floatformat:1 }}% de {{ d.total|floatformat:2 }}). O risco próprio de {{ item.equipamento.hostname }} cai
+        {{ item.fator|floatformat:1 }} × {{ item.vulnerabilidade.cvss|floatformat:1 }} = {{ d.queda_propria|floatformat:2 }}, e cada ponto
+        de risco próprio nele pesa {{ item.peso|floatformat:2 }} no risco total, {{ d.motivo }}.
+      </p>
+      {% if d.herdeiros %}
+        <details class="tree-block" {% if d.herdeiros|length <= 10 %}open{% endif %}>
+          <summary>Quem herda risco dele ({{ d.herdeiros|length }})</summary>
+          <p class="muted">
+            {% for other in d.herdeiros %}
+              {% if scenario %}{{ other.hostname }}{% else %}<a href="{% url 'asset_detail' other.id %}">{{ other.hostname }}</a>{% endif %}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+          </p>
+        </details>
+      {% endif %}
+      {% include "inventory/explanation.html" with e=d.explicacao %}
+      {% if d.aviso %}<p class="muted">{{ d.aviso }}</p>{% endif %}
+    </section>
+  {% endwith %}
+{% endblock %}

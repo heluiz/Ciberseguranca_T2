@@ -5,7 +5,7 @@ from django.contrib.auth.views import (
     PasswordChangeDoneView,
 )
 from django.urls import path, re_path
-from inventory import api_v1, views
+from inventory import api_v1, reference_views, views
 
 urlpatterns = [
     path(
@@ -52,7 +52,13 @@ urlpatterns = [
     path("auditoria/", views.audit_log, name="audit"),
     path("dados/", views.transfer, name="transfer"),
     path("dados/exportar/", views.export, name="export"),
-    path("cve/", views.cve_search, name="cve"),
+    path("cve/", reference_views.cve_search, name="cve"),
+    path("cve/<str:cve>/", reference_views.cve_detail, name="cve_detail"),
+    path("ocorrencias/", reference_views.occurrences, name="occurrences"),
+    path("cvss/", reference_views.cvss_calculator, name="cvss"),
+    path(
+        "analise/correcao/", reference_views.correction, name="correction"
+    ),
     # API pública versionada (cards S5_03, S5_04 e S5_09). Antes das rotas
     # sem versão, que as telas usam com a sessão do navegador.
     path("api/v1/", api_v1.index, name="api_v1"),

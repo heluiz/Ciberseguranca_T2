@@ -11,6 +11,7 @@
   <section class="panel form-panel">
     <h2>Importação inicial do JSON legado</h2>
     <p class="muted">A base deve estar vazia. O arquivo original é preservado. IDs, referências e risco total serão conferidos antes de concluir.</p>
+    <p class="muted">Aceita o JSON deste trabalho (uma lista de equipamentos) e o do Trabalho 1 (objeto com ativos e falhas): o arquivo antigo é convertido como no terminal, falhas iguais viram uma vulnerabilidade do catálogo e a gravidade vira uma nota CVSS da mesma faixa.</p>
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}<label for="file">Arquivo JSON (até 2 MB e 1000 ativos)</label><input id="file"
                                                                                             type="file"

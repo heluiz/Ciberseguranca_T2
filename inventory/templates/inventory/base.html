@@ -88,6 +88,8 @@
           {% if perms.inventory.view_vulnerability %}
             {% include "inventory/nav_link.html" with url="/relatorios/" icon="file" label="Relatórios por setor" %}
             {% include "inventory/nav_link.html" with url="/cve/" icon="search" label="Catálogo CISA KEV" %}
+            {% include "inventory/nav_link.html" with url="/ocorrencias/" icon="search" label="Busca por CVE ou CWE" %}
+            {% include "inventory/nav_link.html" with url="/cvss/" icon="chart" label="Calculadora CVSS" %}
           {% endif %}
           {% if perms.inventory.view_auditevent %}
             {% include "inventory/nav_link.html" with url="/auditoria/" icon="shield" label="Auditoria" %}

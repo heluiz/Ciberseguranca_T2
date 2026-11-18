@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 from django.utils import timezone
 from .models import Asset, Vulnerability, Finding, Dependency
@@ -61,6 +63,99 @@ class VulnerabilityForm(VersionForm):
             "version",
         ]
         labels = {"descricao": "Descrição", "vetor": "Vetor CVSS (opcional)"}
+
+
+class VulnerabilityWebForm(VulnerabilityForm):
+    """O cadastro da tela web, com as ajudas do cadastro do terminal.
+
+    - CVE que está na base de CVEs exploradas preenche o que ficou em branco
+      (descrição, CWE, vetor e nota), como o terminal oferece;
+    - com vetor e sem nota, a nota é a que o vetor dá; com os dois, eles
+      precisam concordar (a mesma regra de vulnerabilidades.conferir_vetor).
+
+    A API continua com VulnerabilityForm: o contrato publicado exige a nota.
+    """
+
+    cvss = forms.DecimalField(
+        required=False,
+        max_digits=3,
+        decimal_places=1,
+        min_value=Decimal("0.1"),
+        max_value=Decimal("10.0"),
+        label="Nota CVSS",
+        help_text="Pode ficar em branco com um vetor ou com uma CVE da base de CVEs exploradas.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["descricao"].required = False
+        self.fields["vetor"].help_text = (
+            "Cole o vetor do boletim ou monte-o em Calculadora CVSS, no menu."
+        )
+        self.filled_from_base = []
+
+    def _fill_from_base(self, data):
+        from vulnerabilidades import validar_cve
+
+        from .references import cve_base
+
+        try:
+            cve = validar_cve(data.get("cve") or "")
+        except ValueError:
+            return
+        record = cve_base()[0].buscar_cve(cve)
+        if record is None:
+            return
+        if not data.get("descricao"):
+            data["descricao"] = record.nome
+            self.filled_from_base.append("descrição")
+        if not data.get("cwe") and record.cwes:
+            data["cwe"] = record.cwes[0]
+            self.filled_from_base.append("CWE")
+        if data.get("cvss") is None and not data.get("vetor"):
+            if record.vetor:
+                data["vetor"] = record.vetor
+                self.filled_from_base.append("vetor")
+            elif record.cvss is not None:
+                data["cvss"] = Decimal(str(record.cvss))
+                self.filled_from_base.append("nota")
+
+    def clean(self):
+        from calculadora_cvss import analisar_vetor
+        from formatacao import numero_br
+
+        data = super().clean()
+        if data.get("cve") and not self.instance.pk:
+            self._fill_from_base(data)
+        vetor = data.get("vetor")
+        if vetor and "vetor" not in self.errors:
+            try:
+                vetor, nota = analisar_vetor(vetor)
+            except ValueError as error:
+                self.add_error("vetor", str(error))
+            else:
+                data["vetor"] = vetor
+                if not nota:
+                    self.add_error(
+                        "vetor",
+                        "O vetor dá nota 0,0 (nenhum impacto): não há vulnerabilidade a cadastrar.",
+                    )
+                elif data.get("cvss") is None:
+                    data["cvss"] = Decimal(str(nota))
+                elif float(data["cvss"]) != nota:
+                    self.add_error(
+                        "cvss",
+                        f"A nota {numero_br(float(data['cvss']))} não confere com o vetor CVSS, "
+                        f"que dá {numero_br(nota)}. Deixe a nota em branco para usar a do vetor.",
+                    )
+        if data.get("cvss") is None and "cvss" not in self.errors and "vetor" not in self.errors:
+            self.add_error(
+                "cvss",
+                "Informe a nota CVSS, um vetor ou uma CVE da base de CVEs exploradas.",
+            )
+        if not data.get("descricao") and "descricao" not in self.errors:
+            self.add_error("descricao", "Informe a descrição.")
+        return data
 
 
 class FindingForm(VersionForm):
@@ -151,3 +246,7 @@ FORMS = {
     "finding": FindingForm,
     "dependency": DependencyForm,
 }
+
+
+# O cadastro pelas telas HTML usa as ajudas do terminal; a API, o contrato.
+WEB_FORMS = {**FORMS, "vulnerability": VulnerabilityWebForm}
