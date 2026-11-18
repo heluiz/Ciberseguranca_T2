@@ -545,7 +545,8 @@ class Inventario:
         equipamentos que existem. Levanta ValueError no primeiro
         problema.
         """
-        hostnames, patrimonios = {}, {}
+        hostnames: dict[str, int] = {}
+        patrimonios: dict[str, int] = {}
         for equipamento in self._equipamentos.values():
             chave = equipamento.hostname.lower()
             if chave in hostnames:
@@ -566,7 +567,7 @@ class Inventario:
 
         # Uma CVE identifica uma falha só: duas vulnerabilidades do
         # catálogo com a mesma CVE seriam uma, cadastrada duas vezes.
-        donos = {}
+        donos: dict[str, int] = {}
         for vulnerabilidade in self.vulnerabilidades():
             if vulnerabilidade.cve is None:
                 continue

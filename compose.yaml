@@ -1,13 +1,18 @@
-# Alternativa ao "docker run": docker compose up -d --build
-# Depois, para usar o menu: docker attach inventario
+# Menu de terminal do Trabalho 2, no seu computador:
+#   docker compose up -d --build
+# Depois, para usar o menu: docker attach trab02_2026_2_12621cbs200_terminal
 # (para sair sem parar o programa: Ctrl+P e depois Ctrl+Q)
+# Nomes no padrão da disciplina (card S5_20): trab02_2026_2_MATRICULA. Sem
+# porta publicada: o programa só é usado pelo terminal. No servidor, use
+# compose.servidor.yaml, que sobe este mesmo menu junto com a versão web.
+name: trab02_2026_2_12621cbs200
 services:
-  inventario:
+  terminal:
     build: .
-    image: inventario:1.0
+    image: trab02_2026_2_12621cbs200_terminal:1.0
     # A imagem é construída aqui: não tentar baixá-la do Docker Hub antes.
     pull_policy: build
-    container_name: inventario
+    container_name: trab02_2026_2_12621cbs200_terminal
     # O processo principal é um menu: precisa de entrada aberta (-i) e de
     # terminal (-t), senão input() recebe fim de entrada e o programa
     # termina na hora.
@@ -20,14 +25,16 @@ services:
     # container é só leitura, menos o volume de dados, e nenhum
     # processo pode ganhar privilégio além do que já tem.
     read_only: true
+    cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 50
     # Os dados sobrevivem ao container: ficam neste volume.
     volumes:
-      - inventario-dados:/app/dados
+      - terminal-data:/app/dados
 
 volumes:
-  inventario-dados:
-    # Nome fixo: sem ele, o Compose chamaria o volume de
-    # "<pasta>_inventario-dados", diferente do usado com "docker run".
-    name: inventario-dados
+  terminal-data:
+    # Nome fixo, o mesmo usado com "docker run" e no servidor.
+    name: trab02_2026_2_12621cbs200_terminal_data

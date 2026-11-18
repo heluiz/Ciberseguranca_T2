@@ -1,0 +1,14 @@
+# Configuração do bandit (análise estática de segurança, card S5_14):
+#   bandit -c .bandit.yaml -r .
+# B101 (assert) fica de fora: os asserts estão nos autotestes dos
+# módulos (bloco if __name__ == "__main__") e nos testes, nunca no
+# caminho que o usuário usa. Cada # nosec do código diz por quê.
+exclude_dirs:
+  - .venv
+  - tests_web
+  - staticfiles
+  - node_modules
+  - migracoes_sql/versions
+  - testes.py
+skips:
+  - B101

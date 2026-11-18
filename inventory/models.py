@@ -198,12 +198,14 @@ AUDIT_NOUNS = {
     "auditevent": "auditoria",
     "findinghistory": "histórico de tratamentos",
     "importreceipt": "importação",
+    "apikey": "chave de API",
 }
 AUDIT_FIXED = {
     "login": "Entrada no sistema",
     "logout": "Saída do sistema",
     "login_failed": "Tentativa de entrada recusada",
     "import": "Importação do inventário (JSON)",
+    "token": "Emissão de token da API",  # nosec B105
 }
 
 
@@ -233,7 +235,7 @@ class AuditEvent(models.Model):
     @property
     def alvo(self):
         """Registro afetado, quando a ação se refere a um."""
-        if self.action in ("login", "logout", "login_failed", "denied"):
+        if self.action in ("login", "logout", "login_failed", "denied", "token"):
             return "—"
         if self.action == "import":
             return f"arquivo {self.target[:12]}…"
@@ -249,3 +251,31 @@ class ImportReceipt(models.Model):
     digest = models.CharField(max_length=64, unique=True)
     imported_at = models.DateTimeField(auto_now_add=True)
     assets = models.PositiveIntegerField()
+
+
+class ApiKey(models.Model):
+    """Chave de API de uma conta (card S5_09).
+
+    A chave tem 256 bits aleatórios (módulo secrets) e só aparece uma vez,
+    ao ser criada. O banco guarda o SHA-256 dela: para um segredo aleatório
+    desse tamanho, um hash rápido basta (não há dicionário a atacar), ao
+    contrário das senhas, que usam Argon2. O prefixo identifica a chave em
+    listas e na revogação sem revelar o segredo.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="api_keys"
+    )
+    name = models.CharField(max_length=80)
+    prefix = models.CharField(max_length=12, unique=True)
+    key_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        situacao = "revogada" if self.revoked_at else "ativa"
+        return f"{self.prefix}… ({self.name}, {situacao})"

@@ -1,6 +1,6 @@
 # Inventário de equipamentos e vulnerabilidades - imagem do Trabalho 2.
 #
-# Construir:  docker build -t inventario:1.0 .
+# Construir:  docker build -t trab02_2026_2_12621cbs200_terminal:1.0 .
 # Executar:   veja o README (docker run -dit ... ou docker compose up -d)
 
 # Imagem oficial do Python 3.14 (em manutenção completa até 2027) sobre
@@ -27,7 +27,11 @@ ENV PYTHONUNBUFFERED=1 \
 # processo que escapasse do container não teria a identidade de
 # ninguém. --no-log-init vem do exemplo da documentação do Docker; com
 # UID alto, evita criar um arquivo de log enorme.
-RUN groupadd --gid 10001 inventario \
+# apt-get upgrade: as correções de segurança do Debian publicadas depois
+# da imagem base (a varredura do Trivy achou a do zlib, card S5_15).
+RUN apt-get update && apt-get -y upgrade \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 inventario \
     && useradd --uid 10001 --gid 10001 --no-log-init \
        --shell /usr/sbin/nologin inventario
 
@@ -36,7 +40,12 @@ WORKDIR /app
 # As dependências vêm antes do código: enquanto o requirements.txt não
 # muda, o Docker reaproveita esta camada e o build não baixa tudo de novo.
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Depois de instalar, o pip sai da imagem: o programa não o usa, e as
+# bibliotecas que ele embute (urllib3, msgpack) tinham CVE altas na
+# varredura. Sem pip e sem ensurepip, também não se instala nada lá dentro.
+RUN pip install --no-cache-dir -r requirements.txt \
+    && python -m pip uninstall -y pip \
+    && rm -rf /usr/local/lib/python3.*/ensurepip
 
 COPY . .
 
@@ -49,7 +58,7 @@ USER inventario
 
 # Saudável = o arquivo de dados (se existir) está legível e válido.
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-    CMD ["python", "-c", "from armazenamento import ArquivoInventario as A; A().carregar()"]
+    CMD ["python", "-c", "from armazenamento import abrir_repositorio as a; a().carregar()"]
 
 # O processo principal é o menu: o container vive enquanto ele esperar
 # o teclado. Por isso precisa de "-it" (veja o README).

@@ -1,16 +1,29 @@
-# SENTINEL web no servidor da disciplina (rede interna, sem domínio).
+# Trabalho 2 no servidor da disciplina (rede interna, sem domínio).
 #
 #   sh ops/servidor/subir.sh        cria o .env na primeira vez e sobe tudo
 #
+# Padrão de nomes da disciplina (card S5_20): identificador
+# trab02_2026_2_MATRICULA, em minúsculas, no diretório, no repositório, no
+# projeto Compose, nos containers, nas imagens e nos volumes. Porta externa
+# = 2000 + os três últimos dígitos da matrícula (12621CBS200 -> 2200).
+#
+#   container                              o que é                 porta
+#   trab02_2026_2_12621cbs200              aplicação web (Django)  2200 -> 8000
+#   trab02_2026_2_12621cbs200_db           PostgreSQL              nenhuma
+#   trab02_2026_2_12621cbs200_preparar     migrações (termina)     nenhuma
+#   trab02_2026_2_12621cbs200_monitor      disponibilidade (log)   nenhuma
+#   trab02_2026_2_12621cbs200_terminal     menu de terminal        nenhuma
+#
+# O menu de terminal não publica porta: ele só é usado com
+# "docker attach" (o card pede para não mapear porta nesse caso).
+#
 # Diferenças para compose.web.yaml (internet, com domínio e HTTPS):
-#   - atende por HTTP em uma única porta alta (SENTINEL_PORT, padrão 8080);
+#   - atende por HTTP na porta externa da matrícula (SENTINEL_PORT);
 #   - não usa proxy: a aplicação entrega os próprios arquivos estáticos;
 #   - a preparação (migrações, grupos, conta inicial, dados de exemplo)
 #     roda sozinha antes de a aplicação subir;
 #   - um container registra a disponibilidade a cada minuto.
-# Nome do projeto: primeiro nome e matrícula, como pede a disciplina. Os
-# containers ficam heluiz-12621cbs200-web-app-1, -db-1, -monitor-1 e -preparar-1.
-name: heluiz-12621cbs200-web
+name: trab02_2026_2_12621cbs200
 x-logging: &logging
   driver: json-file
   options:
@@ -31,6 +44,7 @@ x-app-env: &app-env
 services:
   db:
     image: postgres:17-bookworm
+    container_name: trab02_2026_2_12621cbs200_db
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sentinel}
       POSTGRES_USER: sentinel_owner
@@ -38,7 +52,7 @@ services:
       POSTGRES_APP_PASSWORD: ${POSTGRES_PASSWORD:?Defina a senha da aplicacao}
     volumes:
       # Os dados sobrevivem a reinícios e à recriação dos containers.
-      - postgres-data:/var/lib/postgresql/data
+      - db-data:/var/lib/postgresql/data
       - ./ops/init-db.sh:/docker-entrypoint-initdb.d/01-sentinel.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -47,12 +61,17 @@ services:
       retries: 10
     restart: unless-stopped
     security_opt: ["no-new-privileges:true"]
+    # Limites de recursos (card S5_15): um defeito não esgota o servidor
+    # compartilhado.
+    mem_limit: 512m
+    pids_limit: 200
     logging: *logging
   # Executa uma vez a cada "up" e termina. Usa o proprietário do banco,
   # o único papel que pode criar e alterar tabelas.
   preparar:
     build: *build
-    image: sentinel-web:servidor
+    image: trab02_2026_2_12621cbs200:1.0
+    container_name: trab02_2026_2_12621cbs200_preparar
     environment:
       <<: *app-env
       POSTGRES_USER: sentinel_owner
@@ -68,11 +87,14 @@ services:
     tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    pids_limit: 100
     restart: "no"
     logging: *logging
   app:
     build: *build
-    image: sentinel-web:servidor
+    image: trab02_2026_2_12621cbs200:1.0
+    container_name: trab02_2026_2_12621cbs200
     environment:
       <<: *app-env
       # Papel de execução: lê e grava dados, não altera o esquema.
@@ -84,17 +106,21 @@ services:
       preparar:
         condition: service_completed_successfully
     ports:
-      - "${SENTINEL_PORT:-8080}:8000"
+      # PORTA_EXTERNA:PORTA_INTERNA = 2000 + 200 (matrícula 12621CBS200) : Gunicorn.
+      - "${SENTINEL_PORT:-2200}:8000"
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    pids_limit: 200
     # Religa após falha ou reinício do servidor, salvo parada manual.
     restart: unless-stopped
     logging: *logging
   monitor:
     build: *build
-    image: sentinel-web:servidor
+    image: trab02_2026_2_12621cbs200:1.0
+    container_name: trab02_2026_2_12621cbs200_monitor
     command: ["python", "ops/monitor.py", "http://app:8000/health/", "60"]
     depends_on:
       app:
@@ -102,7 +128,32 @@ services:
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    pids_limit: 50
+    restart: unless-stopped
+    logging: *logging
+  # O programa de terminal do Trabalho 2 (as mesmas classes da web), sem
+  # porta: abre-se com "docker attach trab02_2026_2_12621cbs200_terminal".
+  terminal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trab02_2026_2_12621cbs200_terminal:1.0
+    container_name: trab02_2026_2_12621cbs200_terminal
+    # O processo principal é um menu: precisa de entrada aberta e terminal.
+    stdin_open: true
+    tty: true
+    volumes:
+      - terminal-data:/app/dados
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    pids_limit: 50
     restart: unless-stopped
     logging: *logging
 volumes:
-  postgres-data:
+  db-data:
+    name: trab02_2026_2_12621cbs200_db_data
+  terminal-data:
+    name: trab02_2026_2_12621cbs200_terminal_data

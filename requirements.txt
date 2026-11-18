@@ -9,3 +9,8 @@ numpy>=1.26,<3
 # mesmo vetor tem de dar sempre a mesma nota. Não depende de nenhum
 # outro pacote.
 cvss==3.6
+# SQLAlchemy e Alembic: o repositório em banco relacional
+# (repositorio_sql.py e migracoes_sql/), usado só quando a variável
+# INVENTARIO_BANCO estiver definida; sem ela, o programa fica no JSON.
+SQLAlchemy==2.1.9
+alembic==1.20.1

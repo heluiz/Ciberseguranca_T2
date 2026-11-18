@@ -185,7 +185,7 @@ def merge_sort(items, key=lambda x: x):
 def quick_sort(items, key=lambda x: x, rng=None):
     """Lomuto com pivô aleatório; média O(n log n), pior O(n²), instável."""
     values = list(items)
-    rng = rng or random.Random()
+    rng = rng or random.Random()  # nosec B311
     stack = [(0, len(values) - 1)]
     while stack:
         low, high = stack.pop()

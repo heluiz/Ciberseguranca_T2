@@ -2,7 +2,7 @@
   "info": {
     "name": "SENTINEL · API REST (testes automáticos)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Ciclo completo da API: entra com usuário e senha, cria, consulta, altera (PUT e PATCH), testa os casos de erro e apaga o que criou.\n\nAntes de executar, defina as variáveis username e password (conta com grupo Analista ou superior) e, se preciso, base_url. A API usa a sessão do login e o token CSRF, que a coleção obtém sozinha."
+    "description": "Ciclo completo da API: entra com usuário e senha, cria, consulta, altera (PUT e PATCH), testa os casos de erro e apaga o que criou.\n\nAntes de executar, defina as variáveis username e password (conta com grupo Analista ou superior) e, se preciso, base_url. A API usa a sessão do login e o token CSRF, que a coleção obtém sozinha.\n\nA pasta 5 testa a API v1 (/api/v1): token JWT, Problem Details (RFC 9457), paginação e ordenação por risco, 201 com Location, ETag/If-Match (428 e 409), recursos aninhados e 405."
   },
   "variable": [
     {
@@ -43,6 +43,18 @@
     },
     {
       "key": "dependency",
+      "value": ""
+    },
+    {
+      "key": "jwt",
+      "value": ""
+    },
+    {
+      "key": "v1_asset",
+      "value": ""
+    },
+    {
+      "key": "v1_vuln",
       "value": ""
     }
   ],
@@ -1023,6 +1035,731 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 · API v1 (JWT, Problem Details, versões)",
+      "description": "API versionada (/api/v1), sem sessão nem CSRF: entra com POST /api/v1/auth/token e manda o JWT no cabeçalho Authorization. Use uma conta do grupo Analista (o administrador exige o código do segundo fator no campo otp).",
+      "item": [
+        {
+          "name": "Contrato OpenAPI é público",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/openapi.yaml",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('é OpenAPI 3.1', () => pm.expect(pm.response.text()).to.include('openapi: 3.1'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sem token: 401 com Problem Details",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/assets",
+            "header": []
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});",
+                  "pm.test('pede Bearer', () => pm.expect(pm.response.headers.get('WWW-Authenticate')).to.include('Bearer'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token com senha errada: 401",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"senha-errada-de-proposito\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token: 201 com JWT de 15 minutos",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/token",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const t = pm.response.json();",
+                  "pm.test('Bearer e expiração curta', () => { pm.expect(t.token_type).to.eql('Bearer'); pm.expect(t.expires_in).to.be.at.most(900); });",
+                  "pm.collectionVariables.set('jwt', t.access_token);",
+                  "if (!pm.collectionVariables.get('run')) pm.collectionVariables.set('run', Date.now().toString(36).toUpperCase());",
+                  "const carga = JSON.parse(atob(t.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));",
+                  "pm.test('carga legível e sem senha', () => { pm.expect(carga).to.include.keys('sub', 'exp', 'roles'); pm.expect(JSON.stringify(carga)).to.not.include(pm.variables.get('password')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token adulterado: 401",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/assets",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}x"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar ativos ordenados por risco, paginado",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/assets?ordering=-risco&limit=5",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const pg = pm.response.json();",
+                  "pm.test('página com contagem e links', () => { pm.expect(pg).to.include.keys('count', 'limit', 'offset', 'results', 'links'); pm.expect(pg.results.length).to.be.at.most(5); });",
+                  "pm.test('do maior para o menor risco', () => { const r = pg.results.map(a => a.risco.efetivo); pm.expect(r).to.eql([...r].sort((a, b) => b - a)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Paginação inválida: 400",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/assets?limit=0",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar ativo: 201 com Location e ETag",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/assets",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hostname\": \"PM-V1-{{run}}\",\n  \"tipo\": 2,\n  \"custodiante\": \"Setor de TI\",\n  \"lotacao\": \"Sede\",\n  \"descricao\": \"Criado pela coleção (API v1)\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Location e ETag', () => { pm.expect(pm.response.headers.get('Location')).to.match(/^\\/api\\/v1\\/assets\\/\\d+$/); pm.expect(pm.response.headers.get('ETag')).to.eql('\"1\"'); });",
+                  "pm.collectionVariables.set('v1_asset', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campo não permitido: 422",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/assets",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hostname\": \"PM-V1-X-{{run}}\",\n  \"tipo\": 2,\n  \"custodiante\": \"Setor de TI\",\n  \"lotacao\": \"Sede\",\n  \"descricao\": \"Criado pela coleção (API v1)\",\n  \"is_superuser\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});",
+                  "pm.test('aponta o campo', () => pm.expect(pm.response.json().errors).to.have.property('is_superuser'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hostname repetido: 409 ou 422",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/assets",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hostname\": \"PM-V1-{{run}}\",\n  \"tipo\": 2,\n  \"custodiante\": \"Setor de TI\",\n  \"lotacao\": \"Sede\",\n  \"descricao\": \"Criado pela coleção (API v1)\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('recusado', () => pm.expect(pm.response.code).to.be.oneOf([409, 422]));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar o ativo criado",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/assets/{{v1_asset}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ETag \"1\"', () => pm.expect(pm.response.headers.get('ETag')).to.eql('\"1\"'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH sem versão: 428",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/assets/{{v1_asset}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lotacao\": \"Sala 2\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 428', () => pm.response.to.have.status(428));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH com If-Match: 200 e versão 2",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/assets/{{v1_asset}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              },
+              {
+                "key": "If-Match",
+                "value": "\"1\""
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lotacao\": \"Sala 2\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('versão 2', () => pm.expect(pm.response.json().version).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH com versão antiga: 409",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/assets/{{v1_asset}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              },
+              {
+                "key": "If-Match",
+                "value": "\"1\""
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lotacao\": \"Sala 3\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tratamentos do ativo (recurso aninhado)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/assets/{{v1_asset}}/findings",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('lista vazia para ativo novo', () => pm.expect(pm.response.json().count).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pegar uma vulnerabilidade do catálogo",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/vulnerabilities?limit=1",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json().results;",
+                  "if (r.length) pm.collectionVariables.set('v1_vuln', r[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Equipamentos afetados pela vulnerabilidade",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/vulnerabilities/{{v1_vuln}}/assets",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('página', () => pm.expect(pm.response.json()).to.have.property('count'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Risco de todos os equipamentos",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/risk",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('total e resultados', () => pm.expect(pm.response.json()).to.include.keys('total', 'results'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cenário singular: 422",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/risk?cenario=singular",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rota administrativa sem papel: 403 (ou 200 para administrador)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/audit-events",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 para Analista, 200 para Administrador', () => pm.expect(pm.response.code).to.be.oneOf([200, 403]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Método errado: 405 com Allow",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/v1/assets",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 405', () => pm.response.to.have.status(405));",
+                  "pm.test('Allow', () => pm.expect(pm.response.headers.get('Allow')).to.include('GET'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Excluir sem versão: 428",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/assets/{{v1_asset}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 428', () => pm.response.to.have.status(428));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Excluir com If-Match: 204",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/assets/{{v1_asset}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              },
+              {
+                "key": "If-Match",
+                "value": "\"2\""
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ativo excluído: 404",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/assets/{{v1_asset}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('erro no formato Problem Details (RFC 9457)', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "  const p = pm.response.json();",
+                  "  pm.expect(p).to.include.keys('type', 'title', 'status', 'detail', 'instance');",
+                  "});"
                 ]
               }
             }

@@ -151,6 +151,9 @@ CSRF_COOKIE_SECURE = HTTPS_ONLY
 SESSION_COOKIE_AGE = 3600
 SESSION_SAVE_EVERY_REQUEST = True
 SECURE_SSL_REDIRECT = HTTPS_ONLY
+# A verificação de saúde é chamada por dentro da rede dos containers, em
+# HTTP (healthcheck e monitor): não é redirecionada e não tem dado sensível.
+SECURE_REDIRECT_EXEMPT = [r"^health/$"]
 SECURE_HSTS_SECONDS = 31536000 if HTTPS_ONLY else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = HTTPS_ONLY
 SECURE_HSTS_PRELOAD = HTTPS_ONLY
@@ -159,6 +162,10 @@ X_FRAME_OPTIONS = "DENY"
 # Só habilitar atrás do proxy dedicado, que substitui o cabeçalho recebido.
 if os.getenv("TRUST_PROXY", "0") == "1":
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# Segredo dos tokens JWT da API v1. Sem a variável, é derivado da chave do
+# Django (inventory/api_v1.py); definir um próprio permite trocá-lo sem
+# derrubar as sessões do site.
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
 REQUIRE_ADMIN_MFA = flag("DJANGO_REQUIRE_MFA", not DEBUG)
 if not HTTPS_ONLY:
     # Sem HTTPS de propósito: silencia só os avisos que pedem HTTPS, para que

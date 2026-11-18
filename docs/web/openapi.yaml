@@ -1,0 +1,898 @@
+openapi: 3.1.0
+info:
+  title: SENTINEL — API v1
+  version: 1.0.0
+  summary: Inventário de equipamentos e vulnerabilidades, com o risco pelo modelo linear.
+  description: |
+    API REST do Trabalho 2 (cards S5_03, S5_04 e S5_09). Contrato escrito antes do
+    código (*contract-first*) e conferido por testes automáticos
+    (tests_web/test_api_v1.py e o Schemathesis no workflow).
+
+    **Autenticação.** Peça um token em `POST /api/v1/auth/token` e envie
+    `Authorization: Bearer <token>` (expira em 15 minutos), ou use uma chave de API
+    no cabeçalho `X-API-Key` (criada com `python manage.py apikey criar`).
+    As permissões são as do perfil da conta (Administrador, Analista ou Leitor).
+
+    **Concorrência.** Todo registro tem `version`. Para alterar, envie a versão lida
+    (campo `version` em PUT e PATCH; cabeçalho `If-Match` em DELETE). Se outra pessoa
+    gravou antes, a resposta é 409.
+
+    **Erros.** Sempre no formato Problem Details (RFC 9457), com o tipo de
+    `application/problem+json`.
+  license:
+    name: Uso acadêmico
+servers:
+  - url: /
+    description: O próprio servidor do SENTINEL
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+tags:
+  - name: autenticação
+  - name: ativos
+  - name: vulnerabilidades
+  - name: tratamentos
+  - name: dependências
+  - name: risco
+  - name: administração
+paths:
+  /api/v1/:
+    get:
+      tags: [autenticação]
+      summary: Índice da API, com os links dos recursos
+      operationId: index
+      security: []
+      responses:
+        "200":
+          description: Versão e links
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, links]
+                properties:
+                  version: {type: string, example: 1.0.0}
+                  links: {type: object, additionalProperties: {type: string}}
+  /api/v1/auth/token:
+    post:
+      tags: [autenticação]
+      summary: Emite um token JWT de acesso
+      description: |
+        Senhas erradas contam para o bloqueio da conta (5 tentativas, 15 minutos),
+        como na tela de entrada. Contas de administrador precisam do código do
+        segundo fator (`otp`) quando o perfil exige MFA.
+      operationId: emitirToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              additionalProperties: false
+              properties:
+                username: {type: string, minLength: 1, maxLength: 150}
+                password: {type: string, format: password, minLength: 1, maxLength: 4096}
+                otp: {type: string, description: Código do segundo fator (só administradores, com MFA ligado)}
+            example: {username: analista, password: "sua senha"}
+      responses:
+        "201":
+          description: Token emitido
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Token"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "429": {$ref: "#/components/responses/TooMany"}
+  /api/v1/assets:
+    get:
+      tags: [ativos]
+      summary: Lista os ativos, com o risco próprio e o efetivo
+      operationId: listarAtivos
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+        - name: ordering
+          in: query
+          description: Campo de ordenação; `-` antes do nome para decrescente. `-risco` traz o maior risco efetivo primeiro.
+          schema: {type: string, enum: [id, -id, hostname, -hostname, risco, -risco], default: id}
+        - name: tipo
+          in: query
+          schema: {$ref: "#/components/schemas/TipoEquipamento"}
+        - name: lotacao
+          in: query
+          schema: {type: string, maxLength: 240}
+      responses:
+        "200":
+          description: Página de ativos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      results: {type: array, items: {$ref: "#/components/schemas/Asset"}}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    post:
+      tags: [ativos]
+      summary: Cadastra um ativo
+      operationId: criarAtivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AssetInput"}
+            example:
+              hostname: SRV-EXEMPLO-01
+              tipo: 2
+              custodiante: Setor de TI
+              lotacao: Sede
+              descricao: Servidor de arquivos
+      responses:
+        "201":
+          description: Criado
+          headers:
+            Location: {$ref: "#/components/headers/Location"}
+            ETag: {$ref: "#/components/headers/ETag"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Asset"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+  /api/v1/assets/{id}:
+    parameters: [{$ref: "#/components/parameters/id"}]
+    get:
+      tags: [ativos]
+      summary: Consulta um ativo
+      operationId: consultarAtivo
+      responses:
+        "200":
+          description: O ativo
+          headers: {ETag: {$ref: "#/components/headers/ETag"}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Asset"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    put:
+      tags: [ativos]
+      summary: Substitui o ativo inteiro
+      operationId: substituirAtivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/AssetInput"
+                - $ref: "#/components/schemas/VersionRequired"
+      responses: &update-responses
+        "200":
+          description: Gravado; a versão aumenta em 1
+          headers: {ETag: {$ref: "#/components/headers/ETag"}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Asset"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "428": {$ref: "#/components/responses/VersionRequired"}
+    patch:
+      tags: [ativos]
+      summary: Altera alguns campos do ativo
+      operationId: alterarAtivo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/AssetPatch"
+                - $ref: "#/components/schemas/VersionRequired"
+            example: {version: 1, lotacao: Sala 2}
+      responses: *update-responses
+    delete:
+      tags: [ativos]
+      summary: Exclui o ativo, com os tratamentos e as dependências dele
+      operationId: excluirAtivo
+      parameters: [{$ref: "#/components/parameters/ifMatch"}]
+      responses: &delete-responses
+        "204": {description: Excluído}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "428": {$ref: "#/components/responses/VersionRequired"}
+  /api/v1/assets/{id}/findings:
+    parameters: [{$ref: "#/components/parameters/id"}]
+    get:
+      tags: [ativos, tratamentos]
+      summary: Tratamentos (vulnerabilidades) de um ativo
+      operationId: tratamentosDoAtivo
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: Página de tratamentos, cada um com a vulnerabilidade
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: "#/components/schemas/Finding"
+                            - type: object
+                              properties:
+                                vulnerabilidade: {$ref: "#/components/schemas/Vulnerability"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/v1/vulnerabilities:
+    get:
+      tags: [vulnerabilidades]
+      summary: Lista o catálogo de vulnerabilidades
+      operationId: listarVulnerabilidades
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: Página de vulnerabilidades
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      results: {type: array, items: {$ref: "#/components/schemas/Vulnerability"}}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    post:
+      tags: [vulnerabilidades]
+      summary: Cadastra uma vulnerabilidade no catálogo
+      operationId: criarVulnerabilidade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/VulnerabilityInput"}
+            example: {descricao: Exemplo de falha, origem: 2, cvss: 7.5}
+      responses:
+        "201":
+          description: Criada
+          headers:
+            Location: {$ref: "#/components/headers/Location"}
+            ETag: {$ref: "#/components/headers/ETag"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Vulnerability"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+  /api/v1/vulnerabilities/{id}:
+    parameters: [{$ref: "#/components/parameters/id"}]
+    get:
+      tags: [vulnerabilidades]
+      summary: Consulta uma vulnerabilidade
+      operationId: consultarVulnerabilidade
+      responses:
+        "200":
+          description: A vulnerabilidade
+          headers: {ETag: {$ref: "#/components/headers/ETag"}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Vulnerability"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    put:
+      tags: [vulnerabilidades]
+      summary: Substitui a vulnerabilidade inteira
+      operationId: substituirVulnerabilidade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/VulnerabilityInput"
+                - $ref: "#/components/schemas/VersionRequired"
+      responses: &vuln-update
+        "200":
+          description: Gravada
+          headers: {ETag: {$ref: "#/components/headers/ETag"}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Vulnerability"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "428": {$ref: "#/components/responses/VersionRequired"}
+    patch:
+      tags: [vulnerabilidades]
+      summary: Altera alguns campos da vulnerabilidade
+      operationId: alterarVulnerabilidade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/VulnerabilityPatch"
+                - $ref: "#/components/schemas/VersionRequired"
+      responses: *vuln-update
+    delete:
+      tags: [vulnerabilidades]
+      summary: Exclui a vulnerabilidade e os vínculos dela com ativos
+      operationId: excluirVulnerabilidade
+      parameters: [{$ref: "#/components/parameters/ifMatch"}]
+      responses: *delete-responses
+  /api/v1/vulnerabilities/{id}/assets:
+    parameters: [{$ref: "#/components/parameters/id"}]
+    get:
+      tags: [vulnerabilidades, ativos]
+      summary: Equipamentos afetados por uma vulnerabilidade (recurso aninhado)
+      operationId: ativosAfetados
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: Página de ativos, cada um com o tratamento daquela vulnerabilidade
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: "#/components/schemas/Asset"
+                            - type: object
+                              properties:
+                                tratamento: {$ref: "#/components/schemas/Finding"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/v1/findings:
+    get:
+      tags: [tratamentos]
+      summary: Lista os tratamentos (vínculos entre ativo e vulnerabilidade)
+      operationId: listarTratamentos
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+        - name: situacao
+          in: query
+          schema: {$ref: "#/components/schemas/Situacao"}
+      responses:
+        "200":
+          description: Página de tratamentos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      results: {type: array, items: {$ref: "#/components/schemas/Finding"}}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    post:
+      tags: [tratamentos]
+      summary: Vincula uma vulnerabilidade a um ativo
+      operationId: criarTratamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FindingInput"}
+            example: {asset: 1, vulnerability: 1, situacao: 1}
+      responses:
+        "201":
+          description: Criado
+          headers:
+            Location: {$ref: "#/components/headers/Location"}
+            ETag: {$ref: "#/components/headers/ETag"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Finding"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+  /api/v1/findings/{id}:
+    parameters: [{$ref: "#/components/parameters/id"}]
+    get:
+      tags: [tratamentos]
+      summary: Consulta um tratamento
+      operationId: consultarTratamento
+      responses:
+        "200":
+          description: O tratamento
+          headers: {ETag: {$ref: "#/components/headers/ETag"}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Finding"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    put:
+      tags: [tratamentos]
+      summary: Substitui o tratamento (o ativo e a vulnerabilidade não mudam)
+      operationId: substituirTratamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/FindingInput"
+                - $ref: "#/components/schemas/VersionRequired"
+      responses: &finding-update
+        "200":
+          description: Gravado
+          headers: {ETag: {$ref: "#/components/headers/ETag"}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Finding"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "428": {$ref: "#/components/responses/VersionRequired"}
+    patch:
+      tags: [tratamentos]
+      summary: Altera a situação ou as datas do tratamento
+      operationId: alterarTratamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/FindingPatch"
+                - $ref: "#/components/schemas/VersionRequired"
+            example: {version: 1, situacao: 3}
+      responses: *finding-update
+    delete:
+      tags: [tratamentos]
+      summary: Exclui o vínculo (o ativo e a vulnerabilidade ficam)
+      operationId: excluirTratamento
+      parameters: [{$ref: "#/components/parameters/ifMatch"}]
+      responses: *delete-responses
+  /api/v1/dependencies:
+    get:
+      tags: [dependências]
+      summary: Lista as dependências entre ativos
+      operationId: listarDependencias
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: Página de dependências
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      results: {type: array, items: {$ref: "#/components/schemas/Dependency"}}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    post:
+      tags: [dependências]
+      summary: Cria uma dependência (o ativo de origem herda uma fração do risco do destino)
+      description: A soma das frações de um mesmo ativo precisa ficar abaixo de 1, para I − A ser invertível.
+      operationId: criarDependencia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/DependencyInput"}
+            example: {source: 1, target: 2, fracao: 0.25}
+      responses:
+        "201":
+          description: Criada
+          headers:
+            Location: {$ref: "#/components/headers/Location"}
+            ETag: {$ref: "#/components/headers/ETag"}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Dependency"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+  /api/v1/dependencies/{id}:
+    parameters: [{$ref: "#/components/parameters/id"}]
+    get:
+      tags: [dependências]
+      summary: Consulta uma dependência
+      operationId: consultarDependencia
+      responses:
+        "200":
+          description: A dependência
+          headers: {ETag: {$ref: "#/components/headers/ETag"}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Dependency"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    put:
+      tags: [dependências]
+      summary: Substitui a dependência
+      operationId: substituirDependencia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/DependencyInput"
+                - $ref: "#/components/schemas/VersionRequired"
+      responses: &dependency-update
+        "200":
+          description: Gravada
+          headers: {ETag: {$ref: "#/components/headers/ETag"}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Dependency"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "428": {$ref: "#/components/responses/VersionRequired"}
+    patch:
+      tags: [dependências]
+      summary: Altera a fração da dependência
+      operationId: alterarDependencia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/DependencyPatch"
+                - $ref: "#/components/schemas/VersionRequired"
+      responses: *dependency-update
+    delete:
+      tags: [dependências]
+      summary: Exclui a dependência
+      operationId: excluirDependencia
+      parameters: [{$ref: "#/components/parameters/ifMatch"}]
+      responses: *delete-responses
+  /api/v1/risk:
+    get:
+      tags: [risco]
+      summary: Risco próprio e efetivo de todos os equipamentos
+      description: Resolve (I − A)x = b depois de verificar a invertibilidade. O cenário `singular` mostra a recusa (422).
+      operationId: risco
+      parameters:
+        - name: cenario
+          in: query
+          description: Cenário de demonstração, sem tocar no banco
+          schema: {type: string, enum: [exemplo, singular]}
+      responses:
+        "200":
+          description: O risco de cada equipamento, do maior para o menor
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Risk"}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+  /api/v1/audit-events:
+    get:
+      tags: [administração]
+      summary: Registro de auditoria (somente o papel Administrador)
+      operationId: auditoria
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: Página de eventos, do mais recente para o mais antigo
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          type: object
+                          required: [id, quando, acao, registro]
+                          properties:
+                            id: {type: integer}
+                            quando: {type: string, format: date-time}
+                            conta: {type: [string, "null"]}
+                            acao: {type: string}
+                            registro: {type: string}
+        "400": {$ref: "#/components/responses/Invalid"}
+        "401": {$ref: "#/components/responses/Unauthenticated"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de POST /api/v1/auth/token (HS256, 15 minutos; declarações iss, aud, sub, roles, iat, exp).
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Chave criada com `python manage.py apikey criar CONTA NOME`; o banco guarda só o SHA-256 dela.
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: {type: integer, minimum: 1}
+    limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+    offset:
+      name: offset
+      in: query
+      schema: {type: integer, minimum: 0, maximum: 2147483647, default: 0}
+    ifMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Versão lida do registro, entre aspas (o ETag da consulta), por exemplo `"3"`.
+      schema: {type: string, pattern: '^(W/)?"?[1-9][0-9]*"?$', example: '"1"'}
+  headers:
+    Location:
+      description: Endereço do recurso criado
+      schema: {type: string, example: /api/v1/assets/77}
+    ETag:
+      description: Versão do registro, para o If-Match
+      schema: {type: string, example: '"1"'}
+  responses:
+    Invalid:
+      description: Requisição inválida (JSON malformado ou parâmetro fora do formato)
+      content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}
+    Unauthenticated:
+      description: Sem credencial válida
+      headers:
+        WWW-Authenticate: {schema: {type: string}}
+      content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}
+    Forbidden:
+      description: O perfil da conta não permite a operação
+      content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}
+    NotFound:
+      description: Registro inexistente
+      content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}
+    Conflict:
+      description: Versão diferente da atual ou valor que precisa ser único
+      content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}
+    Unprocessable:
+      description: Dados inválidos (veja errors) ou sistema do modelo recusado
+      content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}
+    VersionRequired:
+      description: Falta a versão do registro
+      content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}
+    TooMany:
+      description: Conta bloqueada por tentativas erradas
+  schemas:
+    Problem:
+      type: object
+      description: Problem Details (RFC 9457)
+      required: [type, title, status, detail, instance]
+      properties:
+        type: {type: string, example: /api/v1/problemas/dados-invalidos}
+        title: {type: string}
+        status: {type: integer}
+        detail: {type: string}
+        instance: {type: string}
+        errors:
+          type: object
+          description: Erros por campo (validação)
+          additionalProperties: {type: array, items: {type: string}}
+    Token:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token: {type: string}
+        token_type: {type: string, const: Bearer}
+        expires_in: {type: integer, example: 900}
+    Page:
+      type: object
+      required: [count, limit, offset, results, links]
+      properties:
+        count: {type: integer}
+        limit: {type: integer}
+        offset: {type: integer}
+        results: {type: array}
+        links:
+          type: object
+          required: [self, next, prev]
+          properties:
+            self: {type: string}
+            next: {type: [string, "null"]}
+            prev: {type: [string, "null"]}
+    Links:
+      type: object
+      required: [self]
+      properties:
+        self: {type: string}
+    TipoEquipamento:
+      type: integer
+      description: 1 estação de trabalho, 2 servidor, 3 roteador, 4 impressora de rede, 5 sistema interno, 6 banco de dados, 7 outro
+      minimum: 1
+      maximum: 7
+    Situacao:
+      type: integer
+      description: 1 aberta, 2 em tratamento, 3 corrigida (sai do risco), 4 aceita como risco
+      minimum: 1
+      maximum: 4
+    VersionRequired:
+      type: object
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1}
+    AssetPatch:
+      type: object
+      additionalProperties: false
+      properties: &asset-props
+        hostname: {type: string, minLength: 1, maxLength: 63}
+        tipo: {$ref: "#/components/schemas/TipoEquipamento"}
+        custodiante: {type: string, minLength: 1, maxLength: 240, description: Prefira cargo ou setor a nome de pessoa (LGPD)}
+        lotacao: {type: string, minLength: 1, maxLength: 240}
+        descricao: {type: string, minLength: 1, maxLength: 2000}
+        fabricante: {type: string, maxLength: 60}
+        modelo: {type: string, maxLength: 60}
+        numero_serie: {type: string, maxLength: 60}
+        patrimonio: {type: string, maxLength: 60}
+        sistema: {type: string, maxLength: 60}
+        versao: {type: string, maxLength: 60}
+        version: {type: integer, minimum: 1}
+    AssetInput:
+      type: object
+      additionalProperties: false
+      required: [hostname, tipo, custodiante, lotacao, descricao]
+      properties: *asset-props
+    Asset:
+      type: object
+      required: [id, hostname, tipo, custodiante, lotacao, descricao, version, links]
+      properties:
+        id: {type: integer}
+        <<: *asset-props
+        risco:
+          type: object
+          description: Risco pelo modelo linear (nulo se o sistema for recusado)
+          properties:
+            proprio: {type: [number, "null"]}
+            efetivo: {type: [number, "null"]}
+        links: {$ref: "#/components/schemas/Links"}
+    VulnerabilityPatch:
+      type: object
+      additionalProperties: false
+      properties: &vuln-props
+        descricao: {type: string, minLength: 1, maxLength: 2000}
+        origem: {type: integer, minimum: 1, maximum: 6, description: 1 erro de configuração, 2 falta de atualização, 3 senha fraca, 4 serviço exposto, 5 permissão indevida, 6 outra}
+        cvss: {type: number, minimum: 0.1, maximum: 10}
+        cve: {type: [string, "null"], maxLength: 32, example: CVE-2021-44228}
+        cwe: {type: [string, "null"], maxLength: 12, example: CWE-502}
+        vetor: {type: [string, "null"], maxLength: 256}
+        version: {type: integer, minimum: 1}
+    VulnerabilityInput:
+      type: object
+      additionalProperties: false
+      required: [descricao, origem, cvss]
+      properties: *vuln-props
+    Vulnerability:
+      type: object
+      required: [id, descricao, origem, cvss, version, links]
+      properties:
+        id: {type: integer}
+        <<: *vuln-props
+        links: {$ref: "#/components/schemas/Links"}
+    FindingPatch:
+      type: object
+      additionalProperties: false
+      properties: &finding-props
+        asset: {type: integer, minimum: 1}
+        vulnerability: {type: integer, minimum: 1}
+        situacao: {$ref: "#/components/schemas/Situacao"}
+        detected_at: {type: [string, "null"], format: date-time}
+        corrected_at: {type: [string, "null"], format: date-time}
+        version: {type: integer, minimum: 1}
+    FindingInput:
+      type: object
+      additionalProperties: false
+      required: [asset, vulnerability, situacao]
+      properties: *finding-props
+    Finding:
+      type: object
+      required: [id, asset, vulnerability, situacao, situacao_rotulo, version, links]
+      properties:
+        id: {type: integer}
+        <<: *finding-props
+        situacao_rotulo: {type: string}
+        links: {$ref: "#/components/schemas/Links"}
+    DependencyPatch:
+      type: object
+      additionalProperties: false
+      properties: &dependency-props
+        source: {type: integer, minimum: 1, description: Ativo que herda risco}
+        target: {type: integer, minimum: 1, description: Ativo do qual depende}
+        fracao: {type: number, exclusiveMinimum: 0, exclusiveMaximum: 1}
+        version: {type: integer, minimum: 1}
+    DependencyInput:
+      type: object
+      additionalProperties: false
+      required: [source, target, fracao]
+      properties: *dependency-props
+    Dependency:
+      type: object
+      required: [id, source, target, fracao, version, links]
+      properties:
+        id: {type: integer}
+        <<: *dependency-props
+        links: {$ref: "#/components/schemas/Links"}
+    Risk:
+      type: object
+      required: [total, residuo, results]
+      properties:
+        total: {type: number}
+        residuo: {type: number, description: "‖(I − A)x − b‖, que confere a solução"}
+        results:
+          type: array
+          items:
+            type: object
+            required: [id, hostname, soma_cvss, fator, proprio, herdado, efetivo]
+            properties:
+              id: {type: integer}
+              hostname: {type: string}
+              soma_cvss: {type: number}
+              fator: {type: number}
+              proprio: {type: number}
+              herdado: {type: number}
+              efetivo: {type: number}

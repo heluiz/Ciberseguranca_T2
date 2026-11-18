@@ -8,6 +8,9 @@ localização. As classes usam estas funções em de_dict(), e o
 armazenamento transforma o ValueError em BaseInvalidaError.
 """
 
+from typing import Any
+
+
 import math
 
 
@@ -120,7 +123,7 @@ if __name__ == "__main__":
     assert exigir_numero(7, "x") == 7.0
     assert exigir_texto("Cartório", "x") == "Cartório"
 
-    recusas = (
+    recusas: tuple[tuple[Any, Any], ...] = (
         (exigir_inteiro, 10.0), (exigir_inteiro, True),
         (exigir_inteiro, "3"), (exigir_inteiro, 0),
         (exigir_numero, "7,5"), (exigir_numero, None),

@@ -20,7 +20,8 @@ def check(url):
     start = time.monotonic()
     try:
         request = urllib.request.Request(url, headers={"Host": "localhost"})
-        with urllib.request.urlopen(request, timeout=10) as response:
+        # URL fixa da configuração (app:8000/health/), não do usuário.
+        with urllib.request.urlopen(request, timeout=10) as response:  # nosec B310
             ok = response.status == 200
             detail = f"HTTP {response.status}"
     except Exception as error:  # qualquer falha conta como indisponível

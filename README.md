@@ -13,7 +13,7 @@ mesmo modelo de risco:
 | Interface | O que é | Dados |
 | --- | --- | --- |
 | **Web (SENTINEL)** | Aplicação Django com login, inventário, mapa de dependências, análise de risco, catálogo de CVEs exploradas e API REST | PostgreSQL, com importação e exportação no formato JSON |
-| **Terminal** | O programa de menu original | Arquivo JSON |
+| **Terminal** | O programa de menu original | Arquivo JSON (ou banco SQL com SQLAlchemy, opcional) |
 
 ## Sumário
 
@@ -51,10 +51,13 @@ Cada bloco é para copiar e colar inteiro, na ordem. Os blocos marcados
 | Criar contas, trocar senha, desbloquear | [6. Contas e senhas](#6-contas-e-senhas) |
 | Abrir o programa de terminal | [7. Programa de terminal](#7-programa-de-terminal) |
 | Rodar os testes | [8. Testes](#8-testes) |
-| Testar a API | [9. API e Postman](#9-api-e-postman) |
+| Testar a API (Swagger, token, Postman) | [9. API e Postman](#9-api-e-postman) |
 | Fazer e restaurar backup | [10. Backup e restauração](#10-backup-e-restauração) |
 | Enviar mudanças para o GitHub | [11. Enviar mudanças para o GitHub](#11-enviar-mudanças-para-o-github) |
 | Resolver um problema | [12. Problemas comuns](#12-problemas-comuns) |
+| Publicar uma versão (tag, release, imagem) e voltar atrás | [13. Versões e reversão](#13-versões-e-reversão) |
+| Ver a versão web por HTTPS no meu computador | [14. HTTPS no computador](#14-https-no-computador) |
+| Achar o documento de cada card da Sprint 5 | [Interface web](#interface-web) e [SPRINTS.md](docs/web/SPRINTS.md) |
 
 ### 1. Versão web no Windows
 
@@ -67,7 +70,7 @@ Primeira vez (baixa o projeto):
 **PowerShell**
 
 ```powershell
-git clone https://github.com/heluiz/Ciberseguranca_T2.git C:\Projetos\SENTINEL
+git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git C:\Projetos\SENTINEL
 ```
 
 Para abrir (na primeira vez e em todas as outras):
@@ -95,7 +98,24 @@ cd C:\Projetos\SENTINEL
 
 ### 2. Versão web no servidor
 
-O servidor do docente só responde de dentro da rede da UFU. Entre nele:
+No servidor da disciplina, tudo segue o padrão de nomes do card S5_20: o
+identificador **`trab02_2026_2_12621cbs200`** (`trab02_2026_2_` + a matrícula,
+em minúsculas) no diretório, no repositório, no projeto Compose, nos
+containers, nas imagens e nos volumes, e a **porta externa 2200** (2000 + os
+três últimos dígitos da matrícula, 200).
+
+| Recurso | Nome | Porta |
+| --- | --- | --- |
+| Diretório no servidor | `~/trab02_2026_2_12621cbs200` | |
+| Repositório | `github.com/heluiz/trab02_2026_2_12621cbs200` | |
+| Projeto Compose | `trab02_2026_2_12621cbs200` (`compose.servidor.yaml`) | |
+| Aplicação web | container `trab02_2026_2_12621cbs200`, imagem `trab02_2026_2_12621cbs200:1.0` | `2200:8000` |
+| Banco PostgreSQL | container `trab02_2026_2_12621cbs200_db`, volume `trab02_2026_2_12621cbs200_db_data` | nenhuma |
+| Preparação (termina sozinha) | container `trab02_2026_2_12621cbs200_preparar` | nenhuma |
+| Monitor de disponibilidade | container `trab02_2026_2_12621cbs200_monitor` | nenhuma |
+| Menu de terminal | container `trab02_2026_2_12621cbs200_terminal`, imagem `trab02_2026_2_12621cbs200_terminal:1.0`, volume `trab02_2026_2_12621cbs200_terminal_data` | nenhuma (só terminal) |
+
+O servidor só responde de dentro da rede da UFU. Entre nele:
 
 **PowerShell**
 
@@ -108,67 +128,79 @@ Já no servidor, na primeira vez:
 **Linux**
 
 ```bash
-git clone https://github.com/heluiz/Ciberseguranca_T2.git sentinel-web
-cd sentinel-web
+git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git ~/trab02_2026_2_12621cbs200
+cd ~/trab02_2026_2_12621cbs200
 sh ops/servidor/subir.sh
 ```
 
-O `subir.sh` cria o arquivo `.env` com senhas aleatórias, constrói a imagem,
-sobe o banco, prepara as tabelas, a conta `admin` e os dados de exemplo, sobe
-a aplicação e o monitor de disponibilidade e mostra os endereços. A primeira
-vez leva alguns minutos.
+O `subir.sh` cria o arquivo `.env` com senhas aleatórias (só o seu usuário lê),
+constrói as duas imagens, põe a base de exemplo no volume do menu de terminal,
+sobe o banco, prepara as tabelas, a conta `admin` e os dados de exemplo, sobe a
+aplicação, o monitor e o menu de terminal e mostra os endereços. A primeira vez
+leva alguns minutos.
 
 Para ver a senha da conta `admin`:
 
 **Linux**
 
 ```bash
-cd ~/sentinel-web
+cd ~/trab02_2026_2_12621cbs200
 grep SENTINEL_ADMIN_PASSWORD .env
 ```
 
-Abra **http://10.0.99.150:8080** no navegador, entre com `admin` e troque a
+Abra **http://10.0.99.150:2200** no navegador, entre com `admin` e troque a
 senha em seguida (clique no seu nome, no canto superior direito).
-
-Se o `subir.sh` parar com `port is already allocated` (outra pessoa já usa a
-porta 8080), escolha outra porta e rode de novo. Não apague o `.env`: o banco
-já foi criado com as senhas dele.
-
-**Linux**
-
-```bash
-cd ~/sentinel-web
-sed -i 's/^SENTINEL_PORT=.*/SENTINEL_PORT=8123/' .env
-sh ops/servidor/subir.sh
-```
 
 Tudo de uma vez, a partir do Windows (pede a senha do SSH uma vez):
 
 **PowerShell**
 
 ```powershell
-ssh 12621CBS200@10.0.99.150 "git clone https://github.com/heluiz/Ciberseguranca_T2.git sentinel-web || git -C sentinel-web pull; cd sentinel-web && sh ops/servidor/subir.sh && grep -E 'SENTINEL_PORT|SENTINEL_ADMIN_PASSWORD' .env"
+ssh 12621CBS200@10.0.99.150 "git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git trab02_2026_2_12621cbs200 || git -C trab02_2026_2_12621cbs200 pull; cd trab02_2026_2_12621cbs200 && sh ops/servidor/subir.sh"
 ```
+
+A porta 2200 é a sua pela regra da disciplina. Se o `subir.sh` parar com
+`port is already allocated`, outra pessoa está usando a sua porta: avise o
+docente, em vez de trocar de porta.
+
+**O container antigo do menu (de 27/10).** Ele se chamava `inventario-heluiz`
+(depois `heluiz-12621cbs200`) e usa a imagem `inventario-heluiz:1.0` e o volume
+`inventario-heluiz-dados`, fora do padrão. Deixe-o ligado até o menu novo,
+`trab02_2026_2_12621cbs200_terminal`, completar 24 horas; depois, remova o
+antigo e aponte o registro de hora em hora para o novo:
+
+**Linux**
+
+```bash
+docker rm -f inventario-heluiz heluiz-12621cbs200 2>/dev/null
+docker rmi inventario-heluiz:1.0
+docker volume rm inventario-heluiz-dados
+(crontab -l 2>/dev/null | grep -v uptime_inventario.log; echo '0 * * * * echo "$(date -Is) $(docker ps -a --filter name=trab02_2026_2_12621cbs200_terminal --format "{{.Status}}" 2>&1)" >> $HOME/uptime_trab02.log') | crontab -
+crontab -l
+```
+
+Guarde antes uma cópia dos registros antigos, que são a prova das 46 horas de
+27 a 29/10: do Windows, `scp ufu:uptime_inventario.log .`.
 
 ### 3. Comprovar as 24 horas
 
 **Linux**
 
 ```bash
-cd ~/sentinel-web
+cd ~/trab02_2026_2_12621cbs200
 sh ops/servidor/verificar.sh
 ```
 
-Mostra há quanto tempo cada container está no ar, quando a aplicação iniciou,
-quantas vezes reiniciou, a resposta de `/health/` e o registro de
-disponibilidade. O container `monitor` consulta a aplicação a cada minuto e
-grava uma linha por consulta, com data, hora (UTC) e o total de falhas. Para
-ver o registro inteiro:
+Mostra há quanto tempo cada container está no ar (a aplicação e o menu de
+terminal), quantas vezes reiniciou, a saúde, a resposta de `/health/` e o
+registro de disponibilidade. O container `monitor` consulta a aplicação a cada
+minuto e grava uma linha por consulta, com data, hora (UTC) e o total de falhas.
+Para ver o registro inteiro:
 
 **Linux**
 
 ```bash
-cd ~/sentinel-web
+cd ~/trab02_2026_2_12621cbs200
 docker compose -f compose.servidor.yaml logs --no-log-prefix monitor
 ```
 
@@ -177,12 +209,14 @@ O mesmo, a partir do Windows:
 **PowerShell**
 
 ```powershell
-ssh 12621CBS200@10.0.99.150 "cd sentinel-web && sh ops/servidor/verificar.sh"
+ssh 12621CBS200@10.0.99.150 "cd trab02_2026_2_12621cbs200 && sh ops/servidor/verificar.sh"
+ssh 12621CBS200@10.0.99.150 "docker ps --filter name=trab02_2026_2_12621cbs200"
 ```
 
-A aplicação e o banco usam `restart: unless-stopped`: voltam sozinhos depois de
-uma falha ou de um reinício do servidor. A contagem das 24 horas recomeça
-quando o container da aplicação é recriado (veja a seção 4).
+Todos os containers usam `restart: unless-stopped` (menos a preparação, que
+roda uma vez): voltam sozinhos depois de uma falha ou de um reinício do
+servidor. A contagem das 24 horas recomeça quando um container é recriado
+(veja a seção 4).
 
 ### 4. Atualizar o servidor
 
@@ -191,14 +225,14 @@ Depois de enviar uma mudança para o GitHub e fazer o merge na `main`:
 **Linux**
 
 ```bash
-cd ~/sentinel-web
+cd ~/trab02_2026_2_12621cbs200
 git pull
 sh ops/servidor/subir.sh
 ```
 
-Os dados continuam (ficam no volume do banco). Se o código mudou, o container
-da aplicação é recriado e a contagem das 24 horas recomeça: faça a última
-atualização antes de começar a contar.
+Os dados continuam (ficam nos volumes). Se o código mudou, os containers são
+recriados e a contagem das 24 horas recomeça: faça a última atualização antes
+de começar a contar.
 
 ### 5. Situação, log, parar e religar
 
@@ -207,11 +241,12 @@ No servidor:
 **Linux**
 
 ```bash
-cd ~/sentinel-web
-docker compose -f compose.servidor.yaml ps                 # situação
-docker compose -f compose.servidor.yaml logs --tail 50 app  # últimas linhas do log
-docker compose -f compose.servidor.yaml stop               # parar (os dados ficam)
-sh ops/servidor/subir.sh                                   # religar
+cd ~/trab02_2026_2_12621cbs200
+docker compose -f compose.servidor.yaml ps                      # situação
+docker compose -f compose.servidor.yaml logs --tail 50 app      # últimas linhas do log da web
+docker compose -f compose.servidor.yaml logs --tail 50 terminal # do menu de terminal
+docker compose -f compose.servidor.yaml stop                    # parar (os dados ficam)
+sh ops/servidor/subir.sh                                        # religar
 ```
 
 No Windows:
@@ -226,7 +261,7 @@ docker compose -f compose.web.yaml -f compose.web.local.yaml stop
 .\ABRIR-SENTINEL.cmd
 ```
 
-Nunca use `down -v`: o `-v` apaga o banco.
+Nunca use `down -v`: o `-v` apaga os volumes, e com eles o banco.
 
 ### 6. Contas e senhas
 
@@ -248,7 +283,7 @@ criar outro superusuário. No servidor:
 **Linux**
 
 ```bash
-cd ~/sentinel-web
+cd ~/trab02_2026_2_12621cbs200
 docker compose -f compose.servidor.yaml exec app python manage.py changepassword admin
 docker compose -f compose.servidor.yaml exec app python manage.py axes_reset
 docker compose -f compose.servidor.yaml exec app python manage.py createsuperuser
@@ -267,16 +302,17 @@ docker compose -f compose.web.yaml -f compose.web.local.yaml exec app python man
 
 ### 7. Programa de terminal
 
-O programa de menu original, em container (com a base de exemplo):
+O programa de menu original, em container (com a base de exemplo). Os nomes
+seguem o mesmo padrão do servidor, e não há porta: o programa só usa o terminal.
 
 **PowerShell**
 
 ```powershell
 cd C:\Projetos\SENTINEL
 docker compose up -d --build
-docker cp dados_exemplo/inventario_exemplo.json inventario:/app/dados/inventario.json
-docker restart inventario
-docker attach inventario
+docker cp dados_exemplo/inventario_exemplo.json trab02_2026_2_12621cbs200_terminal:/app/dados/inventario.json
+docker restart trab02_2026_2_12621cbs200_terminal
+docker attach trab02_2026_2_12621cbs200_terminal
 ```
 
 Tecle Enter para ver o menu. Para sair sem parar o programa: Ctrl+P e depois
@@ -295,12 +331,34 @@ Copy-Item dados_exemplo\inventario_exemplo.json dados\inventario.json
 .\.venv\Scripts\python.exe main.py
 ```
 
-A versão de terminal que roda no servidor do docente desde 27/10/2026:
+O mesmo programa com a base num **banco relacional** (SQLAlchemy + Alembic) em
+vez do JSON: basta a variável `INVENTARIO_BANCO` com a URL do banco. As tabelas
+são criadas pelas migrações na primeira execução (veja
+[ORM-E-SQLALCHEMY.md](docs/ORM-E-SQLALCHEMY.md)):
 
 **PowerShell**
 
 ```powershell
-ssh -t 12621CBS200@10.0.99.150 docker attach heluiz-12621cbs200
+cd C:\Projetos\SENTINEL
+$env:INVENTARIO_BANCO = "sqlite:///dados/inventario.db"
+.\.venv\Scripts\python.exe main.py
+Remove-Item Env:INVENTARIO_BANCO
+```
+
+No container, com o banco dentro do volume:
+
+**PowerShell**
+
+```powershell
+docker compose run --rm -e INVENTARIO_BANCO=sqlite:////app/dados/inventario.db terminal
+```
+
+O menu de terminal no servidor do docente:
+
+**PowerShell**
+
+```powershell
+ssh -t 12621CBS200@10.0.99.150 docker attach trab02_2026_2_12621cbs200_terminal
 ```
 
 Mais opções (Linux, comando único, detalhes do container) em
@@ -319,6 +377,21 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe testes.py
 .\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m mypy
+.\.venv\Scripts\python.exe -m bandit -q -c .bandit.yaml -r .
+.\.venv\Scripts\openapi-spec-validator.exe docs\web\openapi.yaml
+```
+
+`mypy` confere os tipos do domínio (configuração em `mypy.ini`); `bandit`
+procura falhas de segurança no código (`.bandit.yaml`); o último confere o
+contrato da API. Os laboratórios da Sprint 5 (rodam sozinhos, em memória):
+
+**PowerShell**
+
+```powershell
+.\.venv\Scripts\python.exe -m academic.sqli_lab
+.\.venv\Scripts\python.exe -m academic.senhas_lab
+.\.venv\Scripts\python.exe repositorio_sql.py
 ```
 
 Os testes da interface web precisam de um PostgreSQL. Este bloco cria um
@@ -349,6 +422,8 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python testes.py
 .venv/bin/ruff check .
+.venv/bin/mypy
+.venv/bin/bandit -q -c .bandit.yaml -r .
 docker run -d --name sentinel-teste-db -e POSTGRES_USER=sentinel -e POSTGRES_PASSWORD=teste -e POSTGRES_DB=sentinel -p 127.0.0.1:5433:5432 postgres:17-bookworm
 sleep 10
 DJANGO_DEBUG=1 DJANGO_SECRET_KEY=somente-para-testes-locais-0123456789-abcdefghijklmnop \
@@ -369,9 +444,53 @@ cd C:\Projetos\SENTINEL
 
 ### 9. API e Postman
 
-A coleção `docs/web/SENTINEL.postman_collection.json` entra no sistema, cria,
-consulta, altera (PUT e PATCH), testa os casos de erro e apaga o que criou, com
-47 verificações. Use uma conta do grupo Analista ou o administrador.
+A API pública é a **v1**, em `/api/v1/` (detalhes em [API.md](docs/API.md)).
+Documentação interativa (Swagger) em `/api/v1/docs/`: no servidor,
+`http://10.0.99.150:2200/api/v1/docs/`; no seu computador,
+`http://127.0.0.1:8000/api/v1/docs/`. O contrato OpenAPI é
+`docs/web/openapi.yaml` (também em `/api/v1/openapi.yaml`).
+
+Entrar e consultar com um token (vale 15 minutos). Troque o usuário e a senha;
+o administrador precisa também do campo `"otp"` com o código do aplicativo,
+se o segundo fator estiver ligado:
+
+**PowerShell**
+
+```powershell
+$base = "http://127.0.0.1:8000"
+$login = @{ username = "USUARIO"; password = "SUA_SENHA" } | ConvertTo-Json
+$token = (Invoke-RestMethod -Method Post "$base/api/v1/auth/token" -ContentType "application/json" -Body $login).access_token
+Invoke-RestMethod "$base/api/v1/assets?ordering=-risco&limit=5" -Headers @{ Authorization = "Bearer $token" } | ConvertTo-Json -Depth 5
+```
+
+**Linux**
+
+```bash
+BASE=http://127.0.0.1:2200
+TOKEN=$(curl -s -X POST $BASE/api/v1/auth/token -H 'Content-Type: application/json' \
+  -d '{"username":"USUARIO","password":"SUA_SENHA"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+curl -s "$BASE/api/v1/assets?ordering=-risco&limit=5" -H "Authorization: Bearer $TOKEN"
+```
+
+Chave de API para scripts (mostrada uma vez só; o banco guarda só o hash):
+
+**Linux**
+
+```bash
+cd ~/trab02_2026_2_12621cbs200
+docker compose -f compose.servidor.yaml exec app python manage.py apikey criar USUARIO "nome da chave"
+docker compose -f compose.servidor.yaml exec app python manage.py apikey listar
+docker compose -f compose.servidor.yaml exec app python manage.py apikey revogar PREFIXO
+curl -s http://127.0.0.1:2200/api/v1/assets -H "X-API-Key: CHAVE"
+```
+
+No Windows (versão local), o mesmo com `.\.venv\Scripts\python.exe manage.py
+apikey ...`.
+
+A coleção `docs/web/SENTINEL.postman_collection.json` testa as duas APIs: as
+pastas 0 a 4 usam a API das telas (sessão e token CSRF); a pasta 5, a v1
+(token, Problem Details, paginação, ordenação por risco, `If-Match`, 409, 428,
+405). São 58 requisições e 96 verificações. Use uma conta do grupo Analista.
 
 No aplicativo Postman: **Import** → escolha o arquivo → abra a coleção →
 aba **Variables** → preencha `base_url` (por exemplo `http://127.0.0.1:8000`),
@@ -383,7 +502,18 @@ Pela linha de comando (precisa do [Node.js](https://nodejs.org/)):
 
 ```powershell
 cd C:\Projetos\SENTINEL
-npx newman run docs/web/SENTINEL.postman_collection.json --env-var base_url=http://127.0.0.1:8000 --env-var username=admin --env-var password=SUA_SENHA
+npx newman run docs/web/SENTINEL.postman_collection.json --env-var base_url=http://127.0.0.1:8000 --env-var username=USUARIO_ANALISTA --env-var password=SUA_SENHA
+```
+
+Testes gerados a partir do contrato (Schemathesis), com a aplicação no ar e
+uma chave de API:
+
+**Linux**
+
+```bash
+.venv/bin/schemathesis run docs/web/openapi.yaml --url http://127.0.0.1:8000 \
+  -H "X-API-Key: CHAVE" --max-examples 25 \
+  --exclude-checks ignored_auth,positive_data_acceptance,missing_required_header
 ```
 
 ### 10. Backup e restauração
@@ -393,7 +523,7 @@ Backup do banco inteiro (inventário, contas e auditoria), no servidor:
 **Linux**
 
 ```bash
-cd ~/sentinel-web
+cd ~/trab02_2026_2_12621cbs200
 docker compose -f compose.servidor.yaml exec -T db pg_dump -U sentinel_owner -d sentinel -Fc > sentinel-$(date +%F).dump
 ls -lh sentinel-*.dump
 ```
@@ -404,7 +534,7 @@ Restaurar um backup (substitui os dados atuais pelos do arquivo). Troque
 **Linux**
 
 ```bash
-cd ~/sentinel-web
+cd ~/trab02_2026_2_12621cbs200
 docker compose -f compose.servidor.yaml stop app monitor
 docker compose -f compose.servidor.yaml exec -T db pg_restore -U sentinel_owner -d sentinel --clean --if-exists --no-owner --no-acl < ARQUIVO.dump
 sh ops/servidor/subir.sh
@@ -443,6 +573,61 @@ para correção e `docs/` para documentação.
 | A tela mostra **Acesso restrito** | A conta não está em nenhum grupo: inclua-a em Usuários (seção 6) |
 | O servidor não responde | Ele só é alcançável de dentro da rede da UFU |
 | `Existe um banco do SENTINEL, mas falta o arquivo .env` | Recupere o `.env` original. Não apague o volume: ele guarda os dados |
+| `git push` recusa com `refusing to allow ... workflow` | O token do Git não tem a permissão `workflow`: `gh auth refresh -s workflow` (ou entre de novo no Git Credential Manager) e repita |
+
+### 13. Versões e reversão
+
+Publicar a versão entregue (a tag dispara a publicação das imagens no GitHub
+Container Registry; o passo a passo, com a release e o `develop`, está em
+[GIT-FLOW.md](docs/GIT-FLOW.md)):
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+git switch main
+git pull
+git tag -a v1.0.0 -m "Trabalho 02 entregue"
+git push origin v1.0.0
+```
+
+Instalar uma versão no servidor, ou voltar para a anterior (os dados ficam no
+volume; faça antes o backup da seção 10):
+
+**Linux**
+
+```bash
+cd ~/trab02_2026_2_12621cbs200
+git fetch --tags
+git checkout v1.0.0
+sh ops/servidor/subir.sh
+sh ops/servidor/verificar.sh
+```
+
+Para voltar ao código mais novo: `git checkout main && git pull && sh
+ops/servidor/subir.sh`. Cuidados com migrações em [CI-CD.md](docs/CI-CD.md).
+
+### 14. HTTPS no computador
+
+Laboratório do card S5_11: um proxy com TLS (Caddy) na frente da aplicação,
+só neste computador (explicação e evidências em [TLS.md](docs/TLS.md)):
+
+**PowerShell**
+
+```powershell
+cd C:\Projetos\SENTINEL
+docker compose -f compose.servidor.yaml -f compose.tls.yaml up -d --build
+docker compose -f compose.servidor.yaml -f compose.tls.yaml exec app python manage.py createsuperuser
+start https://localhost:8443
+```
+
+Usa o `.env` criado pelo `ABRIR-SENTINEL.cmd` (rode-o uma vez antes) e um banco
+próprio, com a base de exemplo; o segundo comando cria a conta de entrada.
+O navegador alerta sobre o certificado (é de uma autoridade local): **Avançado**
+→ **Continuar**. Para desligar:
+`docker compose -f compose.servidor.yaml -f compose.tls.yaml stop proxy` e
+`docker compose -f compose.servidor.yaml up -d app`. Não use no servidor da
+disciplina: lá só a porta 2200 é liberada.
 
 ## Interface web
 
@@ -473,6 +658,24 @@ Documentação da versão web:
 | [MEDICOES.md](docs/web/MEDICOES.md) | Tempos e crescimento dos algoritmos e do modelo de risco |
 | [SEGURANCA.md](docs/web/SEGURANCA.md), [ACESSIBILIDADE.md](docs/web/ACESSIBILIDADE.md) | Modelo de ameaças e controles; verificação WCAG 2.1 |
 | [VALIDACAO.md](docs/web/VALIDACAO.md) | O que foi testado nesta versão e o que depende do servidor |
+
+Documentos da Sprint 5 (um por assunto; [SPRINTS.md](docs/web/SPRINTS.md) liga cada card ao seu):
+
+| Documento | Conteúdo |
+| --- | --- |
+| [API.md](docs/API.md) | API v1: rotas, códigos, Problem Details, JWT, chave de API, OpenAPI, Schemathesis |
+| [ORM-E-SQLALCHEMY.md](docs/ORM-E-SQLALCHEMY.md) | Mapeamento objeto-relacional, herança, repositório SQLAlchemy, Alembic, N+1 |
+| [LAB-SQL-INJECTION.md](docs/LAB-SQL-INJECTION.md) | Laboratório de SQL injection, correção, testes e bandit |
+| [SENHAS-E-ACESSO.md](docs/SENHAS-E-ACESSO.md) | Política de senha, Argon2id, matriz de permissões, cookies e SameSite |
+| [OWASP-TOP10.md](docs/OWASP-TOP10.md) | O sistema pelo OWASP Top 10:2025, pip-audit, bandit, mypy e achados priorizados |
+| [TLS.md](docs/TLS.md) | Proxy com TLS, redirecionamento, HSTS e `openssl s_client` |
+| [HARDENING.md](docs/HARDENING.md) | Endurecimento dos containers, da imagem e do servidor |
+| [CI-CD.md](docs/CI-CD.md) | Pipeline, publicação no GHCR, implantação, reversão e riscos |
+| [GIT-FLOW.md](docs/GIT-FLOW.md), [CHANGELOG.md](CHANGELOG.md) | Ramos, proteção, tags, hotfix e registro de mudanças |
+| [NUVEM.md](docs/NUVEM.md) | IaaS × PaaS, responsabilidades, custos, conta segura, publicação e LGPD |
+| [ARQUITETURA.md](docs/ARQUITETURA.md) | Requisitos, C4, ADRs, STRIDE e backlog |
+| [REFATORACAO.md](docs/REFATORACAO.md), [DIVIDA-TECNICA.md](docs/DIVIDA-TECNICA.md) | Code smells, refatorações, relatório do mypy e dívida em issues |
+| [APRESENTACAO.md](docs/APRESENTACAO.md), [RETROSPECTIVA.md](docs/RETROSPECTIVA.md) | Roteiro, perguntas, sprint review e retrospectiva |
 
 
 ## Requisitos do Trabalho 2
@@ -512,7 +715,8 @@ e os mesmos comandos globais:
 | `inventario.py` | Classe `Inventario`: o conjunto dos equipamentos e das vulnerabilidades e as regras entre eles (hostname e patrimônio únicos, CVE única no catálogo, cascata, dependências, buscas) |
 | `risco.py` | Classe `ModeloRisco`: monta M, v, A e b, verifica a invertibilidade (com o posto e o teorema de Rouché-Capelli), resolve o sistema e confere a solução; monta também o plano de correção, com o quanto cada correção reduz o risco total |
 | `arvore.py` | A árvore de dependências de um equipamento (opção 12), nos dois sentidos: cada equipamento aparece uma vez, sob a ligação mais específica, com as outras ligações no item e os iguais agrupados |
-| `armazenamento.py` | Classe `ArquivoInventario`: lê e grava o JSON, com gravação atômica |
+| `armazenamento.py` | Classe `ArquivoInventario`: lê e grava o JSON, com gravação atômica; `abrir_repositorio()` escolhe entre o JSON e o banco |
+| `repositorio_sql.py`, `migracoes_sql/` | Classe `BancoInventario`: a mesma interface, num banco relacional (SQLAlchemy 2), com as migrações do Alembic; usada com a variável `INVENTARIO_BANCO` |
 | `migracao.py` | Converte uma base do Trabalho 1 para o formato novo |
 | `base_cve.py` | Classe `BaseCVE`: a base das CVEs exploradas, com a busca por palavras, a navegação por fabricante e produto, as sugestões pela ficha técnica e a leitura e a gravação do arquivo da base |
 | `atualizacao_cve.py` | A atualização da base de CVEs: baixa o catálogo KEV e os registros oficiais das CVEs, escolhe a nota e confere tudo. É o único módulo que usa a rede |
@@ -526,7 +730,8 @@ e os mesmos comandos globais:
 | `formatacao.py`, `cores.py`, `banner.py`, `surpresa.py` | Padronização de texto, cores ANSI, logotipo e a animação-surpresa, herdados do Trabalho 1 |
 | `testes.py` | Testes automáticos (`python testes.py`) |
 | `Dockerfile`, `compose.yaml`, `.dockerignore`, `requirements.txt` | Container |
-| `ruff.toml` | Regras de estilo conferidas pelo Ruff: PEP 8 e PEP 257 |
+| `ruff.toml`, `mypy.ini`, `.bandit.yaml` | Estilo (Ruff: PEP 8 e PEP 257), tipos (mypy) e análise de segurança (bandit) |
+| `CHANGELOG.md` | Registro de mudanças por versão |
 | `.github/workflows/verificacao.yml`, `.coveragerc` | Verificação automática no GitHub (estilo, testes e imagem Docker) e configuração da medida de cobertura |
 | `base_cve/` | A base de CVEs que vem com o programa (`kev.json`) e os avisos de licença das fontes (`AVISOS.txt`) |
 | `dados_exemplo/` | Base fictícia de 76 equipamentos, com ficha técnica, CVEs, CWEs e vetores CVSS, e dois cenários pequenos: um de 3 equipamentos, resolvido à mão, e um singular |
@@ -537,20 +742,22 @@ A interface web acrescenta:
 | --- | --- |
 | `sentinel/` | Configuração do Django (`settings.py`: banco, segurança, HTTPS opcional) e os endereços (`urls.py`) |
 | `inventory/models.py` | As tabelas do PostgreSQL: ativos, vulnerabilidades, tratamentos, dependências, histórico e auditoria |
-| `inventory/views.py` | Recebe cada requisição, confere a permissão e devolve a página ou o JSON da API |
+| `inventory/views.py` | Recebe cada requisição, confere a permissão e devolve a página ou o JSON da API das telas |
+| `inventory/api_v1.py`, `docs/web/openapi.yaml` | A API v1 (JWT, chave de API, Problem Details, versões) e o seu contrato OpenAPI; Swagger UI em `inventory/static/inventory/vendor/swagger-ui/` |
 | `inventory/services.py` | Casos de uso de gravação (cadastrar, alterar, excluir, importar), em transação e com auditoria |
 | `inventory/analysis.py` | Casos de uso de leitura: análise de risco, alcance (busca em largura), ciclos (busca em profundidade) e plano de correção |
 | `inventory/repository.py` | Monta o `Inventario` do domínio a partir do banco (ou da memória, nos cenários e nos testes) |
 | `inventory/templates/`, `inventory/static/` | As telas (HTML, CSS e JavaScript) |
-| `inventory/management/commands/` | Comandos `bootstrap` (preparação da instalação), `import_inventory`, `setup_roles` e `provision_mfa` |
-| `academic/` | Estruturas e algoritmos das sprints (lista encadeada, fila, hash, árvore binária, ordenações, buscas, recursão) e as medições (`benchmark.py`) |
+| `inventory/management/commands/` | Comandos `bootstrap` (preparação da instalação), `import_inventory`, `setup_roles`, `provision_mfa` e `apikey` |
+| `academic/` | Estruturas e algoritmos das sprints (lista encadeada, fila, hash, árvore binária, ordenações, buscas, recursão), as medições (`benchmark.py`) e os laboratórios de SQL injection e de hash de senha |
 | `tests_web/` | Testes com pytest e PostgreSQL real |
 | `Dockerfile.web`, `compose.servidor.yaml`, `compose.web.yaml`, `compose.web.local.yaml` | Imagem da aplicação e os três perfis: servidor da disciplina, internet com HTTPS e Windows |
 | `ops/servidor/` | `subir.sh` (sobe tudo no servidor) e `verificar.sh` (comprova as 24 horas) |
 | `ops/monitor.py`, `ops/init-db.sh`, `ops/Caddyfile` | Registro de disponibilidade, papéis do banco e o proxy HTTPS |
+| `compose.tls.yaml`, `ops/Caddyfile.lab` | Laboratório de HTTPS no computador (proxy com TLS na frente do perfil do servidor) |
 | `ABRIR-SENTINEL.cmd`, `VERIFICAR-SENTINEL.cmd`, `ops/windows/start.ps1` | Abrir e diagnosticar a versão web no Windows |
-| `.github/workflows/web.yml` | Verificação automática da web: estilo, testes com PostgreSQL, checagem de implantação, dependências e o container do servidor |
-| `docs/web/` | Documentação da versão web (veja [Interface web](#interface-web)) |
+| `.github/workflows/web.yml` | Verificação automática da web: estilo, tipos, bandit, testes com PostgreSQL, Schemathesis, checagem de implantação, dependências, o container do servidor com Trivy e a publicação das imagens numa tag |
+| `docs/web/`, `docs/` | Documentação da versão web e da Sprint 5 (veja [Interface web](#interface-web)) |
 
 Só `entrada.py` chama `input()`, só `atualizacao_cve.py` usa a rede, e só
 `armazenamento.py` lê e grava a base do inventário (a conversão manual de
@@ -581,17 +788,17 @@ projeto:
 
 ```
 docker compose up -d --build
-docker cp dados_exemplo/inventario_exemplo.json inventario:/app/dados/inventario.json
-docker restart inventario
-docker attach inventario
+docker cp dados_exemplo/inventario_exemplo.json trab02_2026_2_12621cbs200_terminal:/app/dados/inventario.json
+docker restart trab02_2026_2_12621cbs200_terminal
+docker attach trab02_2026_2_12621cbs200_terminal
 ```
 
 O primeiro comando constrói a imagem e liga o container, com as opções de
 segurança do `compose.yaml`; os dois seguintes põem a base de exemplo no volume
 dos dados e religam o programa, que lê a base ao abrir. No `docker attach`,
 tecle Enter para ver o menu; Ctrl+P e depois Ctrl+Q saem dele sem parar o
-programa. Se já existir um container `inventario`, criado antes com o
-`docker run`, apague-o primeiro com `docker rm -f inventario` (os dados ficam
+programa. Se já existir um container `trab02_2026_2_12621cbs200_terminal`, criado antes com o
+`docker run`, apague-o primeiro com `docker rm -f trab02_2026_2_12621cbs200_terminal` (os dados ficam
 no volume). Sem Docker, com o Python, veja
 [Direto no computador](#direto-no-computador). O que mostrar na apresentação
 está no [Roteiro de demonstração](#roteiro-de-demonstração). Para clonar (ou
@@ -611,7 +818,7 @@ para quando você quiser entender ou controlar o processo.
 Diferente do [Início rápido](#início-rápido), ele abre o programa com
 `docker run -it --rm` em vez de `docker attach`: o menu aparece na hora, sem
 teclar Enter. Ao sair (opção 0 ou `sair`), o container é descartado, mas os
-dados ficam no volume `inventario-dados` e voltam no próximo. Rodar o comando
+dados ficam no volume `trab02_2026_2_12621cbs200_terminal_data` e voltam no próximo. Rodar o comando
 de novo atualiza o código e reabre, com os mesmos dados.
 
 O Docker precisa estar instalado e ligado — no Windows, o Docker Desktop
@@ -622,24 +829,24 @@ usuário não estiver no grupo `docker`.
 **Windows (PowerShell):**
 
 ```
-cd $HOME; if (-not (Get-Command git -ErrorAction SilentlyContinue)) { winget install -e --id Git.Git }; if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Write-Host 'Instale o Docker Desktop: winget install -e --id Docker.DockerDesktop'; return }; docker info *> $null; if ($LASTEXITCODE -ne 0) { Write-Host 'Abra o Docker Desktop, espere "Engine running" e rode de novo.'; return }; if (Test-Path "$HOME\Ciberseguranca_T2\.git") { git -C "$HOME\Ciberseguranca_T2" pull } else { git clone https://github.com/heluiz/Ciberseguranca_T2.git "$HOME\Ciberseguranca_T2" }; cd "$HOME\Ciberseguranca_T2"; docker build -t inventario:1.0 .; docker run --rm --user root --entrypoint sh -v inventario-dados:/app/dados inventario:1.0 -c "[ -f /app/dados/inventario.json ] || { cp /app/dados_exemplo/inventario_exemplo.json /app/dados/inventario.json && chown 10001:10001 /app/dados/inventario.json; }"; docker run -it --rm --read-only --security-opt no-new-privileges -v inventario-dados:/app/dados inventario:1.0
+cd $HOME; if (-not (Get-Command git -ErrorAction SilentlyContinue)) { winget install -e --id Git.Git }; if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Write-Host 'Instale o Docker Desktop: winget install -e --id Docker.DockerDesktop'; return }; docker info *> $null; if ($LASTEXITCODE -ne 0) { Write-Host 'Abra o Docker Desktop, espere "Engine running" e rode de novo.'; return }; if (Test-Path "$HOME\trab02_2026_2_12621cbs200\.git") { git -C "$HOME\trab02_2026_2_12621cbs200" pull } else { git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git "$HOME\trab02_2026_2_12621cbs200" }; cd "$HOME\trab02_2026_2_12621cbs200"; docker build -t trab02_2026_2_12621cbs200_terminal:1.0 .; docker run --rm --user root --entrypoint sh -v trab02_2026_2_12621cbs200_terminal_data:/app/dados trab02_2026_2_12621cbs200_terminal:1.0 -c "[ -f /app/dados/inventario.json ] || { cp /app/dados_exemplo/inventario_exemplo.json /app/dados/inventario.json && chown 10001:10001 /app/dados/inventario.json; }"; docker run -it --rm --read-only --security-opt no-new-privileges -v trab02_2026_2_12621cbs200_terminal_data:/app/dados trab02_2026_2_12621cbs200_terminal:1.0
 ```
 
 **Linux (Debian e Ubuntu):**
 
 ```
-if ! command -v git >/dev/null; then sudo apt update && sudo apt install -y git; fi; if ! command -v docker >/dev/null; then sudo apt install -y docker.io && sudo systemctl enable --now docker; fi; D=docker; docker info >/dev/null 2>&1 || D="sudo docker"; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && $D build -t inventario:1.0 . && $D run --rm --user root --entrypoint sh -v inventario-dados:/app/dados inventario:1.0 -c '[ -f /app/dados/inventario.json ] || { cp /app/dados_exemplo/inventario_exemplo.json /app/dados/inventario.json && chown 10001:10001 /app/dados/inventario.json; }' && $D run -it --rm --read-only --security-opt no-new-privileges -v inventario-dados:/app/dados inventario:1.0
+if ! command -v git >/dev/null; then sudo apt update && sudo apt install -y git; fi; if ! command -v docker >/dev/null; then sudo apt install -y docker.io && sudo systemctl enable --now docker; fi; D=docker; docker info >/dev/null 2>&1 || D="sudo docker"; if [ -d ~/trab02_2026_2_12621cbs200/.git ]; then git -C ~/trab02_2026_2_12621cbs200 pull; else git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git ~/trab02_2026_2_12621cbs200; fi; cd ~/trab02_2026_2_12621cbs200 && $D build -t trab02_2026_2_12621cbs200_terminal:1.0 . && $D run --rm --user root --entrypoint sh -v trab02_2026_2_12621cbs200_terminal_data:/app/dados trab02_2026_2_12621cbs200_terminal:1.0 -c '[ -f /app/dados/inventario.json ] || { cp /app/dados_exemplo/inventario_exemplo.json /app/dados/inventario.json && chown 10001:10001 /app/dados/inventario.json; }' && $D run -it --rm --read-only --security-opt no-new-privileges -v trab02_2026_2_12621cbs200_terminal_data:/app/dados trab02_2026_2_12621cbs200_terminal:1.0
 ```
 
 **Arch Linux:**
 
 ```
-if ! command -v git >/dev/null; then sudo pacman -S --needed --noconfirm git; fi; if ! command -v docker >/dev/null; then sudo pacman -S --needed --noconfirm docker && sudo systemctl enable --now docker; fi; D=docker; docker info >/dev/null 2>&1 || D="sudo docker"; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && $D build -t inventario:1.0 . && $D run --rm --user root --entrypoint sh -v inventario-dados:/app/dados inventario:1.0 -c '[ -f /app/dados/inventario.json ] || { cp /app/dados_exemplo/inventario_exemplo.json /app/dados/inventario.json && chown 10001:10001 /app/dados/inventario.json; }' && $D run -it --rm --read-only --security-opt no-new-privileges -v inventario-dados:/app/dados inventario:1.0
+if ! command -v git >/dev/null; then sudo pacman -S --needed --noconfirm git; fi; if ! command -v docker >/dev/null; then sudo pacman -S --needed --noconfirm docker && sudo systemctl enable --now docker; fi; D=docker; docker info >/dev/null 2>&1 || D="sudo docker"; if [ -d ~/trab02_2026_2_12621cbs200/.git ]; then git -C ~/trab02_2026_2_12621cbs200 pull; else git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git ~/trab02_2026_2_12621cbs200; fi; cd ~/trab02_2026_2_12621cbs200 && $D build -t trab02_2026_2_12621cbs200_terminal:1.0 . && $D run --rm --user root --entrypoint sh -v trab02_2026_2_12621cbs200_terminal_data:/app/dados trab02_2026_2_12621cbs200_terminal:1.0 -c '[ -f /app/dados/inventario.json ] || { cp /app/dados_exemplo/inventario_exemplo.json /app/dados/inventario.json && chown 10001:10001 /app/dados/inventario.json; }' && $D run -it --rm --read-only --security-opt no-new-privileges -v trab02_2026_2_12621cbs200_terminal_data:/app/dados trab02_2026_2_12621cbs200_terminal:1.0
 ```
 
 A base de exemplo só entra quando ainda não há dados: se você já cadastrou
 alguma coisa, o comando não a sobrescreve. Para recomeçar com ela, apague o
-volume antes (`docker volume rm inventario-dados`) e rode de novo. Para abrir
+volume antes (`docker volume rm trab02_2026_2_12621cbs200_terminal_data`) e rode de novo. Para abrir
 **vazio**, sem a base de exemplo, use o [Início rápido](#início-rápido) sem os
 passos do `docker cp`. Mais detalhes da base estão em
 [Dados de exemplo](#dados-de-exemplo).
@@ -654,19 +861,19 @@ política de execução do PowerShell.
 **Windows (PowerShell):**
 
 ```
-cd $HOME; if (-not (Get-Command git -ErrorAction SilentlyContinue)) { winget install -e --id Git.Git }; if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Write-Host 'Instale o Python 3.11+ (py install 3.14) e abra um terminal novo.'; return }; if (Test-Path "$HOME\Ciberseguranca_T2\.git") { git -C "$HOME\Ciberseguranca_T2" pull } else { git clone https://github.com/heluiz/Ciberseguranca_T2.git "$HOME\Ciberseguranca_T2" }; cd "$HOME\Ciberseguranca_T2"; python -m venv .venv; .\.venv\Scripts\python.exe -m pip install -q -r requirements.txt; if (-not (Test-Path dados\inventario.json)) { New-Item -ItemType Directory -Force dados > $null; Copy-Item dados_exemplo\inventario_exemplo.json dados\inventario.json }; .\.venv\Scripts\python.exe main.py
+cd $HOME; if (-not (Get-Command git -ErrorAction SilentlyContinue)) { winget install -e --id Git.Git }; if (-not (Get-Command python -ErrorAction SilentlyContinue)) { Write-Host 'Instale o Python 3.11+ (py install 3.14) e abra um terminal novo.'; return }; if (Test-Path "$HOME\trab02_2026_2_12621cbs200\.git") { git -C "$HOME\trab02_2026_2_12621cbs200" pull } else { git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git "$HOME\trab02_2026_2_12621cbs200" }; cd "$HOME\trab02_2026_2_12621cbs200"; python -m venv .venv; .\.venv\Scripts\python.exe -m pip install -q -r requirements.txt; if (-not (Test-Path dados\inventario.json)) { New-Item -ItemType Directory -Force dados > $null; Copy-Item dados_exemplo\inventario_exemplo.json dados\inventario.json }; .\.venv\Scripts\python.exe main.py
 ```
 
 **Linux (Debian e Ubuntu):**
 
 ```
-if ! command -v git >/dev/null; then sudo apt update && sudo apt install -y git; fi; if ! command -v python3 >/dev/null || ! dpkg -s python3-venv >/dev/null 2>&1; then sudo apt update && sudo apt install -y python3 python3-venv; fi; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && python3 -m venv .venv && . .venv/bin/activate && pip install -q -r requirements.txt && mkdir -p dados && { [ -f dados/inventario.json ] || cp dados_exemplo/inventario_exemplo.json dados/inventario.json; } && python main.py
+if ! command -v git >/dev/null; then sudo apt update && sudo apt install -y git; fi; if ! command -v python3 >/dev/null || ! dpkg -s python3-venv >/dev/null 2>&1; then sudo apt update && sudo apt install -y python3 python3-venv; fi; if [ -d ~/trab02_2026_2_12621cbs200/.git ]; then git -C ~/trab02_2026_2_12621cbs200 pull; else git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git ~/trab02_2026_2_12621cbs200; fi; cd ~/trab02_2026_2_12621cbs200 && python3 -m venv .venv && . .venv/bin/activate && pip install -q -r requirements.txt && mkdir -p dados && { [ -f dados/inventario.json ] || cp dados_exemplo/inventario_exemplo.json dados/inventario.json; } && python main.py
 ```
 
 **Arch Linux:**
 
 ```
-if ! command -v git >/dev/null; then sudo pacman -S --needed --noconfirm git; fi; if ! command -v python >/dev/null; then sudo pacman -S --needed --noconfirm python; fi; if [ -d ~/Ciberseguranca_T2/.git ]; then git -C ~/Ciberseguranca_T2 pull; else git clone https://github.com/heluiz/Ciberseguranca_T2.git ~/Ciberseguranca_T2; fi; cd ~/Ciberseguranca_T2 && python -m venv .venv && . .venv/bin/activate && pip install -q -r requirements.txt && mkdir -p dados && { [ -f dados/inventario.json ] || cp dados_exemplo/inventario_exemplo.json dados/inventario.json; } && python main.py
+if ! command -v git >/dev/null; then sudo pacman -S --needed --noconfirm git; fi; if ! command -v python >/dev/null; then sudo pacman -S --needed --noconfirm python; fi; if [ -d ~/trab02_2026_2_12621cbs200/.git ]; then git -C ~/trab02_2026_2_12621cbs200 pull; else git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git ~/trab02_2026_2_12621cbs200; fi; cd ~/trab02_2026_2_12621cbs200 && python -m venv .venv && . .venv/bin/activate && pip install -q -r requirements.txt && mkdir -p dados && { [ -f dados/inventario.json ] || cp dados_exemplo/inventario_exemplo.json dados/inventario.json; } && python main.py
 ```
 
 ### O que instalar
@@ -727,8 +934,8 @@ recurso opcional *Cliente OpenSSH* nas Configurações.
 ### Baixar o código
 
 ```
-git clone https://github.com/heluiz/Ciberseguranca_T2.git
-cd Ciberseguranca_T2
+git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git
+cd trab02_2026_2_12621cbs200
 ```
 
 Os comandos das próximas seções rodam dentro dessa pasta. Para receber as
@@ -786,14 +993,14 @@ primeira construção precisa de internet, para baixar a imagem do Python e as
 bibliotecas.
 
 ```
-docker build -t inventario:1.0 .
-docker volume create inventario-dados
+docker build -t trab02_2026_2_12621cbs200_terminal:1.0 .
+docker volume create trab02_2026_2_12621cbs200_terminal_data
 
-docker run -dit --name inventario --restart unless-stopped \
+docker run -dit --name trab02_2026_2_12621cbs200_terminal --restart unless-stopped \
   --read-only --security-opt no-new-privileges \
-  -v inventario-dados:/app/dados inventario:1.0
+  -v trab02_2026_2_12621cbs200_terminal_data:/app/dados trab02_2026_2_12621cbs200_terminal:1.0
 
-docker attach inventario
+docker attach trab02_2026_2_12621cbs200_terminal
 ```
 
 (No PowerShell, a barra invertida no fim da linha não continua o comando:
@@ -812,9 +1019,9 @@ ou no Windows Terminal.
 
 O `compose.yaml` é uma alternativa que faz a construção, o volume e a execução
 de uma vez, com as mesmas opções: `docker compose up -d --build`, seguido de
-`docker attach inventario`. Use um jeito ou o outro: os dois dão ao container
-o nome `inventario`, e o segundo daria conflito. Para trocar, apague antes o
-container com `docker rm -f inventario`; os dados continuam no volume.
+`docker attach trab02_2026_2_12621cbs200_terminal`. Use um jeito ou o outro: os dois dão ao container
+o nome `trab02_2026_2_12621cbs200_terminal`, e o segundo daria conflito. Para trocar, apague antes o
+container com `docker rm -f trab02_2026_2_12621cbs200_terminal`; os dados continuam no volume.
 
 | Opção | Por quê |
 | --- | --- |
@@ -823,7 +1030,7 @@ container com `docker rm -f inventario`; os dados continuam no volume.
 | `--restart unless-stopped` | O Docker religa o programa se ele cair ou se o servidor reiniciar, a não ser que alguém tenha parado o container de propósito (`docker stop`). |
 | `--read-only` | O sistema de arquivos do container fica só para leitura; o programa grava apenas no volume dos dados. Quem conseguisse rodar algo lá dentro não poderia alterar o código nem instalar nada. |
 | `--security-opt no-new-privileges` | Nenhum processo do container consegue ganhar mais privilégios do que já tem (por exemplo, por um programa com *setuid*). |
-| `-v inventario-dados:/app/dados` | Os dados ficam num *volume*: sobrevivem a `docker rm` e à troca da imagem por uma versão nova. A base de CVEs atualizada (opção 16) fica no mesmo volume. |
+| `-v trab02_2026_2_12621cbs200_terminal_data:/app/dados` | Os dados ficam num *volume*: sobrevivem a `docker rm` e à troca da imagem por uma versão nova. A base de CVEs atualizada (opção 16) fica no mesmo volume. |
 
 Dentro do container o programa se comporta de forma diferente em cinco pontos,
 ligados pela variável de ambiente `INVENTARIO_EM_CONTAINER` (definida no
@@ -847,10 +1054,10 @@ Para acompanhar o container:
 
 ```
 docker ps                                   # STATUS mostra "Up ... " e (healthy)
-docker inspect -f '{{.State.StartedAt}}' inventario
-docker logs inventario                      # saída do programa
-docker stop inventario                      # para (não religa sozinho)
-docker start inventario                     # liga de novo, com os mesmos dados
+docker inspect -f '{{.State.StartedAt}}' trab02_2026_2_12621cbs200_terminal
+docker logs trab02_2026_2_12621cbs200_terminal                      # saída do programa
+docker stop trab02_2026_2_12621cbs200_terminal                      # para (não religa sozinho)
+docker start trab02_2026_2_12621cbs200_terminal                     # liga de novo, com os mesmos dados
 ```
 
 O `HEALTHCHECK` do `Dockerfile` confere a cada minuto que o arquivo de dados
@@ -860,20 +1067,20 @@ Se o arquivo de dados ficar inválido (editado à mão com erro, por exemplo), o
 programa recusa a base e termina com código 1, sem sobrescrever nada; com
 `--restart unless-stopped`, o Docker tenta religá-lo de novo e de novo, com um
 intervalo que dobra a cada tentativa (até 1 minuto). Para consertar:
-`docker stop inventario`, depois corrija o arquivo dentro do volume (por
-exemplo, `docker run --rm -it -v inventario-dados:/d alpine vi /d/inventario.json`)
-ou mova-o para outro nome, e `docker start inventario`.
+`docker stop trab02_2026_2_12621cbs200_terminal`, depois corrija o arquivo dentro do volume (por
+exemplo, `docker run --rm -it -v trab02_2026_2_12621cbs200_terminal_data:/d alpine vi /d/inventario.json`)
+ou mova-o para outro nome, e `docker start trab02_2026_2_12621cbs200_terminal`.
 
 Para atualizar o programa, mantendo os dados: o `git pull` traz o código novo,
 e o `docker run` é o mesmo de antes.
 
 ```
 git pull
-docker build -t inventario:1.0 .
-docker rm -f inventario
-docker run -dit --name inventario --restart unless-stopped \
+docker build -t trab02_2026_2_12621cbs200_terminal:1.0 .
+docker rm -f trab02_2026_2_12621cbs200_terminal
+docker run -dit --name trab02_2026_2_12621cbs200_terminal --restart unless-stopped \
   --read-only --security-opt no-new-privileges \
-  -v inventario-dados:/app/dados inventario:1.0
+  -v trab02_2026_2_12621cbs200_terminal_data:/app/dados trab02_2026_2_12621cbs200_terminal:1.0
 ```
 
 Se o volume foi criado por uma versão anterior da imagem, em que o usuário do
@@ -882,7 +1089,7 @@ programa tinha o UID 1000 (hoje é 10001), rode uma vez, entre o `docker rm` e o
 novo. Sem ele, o programa lê a base, mas não consegue gravar:
 
 ```
-docker run --rm --user root -v inventario-dados:/app/dados inventario:1.0 chown -R 10001:10001 /app/dados
+docker run --rm --user root -v trab02_2026_2_12621cbs200_terminal_data:/app/dados trab02_2026_2_12621cbs200_terminal:1.0 chown -R 10001:10001 /app/dados
 ```
 
 ### No servidor do docente
@@ -895,26 +1102,35 @@ inicial. O endereço é da rede interna da universidade: só dá para entrar de
 dentro dela, no campus, ou por uma VPN que chegue até ela.
 
 Os comandos abaixo usam `usuario` e `endereco-do-servidor` no lugar dos dados
-reais, que ficam fora deste repositório público, e o sufixo `heluiz` nos nomes
-da imagem, do container e do volume. Quem repetir os passos troca o sufixo pelo
-próprio nome: num servidor compartilhado, nomes iguais aos de um colega dão
-conflito ou misturam os dados dos dois.
+reais. Os nomes seguem o padrão da disciplina (card S5_20),
+`trab02_2026_2_MATRICULA`: num servidor compartilhado, nomes iguais aos de um
+colega dão conflito ou misturam os dados dos dois. Quem repetir os passos troca
+a matrícula pela própria.
 
 #### Como ficou a implantação
 
-O container foi ligado no servidor do docente em 27/10/2026, com os passos de
-[Implantar, passo a passo](#implantar-passo-a-passo), e o requisito está
-cumprido: na leitura de 29/10, às 20:19, ele estava no ar havia 46 horas, sem
-interrupção, como mostram as [Provas das 24 horas](#provas-das-24-horas).
+O menu de terminal foi ligado no servidor do docente em 27/10/2026, com os
+passos de [Implantar, passo a passo](#implantar-passo-a-passo), e o requisito
+está cumprido: na leitura de 29/10, às 20:19, ele estava no ar havia 46 horas,
+sem interrupção, como mostram as [Provas das 24 horas](#provas-das-24-horas).
 
-| O quê | No servidor do docente |
-| --- | --- |
-| Versão | Commit `abae5ec`, a `main` depois do Pull Request #12 |
-| Imagem | `inventario-heluiz:1.0`, construída no próprio servidor (277 MB) |
-| Volume | `inventario-heluiz-dados`, com a base de exemplo, que é fictícia |
-| Container | `heluiz-12621cbs200` (nome e matrícula; chamava-se `inventario-heluiz` até 17/11/2026, quando foi renomeado com `docker rename`, sem desligar), ligado com `--restart unless-stopped`, `--read-only` e `--security-opt no-new-privileges`; roda com o usuário `inventario` e não publica nenhuma porta |
-| Acesso | Por SSH, com chave e o atalho `ufu`; a senha inicial foi trocada |
-| Registro | Uma linha por hora em `uptime_inventario.log`, gravada pelo `cron` do servidor |
+Com a Sprint 5, a implantação passou a seguir o padrão de nomes do card S5_20 e
+a incluir a versão web: `sh ops/servidor/subir.sh` sobe tudo no projeto
+`trab02_2026_2_12621cbs200` (tabela na seção
+[2. Versão web no servidor](#2-versão-web-no-servidor)). O container de 27/10
+fica ligado até o novo completar 24 horas e então é removido.
+
+| O quê | Implantação de 27/10 (registro) | Padrão da Sprint 5 |
+| --- | --- | --- |
+| Versão | Commit `abae5ec`, a `main` depois do Pull Request #12 | A `main` atual |
+| Diretório | `~/Ciberseguranca_T2` | `~/trab02_2026_2_12621cbs200` |
+| Imagens | `inventario-heluiz:1.0` (277 MB) | `trab02_2026_2_12621cbs200:1.0` (web) e `trab02_2026_2_12621cbs200_terminal:1.0` |
+| Volumes | `inventario-heluiz-dados` | `trab02_2026_2_12621cbs200_db_data` e `trab02_2026_2_12621cbs200_terminal_data` |
+| Containers | `inventario-heluiz` (renomeado para `heluiz-12621cbs200` em 17/11) | `trab02_2026_2_12621cbs200` (web, porta 2200), `_db`, `_preparar`, `_monitor` e `_terminal` |
+| Portas | Nenhuma | Só a web: `2200:8000` |
+| Opções | `--restart unless-stopped`, `--read-only`, `--security-opt no-new-privileges`, usuário `inventario` | As mesmas, mais `cap_drop: [ALL]` e limites de memória e de processos |
+| Acesso | Por SSH, com chave e o atalho `ufu`; a senha inicial foi trocada | O mesmo |
+| Registro | Uma linha por hora em `uptime_inventario.log`, pelo `cron` | O monitor (uma linha por minuto) e `uptime_trab02.log`, pelo `cron` |
 
 #### Acessar o servidor
 
@@ -928,11 +1144,11 @@ no macOS, no terminal):
 
 ```
 ssh ufu                                            # entra no servidor; exit sai
-ssh ufu docker ps --filter name=heluiz-12621cbs200  # o container está no ar?
-ssh ufu "date; docker inspect -f '{{.State.StartedAt}}' heluiz-12621cbs200"
+ssh ufu docker ps --filter name=trab02_2026_2_12621cbs200_terminal  # o container está no ar?
+ssh ufu "date; docker inspect -f '{{.State.StartedAt}}' trab02_2026_2_12621cbs200_terminal"
 ssh ufu tail -n 5 uptime_inventario.log            # as últimas horas do registro
 scp ufu:uptime_inventario.log .                    # traz uma cópia do registro
-ssh -t ufu docker attach heluiz-12621cbs200         # abre o menu do programa
+ssh -t ufu docker attach trab02_2026_2_12621cbs200_terminal         # abre o menu do programa
 ```
 
 O terceiro comando mostra a hora do servidor e o momento em que o container
@@ -960,8 +1176,8 @@ usuário e a senha, sem criar chave nem atalho nele:
 
 ```
 ssh usuario@endereco-do-servidor
-ssh usuario@endereco-do-servidor docker ps --filter name=heluiz-12621cbs200
-ssh -t usuario@endereco-do-servidor docker attach heluiz-12621cbs200
+ssh usuario@endereco-do-servidor docker ps --filter name=trab02_2026_2_12621cbs200_terminal
+ssh -t usuario@endereco-do-servidor docker attach trab02_2026_2_12621cbs200_terminal
 ```
 
 A senha é pedida a cada comando, não aparece enquanto é digitada e nunca vai na
@@ -1062,8 +1278,11 @@ certo é `echo texto | sudo tee /root/arquivo`.
 
 #### Implantar, passo a passo
 
-Os passos que puseram o container no ar em 27/10. Servem para refazer a
-implantação, com uma versão nova ou em outro servidor.
+Os passos que puseram o menu de terminal no ar em 27/10, com os nomes da época
+(`inventario-heluiz`). **Hoje a implantação é feita com `sh ops/servidor/subir.sh`**
+([2. Versão web no servidor](#2-versão-web-no-servidor)), que sobe a versão web e
+o menu de terminal com o padrão de nomes da Sprint 5. Os passos abaixo ficam como
+registro e explicam cada comando do Docker usado.
 
 **Antes de começar.**
 
@@ -1159,7 +1378,7 @@ systemctl is-enabled docker       # "enabled": o Docker liga com o servidor
 groups                            # o grupo docker tem de aparecer
 df -h ~ /var/lib/docker           # espaço livre; a imagem ocupa uns 280 MB
 docker ps -a                      # containers que já existem no servidor
-git ls-remote https://github.com/heluiz/Ciberseguranca_T2.git HEAD
+git ls-remote https://github.com/heluiz/trab02_2026_2_12621cbs200.git HEAD
 ```
 
 - Se o `docker version` responder `permission denied`, falta o grupo `docker`.
@@ -1176,7 +1395,7 @@ git ls-remote https://github.com/heluiz/Ciberseguranca_T2.git HEAD
 **4. Baixar o código e construir a imagem.**
 
 ```
-git clone https://github.com/heluiz/Ciberseguranca_T2.git
+git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git
 cd Ciberseguranca_T2
 git log -1 --oneline
 docker build -t inventario-heluiz:1.0 .
@@ -1208,7 +1427,7 @@ docker rm semente-heluiz
 **6. Ligar o container.**
 
 ```
-docker run -dit --name heluiz-12621cbs200 --restart unless-stopped \
+docker run -dit --name inventario-heluiz --restart unless-stopped \
   --read-only --security-opt no-new-privileges \
   -v inventario-heluiz-dados:/app/dados inventario-heluiz:1.0
 ```
@@ -1219,12 +1438,12 @@ não abre nenhuma porta de rede, por isso não há nada a liberar no firewall.
 **7. Conferir e sair.**
 
 ```
-docker ps --filter name=heluiz-12621cbs200
+docker ps --filter name=inventario-heluiz
 ```
 
 O `STATUS` mostra `Up` e, depois de um minuto, `(healthy)`. Para ver o menu,
-`docker attach heluiz-12621cbs200` e Enter (do seu computador, direto:
-`ssh -t ufu docker attach heluiz-12621cbs200`); para sair dele sem parar o
+`docker attach inventario-heluiz` e Enter (do seu computador, direto:
+`ssh -t ufu docker attach inventario-heluiz`); para sair dele sem parar o
 programa, Ctrl+P e depois Ctrl+Q, no PowerShell ou no Windows Terminal (no
 terminal do VS Code, o Ctrl+P não chega ao Docker). Por fim, `exit` fecha a
 conexão, e o container continua rodando. O `docker attach` não é preciso para
@@ -1244,7 +1463,7 @@ criado. Na apresentação, se for mostrar o container do servidor, entre com
 comando mostra o estado do container e o acrescenta a um arquivo:
 
 ```
-ssh ufu "date; docker ps --filter name=heluiz-12621cbs200; docker inspect -f 'Ligado em {{.State.StartedAt}} (UTC) | religado {{.RestartCount}} vez(es) | {{.State.Health.Status}}' heluiz-12621cbs200" | Tee-Object -Append -FilePath $HOME\evidencias_24h.txt
+ssh ufu "date; docker ps --filter name=inventario-heluiz; docker inspect -f 'Ligado em {{.State.StartedAt}} (UTC) | religado {{.RestartCount}} vez(es) | {{.State.Health.Status}}' inventario-heluiz" | Tee-Object -Append -FilePath $HOME\evidencias_24h.txt
 ```
 
 No Linux e no macOS, troque o fim por `| tee -a ~/evidencias_24h.txt`. De um
@@ -1262,7 +1481,7 @@ bloco inteiro no servidor:
 
 ```
 (crontab -l 2>/dev/null; cat <<'EOF'
-0 * * * * echo "$(date -Is) $(docker ps -a --filter name=heluiz-12621cbs200 --format '{{.Status}}' 2>&1)" >> $HOME/uptime_inventario.log
+0 * * * * echo "$(date -Is) $(docker ps -a --filter name=inventario-heluiz --format '{{.Status}}' 2>&1)" >> $HOME/uptime_inventario.log
 EOF
 ) | crontab -
 crontab -l
@@ -1286,8 +1505,8 @@ A cada hora cheia, o arquivo `uptime_inventario.log` ganha uma linha como
   `docker volume prune`.** Eles agem sobre o Docker do servidor inteiro e
   apagam o que estiver parado ou sem uso, seja de quem for. Apague só o que é
   seu, pelo nome.
-- **Não use o `compose.yaml` no servidor**: ele usa nomes fixos (`inventario` e
-  `inventario-dados`), que podem ser os de um colega.
+- **No servidor, use o `compose.servidor.yaml`** (pelo `subir.sh`): ele já sobe o
+  menu de terminal junto com a versão web, com os nomes do padrão da disciplina.
 - **Não deixe senhas nem tokens em arquivos do servidor**, nem pelo
   `git config credential.helper store`: quem tem `sudo` lê qualquer arquivo.
 - **Não instale nem atualize pacotes do sistema** sem combinar com o docente.
@@ -1300,8 +1519,8 @@ espaço:
 cd ~/Ciberseguranca_T2
 git pull
 docker build -t inventario-heluiz:1.1 .
-docker rm -f heluiz-12621cbs200
-docker run -dit --name heluiz-12621cbs200 --restart unless-stopped \
+docker rm -f inventario-heluiz
+docker run -dit --name inventario-heluiz --restart unless-stopped \
   --read-only --security-opt no-new-privileges \
   -v inventario-heluiz-dados:/app/dados inventario-heluiz:1.1
 docker rmi inventario-heluiz:1.0
@@ -1313,8 +1532,8 @@ Os dados continuam no volume, e a contagem das 24 horas recomeça.
 guarde uma cópia dos dados e libere o espaço do servidor:
 
 ```
-docker cp heluiz-12621cbs200:/app/dados/inventario.json ~/inventario_servidor.json
-docker rm -f heluiz-12621cbs200
+docker cp inventario-heluiz:/app/dados/inventario.json ~/inventario_servidor.json
+docker rm -f inventario-heluiz
 docker rmi inventario-heluiz:1.0
 docker volume rm inventario-heluiz-dados
 crontab -r
@@ -1370,8 +1589,8 @@ Docker não aceita senha nem usa o `sudo`.
 | `ModuleNotFoundError: No module named 'numpy'` | O ambiente virtual não está ativado, ou as bibliotecas não foram instaladas nele | Ative o `.venv` (aparece `(.venv)` na linha de comando) e rode `pip install -r requirements.txt` |
 | `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine` | O Docker Desktop está fechado | Abra o Docker Desktop e espere aparecer "Engine running" |
 | `permission denied while trying to connect to the docker API at unix:///var/run/docker.sock` | No Linux, o seu usuário não tem permissão para usar o Docker | Use `sudo` antes do comando ou entre no grupo `docker` |
-| `Conflict. The container name "/inventario" is already in use` | Já existe um container com esse nome | `docker start inventario` liga o que já existe; `docker rm -f inventario` o apaga, para criar de novo (os dados ficam no volume) |
-| `Este programa é interativo e precisa de um terminal`, no `docker logs inventario` | O `docker run` foi feito sem `-it` | `docker rm -f inventario` e o `docker run` de novo, com `-dit` |
+| `Conflict. The container name "/trab02_2026_2_12621cbs200_terminal" is already in use` | Já existe um container com esse nome | `docker start trab02_2026_2_12621cbs200_terminal` liga o que já existe; `docker rm -f trab02_2026_2_12621cbs200_terminal` o apaga, para criar de novo (os dados ficam no volume) |
+| `Este programa é interativo e precisa de um terminal`, no `docker logs trab02_2026_2_12621cbs200_terminal` | O `docker run` foi feito sem `-it` | `docker rm -f trab02_2026_2_12621cbs200_terminal` e o `docker run` de novo, com `-dit` |
 | Ctrl+P, Ctrl+Q não sai do `docker attach` | No terminal do VS Code, o Ctrl+P abre a busca de arquivos | Faça o `docker attach` no PowerShell ou no Windows Terminal |
 | `A base não foi atualizada (raw.githubusercontent.com: ...; www.cisa.gov: ...)`, na opção 16 | Sem internet, ou a rede bloqueia esses sites (um proxy ou firewall) | Nada muda: o programa continua com a base que tinha. Tente de novo mais tarde ou em outra rede; num servidor sem internet, a base que vem com o programa continua valendo |
 | `ssh: connect to host ... port 22: Connection timed out` | O computador está fora da rede interna da universidade, onde fica o servidor do docente | Conecte-se à rede do campus (ou a uma VPN que chegue até ela) e tente de novo |
@@ -1379,7 +1598,7 @@ Docker não aceita senha nem usa o `sudo`.
 | `WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!` | A chave do servidor não é mais a da primeira conexão: ou o servidor foi reinstalado, ou alguém se pôs no meio da conexão (ataque *man-in-the-middle*) | Não continue: pergunte ao docente se o servidor mudou. Só depois, `ssh-keygen -R endereco-do-servidor` apaga a chave antiga, e a próxima conexão pergunta de novo |
 | `no space left on device`, no `docker build` do servidor | O disco do servidor acabou | Avise o docente. Não rode nenhum `prune`: ele apagaria também o que é dos colegas |
 | `ssh: Could not resolve hostname ufu` | O atalho `ufu` só existe no computador em que foi criado, no passo 2 de [Implantar, passo a passo](#implantar-passo-a-passo) | Use `ssh usuario@endereco-do-servidor`, ou crie o atalho neste computador (veja [Acessar o servidor](#acessar-o-servidor)) |
-| `the input device is not a TTY`, no `ssh ufu docker attach ...` | Sem o `-t`, o SSH não dá terminal ao comando, e o `docker attach` precisa de um | `ssh -t ufu docker attach heluiz-12621cbs200` |
+| `the input device is not a TTY`, no `ssh ufu docker attach ...` | Sem o `-t`, o SSH não dá terminal ao comando, e o `docker attach` precisa de um | `ssh -t ufu docker attach trab02_2026_2_12621cbs200_terminal` |
 | O `sudo` diz que precisa de um terminal para ler a senha, no `ssh ufu sudo ...` | Pelo mesmo motivo: sem o `-t`, não há onde digitar a senha | `ssh -t ufu sudo ...` |
 | `command not found` num comando colado no servidor, com `^[[200~` ou `[200~` grudado no texto | O terminal marca o começo e o fim do texto colado (*bracketed paste*), e a marca entrou no comando | Cole uma linha de cada vez; se continuar, rode uma vez no servidor `bind 'set enable-bracketed-paste off'` |
 | `DEPRECATED: The legacy builder is deprecated`, no `docker build` do servidor | O Docker do servidor não tem o componente `buildx` e constrói com o construtor antigo | Nada: a imagem sai igual |
@@ -1863,7 +2082,7 @@ No Docker, o cenário vem com a imagem e roda num container à parte, apagado
 ao sair (`--rm`):
 
 ```
-docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_3_equipamentos.json inventario:1.0
+docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_3_equipamentos.json trab02_2026_2_12621cbs200_terminal:1.0
 ```
 
 Use as opções 15 (matrizes), 13 (risco de todos) e 14 (passo a passo). Direto
@@ -2842,19 +3061,19 @@ cp dados_exemplo/inventario_exemplo.json dados/inventario.json
 container, antes de ligá-lo pela primeira vez:
 
 ```
-docker volume create inventario-dados
-docker create --name semente -v inventario-dados:/app/dados inventario:1.0
+docker volume create trab02_2026_2_12621cbs200_terminal_data
+docker create --name semente -v trab02_2026_2_12621cbs200_terminal_data:/app/dados trab02_2026_2_12621cbs200_terminal:1.0
 docker cp dados_exemplo/inventario_exemplo.json semente:/app/dados/inventario.json
 docker rm semente
 ```
 
 Depois é só executar o `docker run` normal. Com o container já rodando, copie
 com `docker cp dados_exemplo/inventario_exemplo.json
-inventario:/app/dados/inventario.json` e reinicie com
-`docker restart inventario`: a base é lida uma vez, ao abrir.
+trab02_2026_2_12621cbs200_terminal:/app/dados/inventario.json` e reinicie com
+`docker restart trab02_2026_2_12621cbs200_terminal`: a base é lida uma vez, ao abrir.
 
 Isso substitui o inventário que estiver no volume. Para guardar o atual
-antes: `docker cp inventario:/app/dados/inventario.json inventario_antigo.json`.
+antes: `docker cp trab02_2026_2_12621cbs200_terminal:/app/dados/inventario.json inventario_antigo.json`.
 
 ### O que a base de exemplo tem
 
@@ -2895,8 +3114,8 @@ mais detalhe:
 
 | # | O que fazer | O que mostrar | Requisito |
 | --- | --- | --- | --- |
-| 1 | `docker ps` | O container `inventario` no ar (`Up`) e saudável (`(healthy)`). No servidor do docente, do computador com a chave e na rede da universidade: `ssh ufu docker ps --filter name=heluiz-12621cbs200`, em que o `Up` mostra há quanto tempo (as provas das 24 horas estão em [Provas das 24 horas](#provas-das-24-horas)) | 3 |
-| 2 | `docker attach inventario` e Enter | A tela de abertura e "Base carregada: 76 equipamento(s), 88 vulnerabilidade(s).", lida do arquivo JSON | 2 |
+| 1 | `docker ps` | O container `trab02_2026_2_12621cbs200_terminal` no ar (`Up`) e saudável (`(healthy)`). No servidor do docente, do computador com a chave e na rede da universidade: `ssh ufu docker ps --filter name=heluiz-12621cbs200`, em que o `Up` mostra há quanto tempo (as provas das 24 horas estão em [Provas das 24 horas](#provas-das-24-horas)) | 3 |
+| 2 | `docker attach trab02_2026_2_12621cbs200_terminal` e Enter | A tela de abertura e "Base carregada: 76 equipamento(s), 88 vulnerabilidade(s).", lida do arquivo JSON | 2 |
 | 3 | Opção 7, ID `65` | O `INTEL-SRV01`: um objeto da subclasse `Servidor`, com o fator de exposição dela (1,5), a ficha técnica (Dell PowerEdge R430, Windows Server 2008 R2) e as três vulnerabilidades, uma delas o BlueKeep, aberto | 1 |
 | 4 | Opção 13 | A verificação de `I − A` antes da conta (diagonal dominante, determinante 0,98, número de condição 7,98, posto 76) e o risco próprio e o efetivo de todos: no topo, `PERICIA-SRV01` (40,61), `DRPC-SRV01` (40,01) e `INTEL-SRV01` (37,61) | 4 |
 | 5 | Opção 14, ID `65` | A conta do `INTEL-SRV01`: b = 1,5 × 19,6 = 29,40; herdado de quem ele depende, 8,21; x = 29,40 + 8,21 = 37,61 | 4 |
@@ -2928,12 +3147,12 @@ requisito, a de [Estrutura](#estrutura), o que cada arquivo faz, e a seção
 métodos especiais.
 
 Os dois cenários pequenos vêm com a imagem e rodam num container à parte,
-apagado quando o programa termina (`--rm`), sem mexer no `inventario`, que
+apagado quando o programa termina (`--rm`), sem mexer no `trab02_2026_2_12621cbs200_terminal`, que
 continua rodando:
 
 ```
-docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_singular.json inventario:1.0
-docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_3_equipamentos.json inventario:1.0
+docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_singular.json trab02_2026_2_12621cbs200_terminal:1.0
+docker run --rm -it -e INVENTARIO_DADOS=/app/dados_exemplo/cenario_3_equipamentos.json trab02_2026_2_12621cbs200_terminal:1.0
 ```
 
 O passo 6 grava no volume. Para voltar à base de exemplo depois, copie-a de

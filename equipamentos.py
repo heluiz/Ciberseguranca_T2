@@ -30,9 +30,12 @@ contornada.
 A classe não lê do teclado nem grava em disco.
 """
 
+from __future__ import annotations
+
 import string
 from abc import ABC, abstractmethod
 from types import MappingProxyType
+from typing import Any, ClassVar, Mapping
 
 import formatacao
 from classificacoes import SituacaoTratamento, TipoEquipamento
@@ -74,7 +77,7 @@ CASAS_DA_FRACAO = 4
 MENOR_FRACAO = 10 ** -CASAS_DA_FRACAO
 
 
-def validar_fracao(valor):
+def validar_fracao(valor: object) -> float:
     """Devolve a fração arredondada, ou levanta ValueError.
 
     A fração é a parte do risco repassada: de 0 (exclusive) a 1
@@ -101,15 +104,15 @@ class Equipamento(ABC):
     """
 
     # Cada subclasse define o seu tipo; é o valor gravado no arquivo.
-    TIPO = None
+    TIPO: ClassVar[TipoEquipamento]
 
     # O id fica de fora: dependências e vínculos apontam para ele. O
     # tipo também: mudá-lo troca a classe do objeto, o que é tarefa do
     # Inventario (converter_para).
     CAMPOS_EDITAVEIS = ("hostname", "custodiante", "lotacao", "descricao")
 
-    def __init__(self, id_equipamento, hostname, custodiante, lotacao,
-                 descricao):
+    def __init__(self, id_equipamento: int, hostname: str, custodiante: str,
+                 lotacao: str, descricao: str) -> None:
         """Cria o equipamento; ValueError se algum dado for inválido.
 
         Os quatro textos passam pelos setters das propriedades, que
@@ -121,67 +124,67 @@ class Equipamento(ABC):
         self.lotacao = lotacao
         self.descricao = descricao
         self.__ficha = FichaTecnica()
-        self.__vulnerabilidades = {}
-        self.__dependencias = {}
+        self.__vulnerabilidades: dict[int, SituacaoTratamento] = {}
+        self.__dependencias: dict[int, float] = {}
 
     # ------------------------------------------------------------------
     # Encapsulamento: os dados, pelas propriedades
     # ------------------------------------------------------------------
 
     @property
-    def id(self):
+    def id(self) -> int:
         """O identificador. Não muda: vínculos e dependências o usam."""
         return self.__id
 
     @property
-    def hostname(self):
+    def hostname(self) -> str:
         """O nome da máquina, em maiúsculas."""
         return self.__hostname
 
     @hostname.setter
-    def hostname(self, valor):
+    def hostname(self, valor: str) -> None:
         self.__hostname = self._padronizar("hostname", valor)
 
     @property
-    def custodiante(self):
+    def custodiante(self) -> str:
         """O responsável: de preferência o cargo ou o setor (LGPD)."""
         return self.__custodiante
 
     @custodiante.setter
-    def custodiante(self, valor):
+    def custodiante(self, valor: str) -> None:
         self.__custodiante = self._padronizar("custodiante", valor)
 
     @property
-    def lotacao(self):
+    def lotacao(self) -> str:
         """O setor onde o equipamento está."""
         return self.__lotacao
 
     @lotacao.setter
-    def lotacao(self, valor):
+    def lotacao(self, valor: str) -> None:
         self.__lotacao = self._padronizar("lotacao", valor)
 
     @property
-    def descricao(self):
+    def descricao(self) -> str:
         """Para que serve o equipamento."""
         return self.__descricao
 
     @descricao.setter
-    def descricao(self, valor):
+    def descricao(self, valor: str) -> None:
         self.__descricao = self._padronizar("descricao", valor)
 
     @property
-    def ficha(self):
+    def ficha(self) -> FichaTecnica:
         """A FichaTecnica do equipamento (composição)."""
         return self.__ficha
 
     @ficha.setter
-    def ficha(self, nova):
+    def ficha(self, nova: FichaTecnica) -> None:
         if not isinstance(nova, FichaTecnica):
             raise ValueError("A ficha técnica deve ser uma FichaTecnica")
         self.__ficha = nova
 
     @property
-    def vulnerabilidades(self):
+    def vulnerabilidades(self) -> Mapping[int, SituacaoTratamento]:
         """{id da vulnerabilidade: situação}, só para leitura.
 
         Muda pelos métodos vincular_vulnerabilidade, alterar_situacao e
@@ -190,7 +193,7 @@ class Equipamento(ABC):
         return MappingProxyType(self.__vulnerabilidades)
 
     @property
-    def dependencias(self):
+    def dependencias(self) -> Mapping[int, float]:
         """{id do equipamento de que este depende: fração}, só leitura.
 
         Muda por definir_dependencia, que confere a regra da soma das
@@ -199,7 +202,7 @@ class Equipamento(ABC):
         return MappingProxyType(self.__dependencias)
 
     @staticmethod
-    def _padronizar(campo, valor):
+    def _padronizar(campo: str, valor: object) -> str:
         """Confere o valor de um campo de texto e o devolve padronizado.
 
         Levanta ValueError se ele for inválido. Os setters e o
@@ -226,7 +229,7 @@ class Equipamento(ABC):
 
     @property
     @abstractmethod
-    def fator_exposicao(self):
+    def fator_exposicao(self) -> float:
         """Peso do risco próprio deste tipo de equipamento (positivo).
 
         1,0 é a referência (a estação de trabalho). Acima de 1, o tipo
@@ -236,7 +239,7 @@ class Equipamento(ABC):
         """
 
     @property
-    def tipo(self):
+    def tipo(self) -> TipoEquipamento:
         """O TipoEquipamento deste objeto."""
         return self.TIPO
 
@@ -245,7 +248,7 @@ class Equipamento(ABC):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def problema_no_hostname(hostname):
+    def problema_no_hostname(hostname: str) -> str | None:
         """Devolve None se o formato do hostname é válido, ou o motivo.
 
         Devolve a frase em vez de levantar erro para o menu perguntar de
@@ -273,7 +276,7 @@ class Equipamento(ABC):
     # Atualização dos dados do equipamento
     # ------------------------------------------------------------------
 
-    def atualizar(self, alteracoes):
+    def atualizar(self, alteracoes: Mapping[str, Any]) -> None:
         """Aplica as alterações {campo: valor} ao equipamento.
 
         Levanta ValueError em campo protegido ou valor inválido; nesse
@@ -289,7 +292,7 @@ class Equipamento(ABC):
         for campo, valor in alteracoes.items():
             setattr(self, campo, valor)
 
-    def converter_para(self, tipo):
+    def converter_para(self, tipo: TipoEquipamento) -> Equipamento:
         """Devolve um equipamento de outro tipo com os mesmos dados.
 
         Um objeto não muda de classe: muda-se o tipo criando outro
@@ -302,7 +305,7 @@ class Equipamento(ABC):
         novo.copiar_dados_de(self)
         return novo
 
-    def copiar_dados_de(self, outro):
+    def copiar_dados_de(self, outro: Equipamento) -> None:
         """Copia de outro equipamento os textos, a ficha e as relações.
 
         Os textos vêm como estão: padronizar de novo poderia mudar o que
@@ -324,7 +327,8 @@ class Equipamento(ABC):
     # Vulnerabilidades (quais afetam este equipamento)
     # ------------------------------------------------------------------
 
-    def vincular_vulnerabilidade(self, id_vulnerabilidade, situacao):
+    def vincular_vulnerabilidade(self, id_vulnerabilidade: int,
+                                 situacao: SituacaoTratamento) -> None:
         """Registra que a vulnerabilidade afeta este equipamento."""
         if not isinstance(situacao, SituacaoTratamento):
             raise ValueError("A situação deve ser uma SituacaoTratamento")
@@ -333,7 +337,8 @@ class Equipamento(ABC):
                              f"está registrada neste equipamento")
         self.__vulnerabilidades[id_vulnerabilidade] = situacao
 
-    def alterar_situacao(self, id_vulnerabilidade, situacao):
+    def alterar_situacao(self, id_vulnerabilidade: int,
+                         situacao: SituacaoTratamento) -> None:
         """Muda a situação do tratamento de uma vulnerabilidade."""
         if id_vulnerabilidade not in self.__vulnerabilidades:
             raise ValueError(f"A vulnerabilidade {id_vulnerabilidade} não "
@@ -342,7 +347,7 @@ class Equipamento(ABC):
             raise ValueError("A situação deve ser uma SituacaoTratamento")
         self.__vulnerabilidades[id_vulnerabilidade] = situacao
 
-    def desvincular_vulnerabilidade(self, id_vulnerabilidade):
+    def desvincular_vulnerabilidade(self, id_vulnerabilidade: int) -> bool:
         """Remove o vínculo; devolve False se ele não existia."""
         return (self.__vulnerabilidades.pop(id_vulnerabilidade, None)
                 is not None)
@@ -352,11 +357,11 @@ class Equipamento(ABC):
     # ------------------------------------------------------------------
 
     @property
-    def soma_dependencias(self):
+    def soma_dependencias(self) -> float:
         """Soma das frações de dependência (a soma da linha em A)."""
         return round(sum(self.__dependencias.values()), 9)
 
-    def definir_dependencia(self, id_destino, fracao):
+    def definir_dependencia(self, id_destino: int, fracao: object) -> None:
         """Registra que o equipamento herda parte do risco do destino.
 
         Se a dependência já existe, a fração é substituída. Levanta
@@ -392,7 +397,7 @@ class Equipamento(ABC):
                 f"fração deve ser menor que {formatacao.fracao_br(sobra)}")
         self.__dependencias[id_destino] = fracao
 
-    def remover_dependencia(self, id_destino):
+    def remover_dependencia(self, id_destino: int) -> bool:
         """Remove a dependência; devolve False se ela não existia."""
         return self.__dependencias.pop(id_destino, None) is not None
 
@@ -400,7 +405,7 @@ class Equipamento(ABC):
     # Formato do arquivo
     # ------------------------------------------------------------------
 
-    def para_dict(self):
+    def para_dict(self) -> dict[str, Any]:
         """Devolve o objeto JSON do equipamento (só tipos do JSON).
 
         As relações viram listas de objetos, em ordem de id, para o
@@ -408,7 +413,7 @@ class Equipamento(ABC):
         só aparece quando tem algum campo: um arquivo sem fichas fica
         igual ao de antes de ela existir.
         """
-        objeto = {
+        objeto: dict[str, Any] = {
             "id": self.id,
             "tipo": self.TIPO.value,
             "hostname": self.hostname,
@@ -427,7 +432,7 @@ class Equipamento(ABC):
         return objeto
 
     @staticmethod
-    def de_dict(dados):
+    def de_dict(dados: Any) -> Equipamento:
         """Reconstrói um equipamento a partir do objeto do arquivo.
 
         Devolve um objeto da subclasse que o campo "tipo" indica.
@@ -512,17 +517,17 @@ class Equipamento(ABC):
                 raise ValueError(f"{rotulo}: {erro}") from erro
         return equipamento
 
-    def __eq__(self, outro):
+    def __eq__(self, outro: object) -> bool:
         """Dois equipamentos são iguais se tiverem os mesmos dados."""
         if not isinstance(outro, Equipamento):
             return NotImplemented
         return self.para_dict() == outro.para_dict()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Texto para a tela, como [1] DRPC-SRV01 - Servidor."""
         return f"[{self.id}] {self.hostname} - {self.tipo.rotulo}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Texto para depuração, como Servidor(1, 'DRPC-SRV01')."""
         return f"{type(self).__name__}({self.id}, {self.hostname!r})"
 
@@ -537,7 +542,7 @@ class EstacaoTrabalho(Equipamento):
     TIPO = TipoEquipamento.ESTACAO_TRABALHO
 
     @property
-    def fator_exposicao(self):
+    def fator_exposicao(self) -> float:
         """1,0: a referência. Atinge o usuário e o que ele acessa."""
         return 1.0
 
@@ -548,7 +553,7 @@ class Servidor(Equipamento):
     TIPO = TipoEquipamento.SERVIDOR
 
     @property
-    def fator_exposicao(self):
+    def fator_exposicao(self) -> float:
         """1,5: concentra serviços e dados de muitos usuários."""
         return 1.5
 
@@ -559,7 +564,7 @@ class Roteador(Equipamento):
     TIPO = TipoEquipamento.ROTEADOR
 
     @property
-    def fator_exposicao(self):
+    def fator_exposicao(self) -> float:
         """1,2: por ele passa o tráfego de toda a unidade."""
         return 1.2
 
@@ -570,7 +575,7 @@ class ImpressoraRede(Equipamento):
     TIPO = TipoEquipamento.IMPRESSORA_REDE
 
     @property
-    def fator_exposicao(self):
+    def fator_exposicao(self) -> float:
         """0,5: alcance limitado, mas guarda cópias digitalizadas."""
         return 0.5
 
@@ -581,7 +586,7 @@ class SistemaInterno(Equipamento):
     TIPO = TipoEquipamento.SISTEMA_INTERNO
 
     @property
-    def fator_exposicao(self):
+    def fator_exposicao(self) -> float:
         """1,4: acessa dados sensíveis de inquéritos e ocorrências."""
         return 1.4
 
@@ -592,7 +597,7 @@ class BancoDados(Equipamento):
     TIPO = TipoEquipamento.BANCO_DADOS
 
     @property
-    def fator_exposicao(self):
+    def fator_exposicao(self) -> float:
         """2,0: o dado sensível se concentra aqui, o impacto dobra."""
         return 2.0
 
@@ -603,7 +608,7 @@ class OutroEquipamento(Equipamento):
     TIPO = TipoEquipamento.OUTRO
 
     @property
-    def fator_exposicao(self):
+    def fator_exposicao(self) -> float:
         """1,0: sem informação do tipo, vale a referência."""
         return 1.0
 
@@ -616,8 +621,9 @@ CLASSE_DO_TIPO = {
 }
 
 
-def criar_equipamento(tipo, id_equipamento, hostname, custodiante, lotacao,
-                      descricao):
+def criar_equipamento(tipo: TipoEquipamento, id_equipamento: int,
+                      hostname: str, custodiante: str, lotacao: str,
+                      descricao: str) -> Equipamento:
     """Cria o objeto da subclasse que corresponde ao tipo.
 
     É a única função que conhece a tabela CLASSE_DO_TIPO: o resto do
@@ -636,7 +642,7 @@ if __name__ == "__main__":
     assert set(CLASSE_DO_TIPO) == set(TipoEquipamento), \
         "algum tipo ficou sem classe"
     try:
-        Equipamento(1, "PC-01", "A", "B", "C")
+        Equipamento(1, "PC-01", "A", "B", "C")  # type: ignore[abstract]
         raise AssertionError("a classe abstrata foi instanciada")
     except TypeError as erro:
         print(f"Equipamento é abstrata: {erro}")
@@ -800,9 +806,9 @@ if __name__ == "__main__":
         "id decimal": dict(base, id=2.0),
     }
     print()
-    for nome, objeto in adulterados.items():
+    for nome, adulterado in adulterados.items():
         try:
-            Equipamento.de_dict(objeto)
+            Equipamento.de_dict(adulterado)
             raise AssertionError(f"aceitou o objeto adulterado: {nome}")
         except ValueError as erro:
             print(f"Recusado ({nome}): {erro}")

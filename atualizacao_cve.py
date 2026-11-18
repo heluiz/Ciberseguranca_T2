@@ -356,9 +356,14 @@ def abrir_url(url):
     O nome vai no cabeçalho User-Agent, como pedem os serviços públicos
     para identificar quem baixa.
     """
+    # Só HTTPS: file:// ou outro esquema leria o disco ou sairia sem
+    # criptografia (bandit B310).
+    if not url.startswith("https://"):
+        raise AtualizacaoError(f"endereço sem HTTPS recusado: {url}")
     pedido = urllib.request.Request(
         url, headers={"User-Agent": "inventario-t2 (base de CVEs)"})
-    return urllib.request.urlopen(pedido, timeout=TEMPO_LIMITE)
+    return urllib.request.urlopen(  # nosec B310
+        pedido, timeout=TEMPO_LIMITE)
 
 
 def _baixar_json(url, limite, abrir):

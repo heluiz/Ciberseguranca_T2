@@ -10,6 +10,10 @@ e traduz erros de leitura em BaseInvalidaError.
 Onde fica o arquivo: dados/inventario.json ao lado do código, ou o
 caminho da variável de ambiente INVENTARIO_DADOS (é o que o Docker usa,
 para o arquivo ficar num volume).
+
+Banco relacional em vez do arquivo: com a variável INVENTARIO_BANCO (uma
+URL do SQLAlchemy), abrir_repositorio() devolve o BancoInventario de
+repositorio_sql.py, que tem a mesma interface (carregar e salvar).
 """
 
 import json
@@ -35,6 +39,20 @@ def caminho_padrao():
     """Devolve onde a base fica: a variável de ambiente, se definida."""
     return (os.environ.get(VARIAVEL_DO_CAMINHO)
             or os.path.join(PASTA_DO_PROJETO, "dados", "inventario.json"))
+
+
+def abrir_repositorio():
+    """Devolve onde a base é lida e gravada: o banco ou o arquivo JSON.
+
+    INVENTARIO_BANCO definida escolhe o banco (repositorio_sql.py); sem
+    ela, o arquivo JSON de sempre. Quem chama só usa carregar() e
+    salvar(), sem saber qual dos dois recebeu.
+    """
+    if os.environ.get("INVENTARIO_BANCO"):
+        # Importado aqui: o SQLAlchemy só é carregado quando usado.
+        from repositorio_sql import BancoInventario
+        return BancoInventario()
+    return ArquivoInventario()
 
 
 class ArquivoInventario:
@@ -200,8 +218,8 @@ if __name__ == "__main__":
     }
     print()
     for nome, conteudo in adulteradas.items():
-        with open(arquivo.caminho, "wb") as f:
-            f.write(conteudo)
+        with open(arquivo.caminho, "wb") as fb:
+            fb.write(conteudo)
         try:
             arquivo.carregar()
             raise AssertionError(f"aceitou a base adulterada: {nome}")
@@ -218,6 +236,7 @@ if __name__ == "__main__":
     with open(arquivo.caminho, "w", encoding="utf-8") as f:
         json.dump(t1, f)
     convertido = arquivo.carregar()
+    assert arquivo.migracao_feita is not None, "faltou a migração"
     copia, avisos = arquivo.migracao_feita
     assert os.path.exists(copia), "faltou a cópia de segurança"
     assert convertido.buscar_por_id(1).hostname == "PC-01"

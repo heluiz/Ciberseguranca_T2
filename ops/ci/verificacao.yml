@@ -1,0 +1,46 @@
+# Integração contínua do programa no terminal: a cada push e a cada pull
+# request, o GitHub roda as mesmas verificações feitas à mão.
+#   - estilo: ruff (PEP 8 e PEP 257, configurado em ruff.toml);
+#   - tipos: mypy nas classes de domínio (mypy.ini);
+#   - testes: python testes.py (inclui o autoteste de cada módulo e o
+#     repositório em banco, SQLAlchemy + Alembic, em SQLite na memória);
+#   - container: constrói a imagem do Dockerfile e roda, dentro dela, o
+#     autoteste do modelo de risco e o do repositório em banco.
+# As ações estão fixadas pelo commit (SHA); o comentário diz a versão.
+name: Verificação
+
+on:
+  push:
+  pull_request:
+
+# O token do workflow só lê o repositório (menor privilégio).
+permissions:
+  contents: read
+
+jobs:
+  estilo-e-testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Instalar dependências
+        run: pip install -r requirements.txt ruff==0.17.4 mypy==2.4.1
+      - name: Estilo (PEP 8 e PEP 257)
+        run: ruff check .
+      - name: Tipos (mypy)
+        run: mypy
+      - name: Testes
+        run: python testes.py
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Construir a imagem
+        run: docker build -t trab02_2026_2_12621cbs200_terminal:ci .
+      - name: Autotestes dentro da imagem (risco e banco)
+        run: |
+          docker run --rm --read-only trab02_2026_2_12621cbs200_terminal:ci python risco.py
+          docker run --rm --read-only trab02_2026_2_12621cbs200_terminal:ci python repositorio_sql.py

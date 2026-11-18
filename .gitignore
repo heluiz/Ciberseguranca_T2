@@ -33,3 +33,8 @@ artifacts/
 playwright-report/
 test-results/
 .ruff_cache/
+
+# Caches das ferramentas de análise (mypy, schemathesis/hypothesis)
+.mypy_cache/
+.hypothesis/
+.schemathesis/

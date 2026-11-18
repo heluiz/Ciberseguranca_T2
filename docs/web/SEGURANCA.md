@@ -15,9 +15,14 @@ Não é auditoria independente nem certificação ASVS. Objetivo de engenharia: 
 | Operador → segredos | Ambiente externo, exclusão de build/Git, MFA arquivo privado | Revisão operacional e cofre |
 | Falha de serviço → perda | Health, restart, rotação de logs, dump/restauração | Exercício de restauração; 24h ainda pendente |
 | Colega com acesso ao banco → auditoria | Eventos sem conteúdo sensível, tela somente leitura | Não resiste ao DBA; armazenamento externo futuro |
+| Script → API v1 | JWT HS256 de 15 min com algoritmo, emissor e público fixos; chave de API guardada como SHA-256; papel conferido em cada rota; sem cookie (sem CSRF) | `tests_web/test_api_v1.py` (tokens vencido, adulterado, de outro segredo, `alg: none`; matriz; IDOR); Schemathesis no CI |
+| Entrada da API → banco | Tipos do JSON conferidos, campo desconhecido recusado, caracteres de controle recusados, ORM com parâmetros | `tests_web/test_sqli_e_consultas.py`; laboratório em `academic/sqli_lab.py` |
+| Imagem → servidor | Base atualizada na construção (`apt-get upgrade`), pip removido, Trivy no CI | Varredura antes/depois em [HARDENING.md](../HARDENING.md) |
 
 Não há varredura de redes, execução de comandos fornecidos por usuários ou requisições a destinos arbitrários. A consulta CVE web é offline. O sistema registra relações declaradas, sem afirmar descoberta de ativos ou exploração.
 
 LGPD: minimizar identificação pessoal, definir finalidade, base legal aplicável, retenção, responsáveis pelo acesso e exclusão. A faculdade/organização deve avaliar o uso concreto; estes controles técnicos não substituem essa análise.
 
 Referências primárias consultadas: [Django deployment checklist](https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/), [Django transactions](https://docs.djangoproject.com/en/5.2/topics/db/transactions/), [Axes](https://django-axes.readthedocs.io/en/latest/3_usage.html), [django-otp](https://django-otp-official.readthedocs.io/en/stable/auth.html), [OWASP ASVS](https://asvs.owasp.org/), [Cosmic Python Repository](https://www.cosmicpython.com/book/chapter_02_repository.html) e [Service Layer](https://www.cosmicpython.com/book/chapter_04_service_layer.html).
+
+Sprint 5: a análise pelo OWASP Top 10:2025, com os achados priorizados por CVSS, está em [OWASP-TOP10.md](../OWASP-TOP10.md); o modelo STRIDE por fluxo, em [ARQUITETURA.md](../ARQUITETURA.md); senhas, permissões e cookies, em [SENHAS-E-ACESSO.md](../SENHAS-E-ACESSO.md); TLS, em [TLS.md](../TLS.md).
