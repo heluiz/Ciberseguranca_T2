@@ -85,7 +85,8 @@ def converter(dados_t1):
             "dependencias": [],
         }
 
-    catalogo = {}      # (descrição, origem, gravidade) -> objeto
+    # (descrição, origem, gravidade) -> objeto
+    catalogo: dict[tuple, dict] = {}
     avisos = []
     for chave in sorted(falhas, key=lambda c: _chave_para_id(
             c, f"falha {c}")):

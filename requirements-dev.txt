@@ -5,3 +5,9 @@ pytest-cov==7.1.0
 ruff==0.17.4
 playwright==1.65.0
 pip-audit
+# Análise estática e testes de contrato (Sprint 5):
+mypy==2.4.1                    # tipos do domínio (mypy.ini)
+bandit==1.9.4                  # segurança do código (.bandit.yaml)
+schemathesis==4.33.4           # testes gerados a partir do OpenAPI
+openapi-spec-validator==0.9.0  # o docs/web/openapi.yaml é OpenAPI 3.1 válido
+PyYAML==6.0.3

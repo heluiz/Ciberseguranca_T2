@@ -14,8 +14,11 @@ de fraqueza que a causou (CWE-416). Os dois seguem o formato oficial.
 A classe não lê do teclado nem grava em disco.
 """
 
+from __future__ import annotations
+
 import math
 import re
+from typing import Any, Mapping
 
 import formatacao
 from calculadora_cvss import analisar_vetor
@@ -42,7 +45,7 @@ _FORMATO_CWE = re.compile(r"(?:CWE-)?([1-9][0-9]{0,5})")
 PRIMEIRO_ANO_CVE = 1999
 
 
-def validar_cvss(valor):
+def validar_cvss(valor: object) -> float:
     """Devolve a nota CVSS como float, ou levanta ValueError.
 
     A nota vai de 0,1 a 10,0 e tem uma casa decimal, como as notas
@@ -64,7 +67,7 @@ def validar_cvss(valor):
     return nota
 
 
-def conferir_vetor(vetor, nota):
+def conferir_vetor(vetor: str, nota: float) -> str:
     """Devolve o vetor CVSS arrumado, se ele der exatamente a nota.
 
     Levanta ValueError se o vetor for inválido ou se a nota for outra:
@@ -78,7 +81,7 @@ def conferir_vetor(vetor, nota):
     return arrumado
 
 
-def validar_cve(texto):
+def validar_cve(texto: str) -> str:
     """Devolve a CVE no formato oficial (CVE-2019-0708), ou ValueError.
 
     Aceita minúsculas e o número sem o prefixo ("2019-0708").
@@ -96,7 +99,7 @@ def validar_cve(texto):
     return f"CVE-{ano}-{numero}"
 
 
-def validar_cwe(texto):
+def validar_cwe(texto: str) -> str:
     """Devolve o CWE no formato oficial (CWE-416), ou ValueError.
 
     Aceita minúsculas e o número sem o prefixo ("416").
@@ -109,7 +112,7 @@ def validar_cwe(texto):
     return f"CWE-{achado.group(1)}"
 
 
-def validar_referencia(texto):
+def validar_referencia(texto: str) -> str:
     """Devolve uma CVE ou um CWE no formato oficial, ou ValueError.
 
     Serve para a busca, que aceita os dois: "2019-0708" é uma CVE, e
@@ -137,8 +140,10 @@ class Vulnerabilidade:
     CAMPOS_EDITAVEIS = ("descricao", "origem", "cvss", "vetor", "cve",
                         "cwe")
 
-    def __init__(self, id_vulnerabilidade, descricao, origem, cvss,
-                 vetor=None, *, cve=None, cwe=None):
+    def __init__(self, id_vulnerabilidade: int, descricao: str,
+                 origem: OrigemVulnerabilidade, cvss: float,
+                 vetor: str | None = None, *, cve: str | None = None,
+                 cwe: str | None = None) -> None:
         """Cria a vulnerabilidade; dado inválido levanta ValueError.
 
         cve e cwe só podem ser passados pelo nome (cve="CVE-..."): com
@@ -160,11 +165,11 @@ class Vulnerabilidade:
         self.cwe = None if cwe is None else validar_cwe(cwe)
 
     @property
-    def gravidade(self):
+    def gravidade(self) -> NivelGravidade:
         """Nível de severidade, derivado da nota CVSS."""
         return NivelGravidade.do_cvss(self.cvss)
 
-    def atualizar(self, alteracoes):
+    def atualizar(self, alteracoes: Mapping[str, Any]) -> None:
         """Aplica as alterações {campo: valor} à vulnerabilidade.
 
         "vetor" com um texto troca o vetor e a nota passa a ser a dele;
@@ -199,7 +204,8 @@ class Vulnerabilidade:
         for campo, valor in novos.items():
             setattr(self, campo, valor)
 
-    def _nota_e_vetor(self, alteracoes):
+    def _nota_e_vetor(self, alteracoes: Mapping[str, Any]
+                      ) -> tuple[float, str | None]:
         """Devolve a nota e o vetor que ficam depois das alterações.
 
         Um vetor novo dá a nota; uma nota digitada vale se não houver
@@ -216,7 +222,7 @@ class Vulnerabilidade:
             vetor = conferir_vetor(vetor, nota)
         return nota, vetor
 
-    def para_dict(self):
+    def para_dict(self) -> dict[str, Any]:
         """Devolve o objeto JSON da vulnerabilidade (só tipos JSON).
 
         Os campos opcionais (cve, cwe, vetor) só aparecem quando
@@ -235,7 +241,7 @@ class Vulnerabilidade:
         return objeto
 
     @classmethod
-    def de_dict(cls, dados):
+    def de_dict(cls, dados: Any) -> Vulnerabilidade:
         """Reconstrói a vulnerabilidade a partir do objeto do arquivo.
 
         Levanta ValueError, com a localização do problema, se o objeto
@@ -272,19 +278,19 @@ class Vulnerabilidade:
         vulnerabilidade.descricao = " ".join(descricao.split())
         return vulnerabilidade
 
-    def __eq__(self, outro):
+    def __eq__(self, outro: object) -> bool:
         """Vulnerabilidades com os mesmos dados são iguais."""
         if not isinstance(outro, Vulnerabilidade):
             return NotImplemented
         return self.para_dict() == outro.para_dict()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Texto para a tela: [3] Senha padrão (CVSS 9,8, crítica)."""
         return (f"[{self.id}] {self.descricao} (CVSS "
                 f"{formatacao.numero_br(self.cvss)}, "
                 f"{self.gravidade.rotulo.lower()})")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Texto para depuração, como Vulnerabilidade(3, CVSS 7.5)."""
         cve = f"{self.cve}, " if self.cve is not None else ""
         return f"Vulnerabilidade({self.id}, {cve}CVSS {self.cvss})"

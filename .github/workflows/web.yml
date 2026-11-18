@@ -1,17 +1,29 @@
-# Verificação da interface web a cada push e pull request:
-#   - estilo, testes do programa original e testes web com PostgreSQL real;
-#   - migrações em dia, verificação de implantação e auditoria de dependências;
+# Verificação da interface web a cada push e pull request (cópia em
+# .github/workflows/web.yml; as duas ficam iguais):
+#   - estilo, tipos (mypy), segurança do código (bandit), testes do
+#     programa original e testes web com PostgreSQL real;
+#   - contrato da API: o OpenAPI é válido e o schemathesis gera pedidos
+#     a partir dele contra a aplicação rodando;
+#   - migrações em dia, verificação de implantação e auditoria de
+#     dependências;
 #   - o mesmo container usado no servidor da disciplina é construído,
-#     iniciado e consultado por HTTP.
+#     iniciado, consultado por HTTP e varrido pelo Trivy (falha com
+#     vulnerabilidade ALTA ou CRÍTICA que já tem correção);
+#   - numa tag vX.Y.Z, as duas imagens são publicadas no GHCR.
+# As ações estão fixadas pelo commit (SHA), não pela tag, que pode ser
+# movida: o comentário diz a versão.
 name: Verificação web PostgreSQL
 on:
   push:
+    branches: ["**"]
+    tags: ["v*.*.*"]
   pull_request:
 permissions:
   contents: read
 jobs:
   web:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17-bookworm
@@ -31,37 +43,137 @@ jobs:
       POSTGRES_PASSWORD: ci-only-not-production
       POSTGRES_HOST: 127.0.0.1
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
-      - run: ruff check .
-      - run: python testes.py
-      - run: pytest --cov=inventory --cov=academic --cov-fail-under=80
+      - name: Estilo (ruff)
+        run: ruff check .
+      - name: Tipos do domínio (mypy)
+        run: mypy
+      - name: Segurança do código (bandit)
+        run: bandit -q -c .bandit.yaml -r .
+      - name: OpenAPI 3.1 válido
+        run: openapi-spec-validator docs/web/openapi.yaml
+      - name: Testes do programa no terminal (inclui o banco SQLAlchemy)
+        run: python testes.py
+      - name: Testes web
+        run: pytest --cov=inventory --cov=academic --cov-fail-under=80
       - run: python manage.py makemigrations --check --dry-run
       - run: DJANGO_DEBUG=0 python manage.py check --deploy --fail-level WARNING
       - run: pip-audit -r requirements-web.txt
+      - name: Contrato da API (schemathesis)
+        env:
+          SENTINEL_ADMIN_USER: ci-admin
+          SENTINEL_ADMIN_PASSWORD: ci-only-not-production-senha-longa
+          SENTINEL_DEMO: "1"
+        # missing_required_header fica de fora: a API responde 428 de
+        # propósito quando falta o If-Match (concorrência otimista).
+        run: |
+          python manage.py bootstrap
+          KEY=$(python manage.py apikey criar ci-admin schemathesis | sed -n 2p | tr -d ' ')
+          echo "::add-mask::$KEY"
+          python manage.py runserver 127.0.0.1:8001 --noreload > runserver.log 2>&1 &
+          for i in $(seq 30); do curl -fs -o /dev/null http://127.0.0.1:8001/health/ && break; sleep 1; done
+          schemathesis run docs/web/openapi.yaml --url http://127.0.0.1:8001 \
+            -H "X-API-Key: $KEY" --max-examples 25 --seed 2026 \
+            --exclude-checks ignored_auth,positive_data_acceptance,missing_required_header \
+            --report junit --report-dir artifacts/schemathesis
+      - name: Guardar o relatório do schemathesis
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: schemathesis
+          path: artifacts/schemathesis
+          if-no-files-found: ignore
 
   container:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - name: Subir como no servidor da disciplina
-        run: SENTINEL_PORT=8080 sh ops/servidor/subir.sh
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Subir como no servidor da disciplina (porta 2200)
+        run: sh ops/servidor/subir.sh
       - name: Consultar a aplicação por HTTP
         run: |
-          curl --fail --silent http://127.0.0.1:8080/health/
-          curl --fail --silent --output /dev/null http://127.0.0.1:8080/entrar/
-          curl --fail --silent --output /dev/null http://127.0.0.1:8080/static/inventory/app.css
+          curl --fail --silent http://127.0.0.1:2200/health/
+          curl --fail --silent --output /dev/null http://127.0.0.1:2200/entrar/
+          curl --fail --silent --output /dev/null http://127.0.0.1:2200/static/inventory/app.css
+          curl --fail --silent --output /dev/null http://127.0.0.1:2200/api/v1/
+          curl --fail --silent http://127.0.0.1:2200/api/v1/openapi.yaml | grep -q "openapi: 3.1"
+          curl --silent --output /dev/null --write-out "%{http_code}" \
+            http://127.0.0.1:2200/api/v1/assets | grep -qx 401
+      - name: Menu do terminal no ar, sem porta publicada
+        run: |
+          test "$(docker inspect -f '{{.State.Running}}' trab02_2026_2_12621cbs200_terminal)" = true
+          test -z "$(docker port trab02_2026_2_12621cbs200_terminal)"
+          docker exec trab02_2026_2_12621cbs200_terminal python -c \
+            "from armazenamento import abrir_repositorio as a; print(len(a().carregar()))"
       - name: Dados sobrevivem à recriação dos containers
         run: |
           docker compose -f compose.servidor.yaml down
           sh ops/servidor/subir.sh
           docker compose -f compose.servidor.yaml exec -T db \
             psql -U sentinel_owner -d sentinel -tAc "SELECT count(*) FROM inventory_asset" | grep -qx 76
+      - name: Varredura das imagens (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: trab02_2026_2_12621cbs200:1.0
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Varredura da imagem do terminal (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: trab02_2026_2_12621cbs200_terminal:1.0
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
       - name: Situação e registro de disponibilidade
         if: always()
         run: |
           sh ops/servidor/verificar.sh || true
           docker compose -f compose.servidor.yaml logs --tail 30 preparar app
+
+  publicar:
+    # Só numa tag de versão (git tag v1.0.0 && git push origin v1.0.0) e
+    # só depois das verificações. Só este job pode escrever pacotes.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [web, container]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - dockerfile: Dockerfile.web
+            image: trab02_2026_2_12621cbs200
+          - dockerfile: Dockerfile
+            image: trab02_2026_2_12621cbs200_terminal
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true

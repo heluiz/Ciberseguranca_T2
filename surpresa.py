@@ -178,7 +178,8 @@ if __name__ == "__main__":
     cores.ativar()
     if ativa():
         import os
-        executar(lambda: os.system("cls" if os.name == "nt" else "clear"))
+        executar(lambda: os.system(  # nosec B605
+            "cls" if os.name == "nt" else "clear"))
     else:
         print("Sem terminal: mostrando só os quadros, sem animação.")
         for periodo in (0, 3, 7):

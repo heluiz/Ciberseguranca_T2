@@ -1,0 +1,40 @@
+# Laboratório de HTTPS (card S5_11), SÓ no seu computador. Acrescenta um
+# proxy reverso com TLS (Caddy) na frente da aplicação do servidor:
+#
+#   docker compose -f compose.servidor.yaml -f compose.tls.yaml up -d
+#   https://localhost:8443   (HTTP em http://localhost:8080 é redirecionado)
+#
+# Não usar no servidor da disciplina: lá a única porta liberada é a 2200.
+# Para a internet, com domínio e certificado público, use compose.web.yaml.
+services:
+  app:
+    # A aplicação deixa de ter porta própria: só se chega a ela pelo proxy.
+    ports: !reset []
+    environment:
+      DJANGO_HTTPS: "1"
+      TRUST_PROXY: "1"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+  proxy:
+    image: caddy:2-alpine
+    container_name: trab02_2026_2_12621cbs200_proxy
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./ops/Caddyfile.lab:/etc/caddy/Caddyfile:ro
+      - proxy-data:/data
+      - proxy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    pids_limit: 50
+    restart: unless-stopped
+volumes:
+  proxy-data:
+    name: trab02_2026_2_12621cbs200_proxy_data
+  proxy-config:
+    name: trab02_2026_2_12621cbs200_proxy_config

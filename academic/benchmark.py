@@ -48,7 +48,7 @@ def table(title, header, rows):
 
 def synthetic_inventory(n, seed=42):
     """Inventário de n equipamentos, 2 vulnerabilidades e até 3 dependências cada."""
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # nosec B311
     catalog = [
         {
             "id": i,
@@ -93,7 +93,7 @@ def full_pipeline(inventory):
 
 
 def main():
-    rng = random.Random(42)
+    rng = random.Random(42)  # nosec B311
     print("# Medições dos algoritmos e do modelo de risco\n")
     print(
         f"Python {platform.python_version()}, NumPy {np.__version__}. "

@@ -1,0 +1,18 @@
+{% load static %}<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API v1 · SENTINEL</title>
+  <link rel="stylesheet" href="{% static 'inventory/vendor/swagger-ui/swagger-ui.css' %}">
+</head>
+<body>
+  <main>
+    <p><a href="/">← SENTINEL</a> · <a href="/api/v1/openapi.yaml">openapi.yaml</a></p>
+    <div id="swagger-ui"></div>
+  </main>
+  {# Swagger UI servido pelo próprio site: nenhuma requisição a CDN (CSP 'self'). #}
+  <script src="{% static 'inventory/vendor/swagger-ui/swagger-ui-bundle.js' %}"></script>
+  <script src="{% static 'inventory/api_docs.js' %}"></script>
+</body>
+</html>

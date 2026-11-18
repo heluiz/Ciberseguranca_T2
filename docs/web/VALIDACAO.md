@@ -1,5 +1,32 @@
 # Verificações desta versão
 
+## Sprint 5 (17/11/2026)
+
+Executadas em Linux, Python 3.13, PostgreSQL 16 (testes) e Docker 29 com as
+imagens reais do servidor.
+
+| Verificação | Resultado |
+|---|---|
+| `ruff check .` | Sem apontamentos |
+| `mypy` (`mypy.ini`, domínio e persistência) | Success: no issues found in 10 source files |
+| `bandit -c .bandit.yaml -r .` | Nenhum alerta aberto |
+| `openapi-spec-validator docs/web/openapi.yaml` | OK (OpenAPI 3.1) |
+| `actionlint` nos dois workflows | Sem apontamentos |
+| `python testes.py` | 125 testes aprovados (inclui o repositório SQLAlchemy e as migrações 0001 → 0002) |
+| `pytest --cov` (web) | 200 testes aprovados; cobertura de `inventory` e `academic` 91% |
+| `makemigrations --check`, `check --deploy` | Em dia; sem apontamentos |
+| `pip-audit -r requirements-web.txt` | Nenhuma vulnerabilidade conhecida |
+| Schemathesis (30 operações, ~2.400 casos) | Um achado (`?cenario=` vazio aceito), corrigido e coberto por teste; nova rodada sem falhas |
+| Coleção Postman (newman) | 58 requisições, 96 verificações aprovadas |
+| `subir.sh` com as imagens reais | Os cinco containers no ar e saudáveis; porta 2200 só na aplicação; terminal sem porta, lendo os 76 ativos; banco com 76 ativos depois de `down` e nova subida |
+| `verificar.sh` | Início, reinícios, saúde, `/health/` e o log do monitor |
+| Opções dos containers (`docker inspect`) | `read_only`, `cap_drop ALL`, limites de memória e processos, usuário sem privilégio |
+| Laboratório TLS (`compose.tls.yaml`) | HTTP → 301 para HTTPS; HSTS; cookies `Secure`; entrada pelo proxy; TLS 1.3 (e 1.2 aceito) com `openssl s_client` ([TLS.md](../TLS.md)) |
+| Trivy (ALTA e CRÍTICA) | Antes: 48 e 53 altas, das quais 1 e 6 com correção; depois de `apt-get upgrade` e da remoção do pip: 47 altas, nenhuma com correção disponível; nenhuma crítica ([HARDENING.md](../HARDENING.md)) |
+
+
+## Sprint 4 (13 e 14/11/2026)
+
 Executadas em 13 e 14/11/2026, em Linux, com Python 3.13 e PostgreSQL 16. A integração contínua repete as verificações automáticas com Python 3.12 e PostgreSQL 17, e o job `container` sobe o perfil do servidor de verdade (passou no merge do Pull Request #14).
 
 | Verificação | Resultado |
@@ -44,7 +71,8 @@ Os arquivos Compose foram validados com `docker compose config`.
 
 ## O que ainda não foi executado
 
-- **Construção e execução dos containers.** Não havia Docker no ambiente destas verificações. O job `container` do GitHub Actions constrói a imagem, sobe `compose.servidor.yaml`, consulta a aplicação por HTTP e confere que os dados sobrevivem à recriação dos containers; o resultado aparece na aba Actions depois do push.
+- **Pipeline com as mudanças da Sprint 5 no GitHub** (Schemathesis, Trivy e a publicação no GHCR): roda depois do push e da tag `v1.0.0`.
+- **Construção e execução dos containers** (pendente na Sprint 4): executada na Sprint 5, tabela acima.
 - **As 24 horas no servidor da disciplina.** Dependem de subir lá e aguardar; `sh ops/servidor/verificar.sh` mostra a evidência.
 - **`ABRIR-SENTINEL.cmd` em um Windows com Docker Desktop.**
 - **Perfil com domínio e HTTPS** (`compose.web.yaml`): exige um domínio real.

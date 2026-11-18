@@ -1,8 +1,8 @@
 # Relação entre as sprints e o projeto
 
-Resumo de onde cada cartão das Sprints 1 a 4 aparece no projeto. O programa de terminal (arquivos na raiz) e a versão web (`inventory/`, `sentinel/`, `academic/`) usam as mesmas classes de domínio.
+Resumo de onde cada cartão das Sprints 1 a 5 aparece no projeto. O programa de terminal (arquivos na raiz) e a versão web (`inventory/`, `sentinel/`, `academic/`) usam as mesmas classes de domínio.
 
-O enunciado do Trabalho 2 cobre as Sprints 3, 4 e 5; o quadro consultado tinha cartões até a Sprint 4.
+O enunciado do Trabalho 2 cobre as Sprints 3, 4 e 5.
 
 ## Requisitos do enunciado (Tabela 1)
 
@@ -87,3 +87,28 @@ O enunciado do Trabalho 2 cobre as Sprints 3, 4 e 5; o quadro consultado tinha c
 | 18 — Logs e monitoramento | Logs em saída padrão com rotação; container `monitor` registra a disponibilidade a cada minuto |
 | 19 — Implantação em Linux | `ops/servidor/subir.sh` e `verificar.sh`; reinício automático e volume persistente |
 | 20 — Integração do Trabalho 2 | Aplicação orientada a objetos em container, com o modelo de risco consultável pela web e pelo terminal |
+
+## Sprint 5
+
+| Cartão | Onde está |
+|---|---|
+| 01 — Refatoração | [REFATORACAO.md](../REFATORACAO.md): smells, seis refatorações, relatório do mypy (`mypy.ini`); dívida em [DIVIDA-TECNICA.md](../DIVIDA-TECNICA.md) |
+| 02 — OWASP Top 10 | [OWASP-TOP10.md](../OWASP-TOP10.md): as dez categorias de 2025 com CWE, pip-audit, bandit e os achados priorizados por CVSS |
+| 03 — Boas práticas REST | `inventory/api_v1.py`: `/api/v1`, recursos aninhados, 201 + `Location`, Problem Details, paginação, ordenação por risco, `If-Match`; [API.md](../API.md) |
+| 04 — OpenAPI e Swagger | `docs/web/openapi.yaml` (OpenAPI 3.1, validado) e Swagger UI em `/api/v1/docs/` |
+| 05 — ORM | [ORM-E-SQLALCHEMY.md](../ORM-E-SQLALCHEMY.md): mapeamento, herança em tabela única, N:N, N+1 demonstrado e corrigido |
+| 06 — SQLAlchemy | `repositorio_sql.py` (mesma interface do JSON, escolhido por `INVENTARIO_BANCO`), `migracoes_sql/` (Alembic 0001 e 0002), testes em SQLite na memória |
+| 07 — SQL injection | `academic/sqli_lab.py` e [LAB-SQL-INJECTION.md](../LAB-SQL-INJECTION.md); testes em `tests_web/test_sqli_e_consultas.py`; bandit |
+| 08 — Hash de senhas | Argon2id, recálculo do hash, política NIST: [SENHAS-E-ACESSO.md](../SENHAS-E-ACESSO.md), `academic/senhas_lab.py`, `tests_web/test_senhas.py` |
+| 09 — API key e JWT | `POST /api/v1/auth/token`, `manage.py apikey`; testes de token vencido, adulterado, de outro segredo e `alg: none` |
+| 10 — Cookies, sessões e acesso | Matriz de permissões, IDOR e atributos do cookie testados; SameSite explicado em [SENHAS-E-ACESSO.md](../SENHAS-E-ACESSO.md) |
+| 11 — HTTPS e TLS | `compose.tls.yaml` + `ops/Caddyfile.lab` (proxy com TLS, redirecionamento, HSTS); evidências em [TLS.md](../TLS.md) |
+| 12 — Testes de integração | `tests_web/test_api_v1.py`; Schemathesis no CI; coleção Postman com a pasta da API v1 |
+| 13 — Git Flow | [GIT-FLOW.md](../GIT-FLOW.md), `CHANGELOG.md` |
+| 14 — CI/CD | `.github/workflows/web.yml` e `verificacao.yml` (mypy, bandit, pip-audit, Schemathesis, Trivy, GHCR); [CI-CD.md](../CI-CD.md) |
+| 15 — Hardening | [HARDENING.md](../HARDENING.md): containers, imagem (varredura antes e depois), checklist do servidor |
+| 16 e 17 — Nuvem | [NUVEM.md](../NUVEM.md): IaaS × PaaS, responsabilidades, custos, conta segura, roteiro do Cloud Run, LGPD |
+| 18 — Arquitetura | [ARQUITETURA.md](../ARQUITETURA.md): requisitos, C4, ADRs, STRIDE, backlog |
+| 19 — Apresentação | [APRESENTACAO.md](../APRESENTACAO.md) |
+| 20 — Nomes e implantação | `trab02_2026_2_12621cbs200` no projeto Compose, containers, imagens e volumes; porta 2200; terminal sem porta; `tests_web/test_nomenclatura.py`; README, seções 2 e 3 |
+| 21 — Sprint review | [RETROSPECTIVA.md](../RETROSPECTIVA.md) |

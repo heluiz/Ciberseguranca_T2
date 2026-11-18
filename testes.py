@@ -2255,6 +2255,153 @@ class TesteDaArvore(unittest.TestCase):
                 self.assertLessEqual(maior, 80, (e.hostname, sentido))
 
 
+class TesteDoRepositorioSQL(unittest.TestCase):
+    """O banco relacional (repositorio_sql.py) no lugar do arquivo JSON.
+
+    SQLite em memória: nenhum arquivo é criado. As mesmas regras do
+    domínio valem para os dois repositórios.
+    """
+
+    def setUp(self):
+        """Abre um banco SQLite em memória e lê a base de exemplo."""
+        from sqlalchemy import create_engine
+        from sqlalchemy.pool import StaticPool
+
+        import repositorio_sql
+        self.sql = repositorio_sql
+        self.engine = create_engine(
+            "sqlite://", poolclass=StaticPool,
+            connect_args={"check_same_thread": False})
+        self.banco = repositorio_sql.BancoInventario(engine=self.engine)
+        with open(os.path.join(PASTA, "dados_exemplo",
+                               "inventario_exemplo.json"),
+                  encoding="utf-8") as f:
+            self.exemplo = Inventario.de_dict(json.load(f))
+
+    def _executar(self, sql, **parametros):
+        """Executa um SQL direto no banco, por fora do repositório."""
+        from sqlalchemy import text
+        with self.engine.begin() as conexao:
+            conexao.execute(text(sql), parametros)
+
+    def test_banco_novo_vazio_e_esquema_pelo_alembic(self):
+        """Banco novo: inventário vazio e as tabelas da migração."""
+        self.assertEqual(len(self.banco.carregar()), 0)
+        self.assertEqual(self.banco.tabelas(), [
+            "alembic_version", "dependencias", "equipamentos", "vinculos",
+            "vulnerabilidades"])
+
+    def test_migracao_igual_ao_modelo(self):
+        """A migração do Alembic cria o mesmo esquema do ORM."""
+        from alembic.autogenerate import compare_metadata
+        from alembic.migration import MigrationContext
+        self.banco.carregar()
+        with self.engine.connect() as conexao:
+            diferencas = compare_metadata(
+                MigrationContext.configure(conexao), self.sql.Base.metadata)
+        self.assertEqual(diferencas, [])
+
+    def test_ida_e_volta_igual_ao_json(self):
+        """Gravar e ler devolve o mesmo conteúdo do arquivo JSON."""
+        self.banco.salvar(self.exemplo)
+        relido = self.banco.carregar()
+        self.assertEqual(relido.para_dict(), self.exemplo.para_dict())
+        # Normalizado: cada vulnerabilidade uma vez só no catálogo.
+        from sqlalchemy import func, select
+        with self.engine.connect() as conexao:
+            total = conexao.execute(select(func.count()).select_from(
+                self.sql.VulnerabilidadeSQL)).scalar_one()
+        self.assertEqual(total, len(self.exemplo.vulnerabilidades()))
+
+    def test_migracao_0001_para_0002_mantem_os_dados(self):
+        """Banco criado na 0001 recebe a 0002 sem perder nada."""
+        from alembic import command
+        from alembic.config import Config
+        config = Config()
+        config.set_main_option("script_location",
+                               self.sql.PASTA_DAS_MIGRACOES)
+        with self.engine.begin() as conexao:
+            config.attributes["connection"] = conexao
+            command.upgrade(config, "0001")
+        self.banco._esquema_pronto = True      # só a 0001 aplicada
+        self.banco.salvar(self.exemplo)
+        self.banco._esquema_pronto = False     # a próxima leitura sobe
+        relido = self.banco.carregar()
+        self.assertEqual(relido.para_dict(), self.exemplo.para_dict())
+        from sqlalchemy import inspect
+        indices = {i["name"] for i in inspect(self.engine).get_indexes(
+            "equipamentos")}
+        self.assertIn("ix_equipamentos_lotacao", indices)
+        with self.engine.connect() as conexao:
+            versao = conexao.exec_driver_sql(
+                "SELECT version_num FROM alembic_version").scalar_one()
+        self.assertEqual(versao, "0002")
+
+    def test_salvar_de_novo_substitui(self):
+        """Uma nova gravação substitui a anterior inteira."""
+        self.banco.salvar(self.exemplo)
+        self.exemplo.excluir_equipamento(76)
+        self.banco.salvar(self.exemplo)
+        self.assertIsNone(self.banco.carregar().buscar_por_id(76))
+
+    def test_gravacao_com_erro_nao_muda_nada(self):
+        """Transação: um erro no meio desfaz a gravação inteira."""
+        self.banco.salvar(self.exemplo)
+        dados = self.exemplo.para_dict()
+        dados[1]["hostname"] = dados[0]["hostname"]   # UNIQUE do banco
+
+        class Falso:
+            def para_dict(self):
+                return dados
+
+        from sqlalchemy.exc import IntegrityError
+        with self.assertRaises(IntegrityError):
+            self.banco.salvar(Falso())
+        self.assertEqual(self.banco.carregar().para_dict(),
+                         self.exemplo.para_dict())
+
+    def test_restricoes_do_banco_barram_alteracao_por_fora(self):
+        """CHECK e chaves estrangeiras barram SQL feito por fora."""
+        from sqlalchemy.exc import IntegrityError
+        self.banco.salvar(self.exemplo)
+        for sql in ("UPDATE vulnerabilidades SET cvss = 11 WHERE id = 1",
+                    "UPDATE vinculos SET situacao = 9",
+                    "INSERT INTO dependencias VALUES (1, 1, 0.5)",
+                    "INSERT INTO dependencias VALUES (1, 999, 0.5)"):
+            with self.subTest(sql=sql), self.assertRaises(IntegrityError):
+                # Sem PRAGMA aqui: o repositório liga as chaves
+                # estrangeiras do SQLite em cada conexão.
+                with self.engine.begin() as conexao:
+                    conexao.exec_driver_sql(sql)
+
+    def test_conteudo_fora_das_regras_e_recusado(self):
+        """Aceito no banco, recusado no domínio: BaseInvalidaError."""
+        self.banco.salvar(self.exemplo)
+        self._executar("UPDATE equipamentos SET hostname = :h WHERE id = 1",
+                       h="nome com espaço")
+        with self.assertRaises(BaseInvalidaError):
+            self.banco.carregar()
+
+    def test_variavel_de_ambiente_escolhe_o_repositorio(self):
+        """INVENTARIO_BANCO escolhe o banco; sem ela, o arquivo."""
+        import armazenamento
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("INVENTARIO_BANCO", None)
+            self.assertIsInstance(armazenamento.abrir_repositorio(),
+                                  ArquivoInventario)
+        with mock.patch.dict(os.environ,
+                             {"INVENTARIO_BANCO": "sqlite://"}):
+            repositorio = armazenamento.abrir_repositorio()
+            self.assertIsInstance(repositorio, self.sql.BancoInventario)
+            self.assertEqual(len(repositorio.carregar()), 0)
+
+    def test_senha_da_url_nao_aparece(self):
+        """A senha da URL não aparece nas mensagens de erro."""
+        banco = self.sql.BancoInventario(
+            "postgresql+psycopg://usuario:segredo@servidor/banco")
+        self.assertNotIn("segredo", banco.caminho)
+
+
 class TesteDosAutotestes(unittest.TestCase):
     """Roda o autoteste de cada módulo, como "python modulo.py"."""
 
@@ -2272,7 +2419,8 @@ class TesteDosAutotestes(unittest.TestCase):
                        "calculadora_cvss", "vulnerabilidades",
                        "ficha_tecnica", "equipamentos", "inventario",
                        "armazenamento", "risco", "arvore", "base_cve",
-                       "atualizacao_cve", "explicacao_cve"):
+                       "atualizacao_cve", "explicacao_cve",
+                       "repositorio_sql"):
             with self.subTest(modulo=modulo):
                 resultado = subprocess.run(
                     [sys.executable, os.path.join(PASTA, modulo + ".py")],

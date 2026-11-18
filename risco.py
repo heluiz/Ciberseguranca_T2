@@ -471,12 +471,11 @@ class ModeloRisco:
         Resolve o sistema se ainda não foi resolvido. Levanta
         SistemaSingularError se não for possível.
         """
-        if self.x is None:
-            self.resolver()
+        x = self.x if self.x is not None else self.resolver()
         return [
             RiscoEquipamento(equipamento, float(self.soma_cvss[i]),
                              float(self.fatores[i]), float(self.b[i]),
-                             float(self.x[i]))
+                             float(x[i]))
             for i, equipamento in enumerate(self.equipamentos)
         ]
 
@@ -494,14 +493,13 @@ class ModeloRisco:
         dele, parcela herdada = fração x risco efetivo dele). A soma das
         parcelas é x - b. Resolve o sistema se necessário.
         """
-        if self.x is None:
-            self.resolver()
+        x = self.x if self.x is not None else self.resolver()
         i = self._linha[id_equipamento]
         itens = []
         for outro in self.equipamentos:
             fracao = self.A[i, self._linha[outro.id]]
             if fracao > 0:
-                efetivo = float(self.x[self._linha[outro.id]])
+                efetivo = float(x[self._linha[outro.id]])
                 itens.append((outro, float(fracao), efetivo,
                               float(fracao) * efetivo))
         return itens
@@ -512,9 +510,8 @@ class ModeloRisco:
 
     def risco_total(self):
         """A soma dos riscos efetivos, 1^T x. Resolve se necessário."""
-        if self.x is None:
-            self.resolver()
-        return float(self.x.sum())
+        x = self.x if self.x is not None else self.resolver()
+        return float(x.sum())
 
     def pesos_no_total(self):
         """Resolve (I - A)^T w = 1 e devolve w.
@@ -711,7 +708,7 @@ if __name__ == "__main__":
     x = modelo.resolver()
     print("x =", x, f"(resíduo {modelo.residuo:.1e})")
     assert np.allclose(x, [16, 24, 18]), "o NumPy não bate com a mão"
-    assert modelo.residuo < 1e-12
+    assert modelo.residuo is not None and modelo.residuo < 1e-12
     for linha_do_relatorio in modelo.relatorio():
         print(f"  {linha_do_relatorio.equipamento.hostname:12} "
               f"Mv={linha_do_relatorio.soma_cvss:5.1f} "
@@ -917,7 +914,7 @@ if __name__ == "__main__":
     # (a) frações exatas; (b) série de Neumann:
     # x = b + A b + A^2 b + ..., que é repetir x <- b + A x até
     # estabilizar (converge se a soma das linhas de A for menor que 1).
-    gerador = random.Random(2026)
+    gerador = random.Random(2026)  # nosec B311
     for _ in range(20):
         n = gerador.randint(2, 12)
         grande = Inventario()

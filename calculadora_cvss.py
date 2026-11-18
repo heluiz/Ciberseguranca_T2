@@ -377,7 +377,7 @@ def analisar_vetor(texto):
     vetor = vetor.upper()
     versao = _versao_do_vetor(vetor)
     perguntas = {m.codigo: m for m in _PERGUNTAS_DO_VETOR[versao]}
-    respostas = {}
+    respostas: dict[str, str] = {}
     # Barra sobrando (no fim ou dobrada) não atrapalha: é ignorada.
     for trecho in filter(None, vetor.partition("/")[2].split("/")):
         _conferir_trecho(trecho, versao, perguntas, respostas)

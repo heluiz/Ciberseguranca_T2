@@ -4,7 +4,14 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY requirements.txt requirements-web.txt ./
-RUN pip install --no-cache-dir -r requirements-web.txt \
+# Correções de segurança do Debian posteriores à imagem base (Trivy, S5_15);
+# depois de instalar as dependências, o pip sai da imagem (não é usado na
+# execução, e as bibliotecas que ele embute aparecem nas varreduras).
+RUN apt-get update && apt-get -y upgrade \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir -r requirements-web.txt \
+    && python -m pip uninstall -y pip \
+    && rm -rf /usr/local/lib/python3.*/ensurepip \
     && useradd --create-home --uid 10001 sentinel
 COPY --chown=sentinel:sentinel . .
 RUN mkdir -p /app/staticfiles && chown sentinel:sentinel /app/staticfiles

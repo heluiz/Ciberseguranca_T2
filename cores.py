@@ -37,7 +37,8 @@ def ativar():
     como efeito colateral. Nos outros sistemas não faz nada.
     """
     if _LIGADAS and os.name == "nt":
-        os.system("")
+        # Comando fixo e vazio: nada vindo do usuário chega ao shell.
+        os.system("")  # nosec B605 B607
 
 
 def desligar():

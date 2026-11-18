@@ -51,7 +51,8 @@ def pedir_saida():
 
 def limpar_tela():
     """Atende "limpar": limpa o terminal com o comando do sistema."""
-    os.system("cls" if os.name == "nt" else "clear")
+    # Comando fixo (cls ou clear): nada vindo do usuário chega ao shell.
+    os.system("cls" if os.name == "nt" else "clear")  # nosec B605
 
 
 def mostrar_ajuda():

@@ -8,6 +8,19 @@ class VersionForm(forms.ModelForm):
         widget=forms.HiddenInput, initial=1, min_value=1
     )
 
+    def clean(self):
+        """Só texto visível, a mesma regra do programa de terminal.
+
+        Um caractere de controle (ESC, quebra de linha...) seria gravado no
+        banco, mas o inventário deixaria de carregar (validacao.exigir_texto),
+        e com ele o modelo de risco inteiro.
+        """
+        data = super().clean()
+        for name, value in list(data.items()):
+            if isinstance(value, str) and not value.isprintable():
+                self.add_error(name, "Use apenas caracteres visíveis (sem quebra de linha nem caractere de controle).")
+        return data
+
 
 class AssetForm(VersionForm):
     class Meta:

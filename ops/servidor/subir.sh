@@ -1,7 +1,7 @@
 #!/bin/sh
-# Sobe o SENTINEL web no servidor da disciplina.
-#   sh ops/servidor/subir.sh            porta 8080
-#   SENTINEL_PORT=8123 sh ops/servidor/subir.sh
+# Sobe o Trabalho 2 no servidor da disciplina: a versão web (porta 2200,
+# a da matrícula 12621CBS200) e o menu de terminal (sem porta).
+#   sh ops/servidor/subir.sh
 # Na primeira execução cria o arquivo .env com segredos aleatórios e a senha
 # do administrador inicial. Nas seguintes, reaproveita o .env existente.
 set -eu
@@ -14,7 +14,7 @@ segredo() {
 }
 
 if [ ! -f .env ]; then
-    if docker volume ls --format '{{.Name}}' | grep -qx 'heluiz-12621cbs200-web_postgres-data'; then
+    if docker volume ls --format '{{.Name}}' | grep -qx 'trab02_2026_2_12621cbs200_db_data'; then
         echo "Existe um banco do SENTINEL, mas falta o arquivo .env." >&2
         echo "Recupere o .env original; uma senha nova nao abriria esse banco." >&2
         exit 1
@@ -33,7 +33,7 @@ if [ ! -f .env ]; then
         echo "DJANGO_ALLOWED_HOSTS=$HOSTS"
         echo "DJANGO_HTTPS=0"
         echo "DJANGO_REQUIRE_MFA=0"
-        echo "SENTINEL_PORT=${SENTINEL_PORT:-8080}"
+        echo "SENTINEL_PORT=${SENTINEL_PORT:-2200}"
         echo "SENTINEL_ADMIN_USER=admin"
         echo "SENTINEL_ADMIN_PASSWORD=$(segredo | cut -c1-20)"
         echo "SENTINEL_DEMO=1"
@@ -41,8 +41,18 @@ if [ ! -f .env ]; then
     echo "Arquivo .env criado (somente o seu usuario pode ler)."
 fi
 
-# Sobe na ordem: banco, preparação (termina sozinha), aplicação e monitor.
-$COMPOSE up -d --build
+# Constrói as duas imagens (web e terminal).
+$COMPOSE build
+
+# Menu de terminal: na primeira vez, o volume recebe a base de exemplo
+# (fictícia), com o dono certo; depois disso, nunca é sobrescrito.
+# Roda com o próprio usuário do programa (UID 10001), dono da pasta.
+$COMPOSE run --rm -T --no-deps --entrypoint sh terminal -c \
+    '[ -f /app/dados/inventario.json ] || { cp /app/dados_exemplo/inventario_exemplo.json /app/dados/inventario.json && echo "Base de exemplo copiada para o menu de terminal."; }'
+
+# Sobe na ordem: banco, preparação (termina sozinha), aplicação, monitor e
+# o menu de terminal.
+$COMPOSE up -d
 
 # Espera a aplicação responder à verificação de saúde (até 3 minutos).
 APP=$($COMPOSE ps -q app)
@@ -57,11 +67,12 @@ until [ "$(docker inspect --format '{{.State.Health.Status}}' "$APP" 2>/dev/null
     sleep 2
 done
 PORTA=$(grep '^SENTINEL_PORT=' .env | cut -d= -f2)
-PORTA=${PORTA:-8080}
+PORTA=${PORTA:-2200}
 echo
-echo "SENTINEL em execucao."
+echo "Trabalho 2 em execucao (trab02_2026_2_12621cbs200)."
 for host in $(grep '^DJANGO_ALLOWED_HOSTS=' .env | cut -d= -f2 | tr ',' ' '); do
     echo "  http://$host:$PORTA/"
 done
 echo "Usuario inicial: admin   Senha: veja SENTINEL_ADMIN_PASSWORD no arquivo .env"
 echo "Disponibilidade:  $COMPOSE logs --tail 5 monitor"
+echo "Menu de terminal: docker attach trab02_2026_2_12621cbs200_terminal   (sair sem parar: Ctrl+P, Ctrl+Q)"

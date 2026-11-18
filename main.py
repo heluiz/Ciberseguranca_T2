@@ -24,7 +24,7 @@ import atualizacao_cve
 import banner
 import cores
 import telas
-from armazenamento import ArquivoInventario, BaseInvalidaError
+from armazenamento import BaseInvalidaError, abrir_repositorio
 from base_cve import BaseCVE, BaseCVEInvalidaError
 from base_cve import caminho_padrao as caminho_da_base_cve
 from classificacoes import (
@@ -122,7 +122,7 @@ class Aplicacao:
     """O programa: carrega a base e repete o menu até o usuário sair."""
 
     def __init__(self, arquivo, base_cve=None, abrir=None):
-        """Recebe o ArquivoInventario onde a base é lida e gravada.
+        """Recebe o repositório (arquivo ou banco) da base.
 
         base_cve é a base de CVEs exploradas; sem ela, a do disco é lida
         na primeira vez que for usada. abrir(url) baixa a atualização
@@ -1488,7 +1488,7 @@ def main():
     """Ponto de entrada: cria a aplicação e a inicia."""
     if em_container():
         preparar_container()
-    aplicacao = Aplicacao(ArquivoInventario())
+    aplicacao = Aplicacao(abrir_repositorio())
     try:
         aplicacao.iniciar()
     except BaseInvalidaError as erro:

@@ -14,6 +14,10 @@ outros equipamentos, fica no Inventario.
 A classe não lê do teclado nem grava em disco.
 """
 
+from __future__ import annotations
+
+from typing import Any, Mapping
+
 from validacao import exigir_objeto, exigir_texto
 
 # Campo -> rótulo na tela, na ordem em que aparecem.
@@ -31,7 +35,7 @@ CAMPOS = tuple(ROTULOS)
 TAMANHO_MAXIMO = 60
 
 
-def validar_valor(rotulo, texto):
+def validar_valor(rotulo: str, texto: str) -> str:
     """Devolve o texto de um campo da ficha, arrumado, ou ValueError.
 
     Tira os espaços repetidos e mantém maiúsculas e minúsculas como
@@ -57,32 +61,32 @@ class FichaTecnica:
     Cada campo é um texto ou None (não informado).
     """
 
-    def __init__(self, dados=None):
+    def __init__(self, dados: Mapping[str, Any] | None = None) -> None:
         """Cria a ficha a partir de {campo: texto}.
 
         Sem dados, a ficha fica vazia. Levanta ValueError se algum
         campo for inválido.
         """
-        self.fabricante = None
-        self.modelo = None
-        self.numero_serie = None
-        self.patrimonio = None
-        self.sistema = None
-        self.versao = None
+        self.fabricante: str | None = None
+        self.modelo: str | None = None
+        self.numero_serie: str | None = None
+        self.patrimonio: str | None = None
+        self.sistema: str | None = None
+        self.versao: str | None = None
         self.atualizar(dados or {})
 
     @property
-    def vazia(self):
+    def vazia(self) -> bool:
         """True se nenhum campo foi informado."""
         return all(getattr(self, campo) is None for campo in CAMPOS)
 
-    def atualizar(self, alteracoes):
+    def atualizar(self, alteracoes: Mapping[str, Any]) -> None:
         """Aplica {campo: texto}; None ou "" apaga o campo.
 
         Levanta ValueError em campo que não existe ou valor inválido;
         nesse caso nada muda (tudo ou nada).
         """
-        novos = {}
+        novos: dict[str, str | None] = {}
         for campo, valor in alteracoes.items():
             if campo not in ROTULOS:
                 raise ValueError(f"A ficha técnica não tem o campo "
@@ -95,18 +99,18 @@ class FichaTecnica:
         for campo, valor in novos.items():
             setattr(self, campo, valor)
 
-    def preenchidos(self):
+    def preenchidos(self) -> list[tuple[str, str]]:
         """Devolve os pares (rótulo, valor) dos campos informados."""
         return [(ROTULOS[campo], getattr(self, campo)) for campo in CAMPOS
                 if getattr(self, campo) is not None]
 
-    def para_dict(self):
+    def para_dict(self) -> dict[str, str]:
         """Devolve o objeto JSON da ficha: só os campos informados."""
         return {campo: getattr(self, campo) for campo in CAMPOS
                 if getattr(self, campo) is not None}
 
     @classmethod
-    def de_dict(cls, dados, nome):
+    def de_dict(cls, dados: Any, nome: str) -> FichaTecnica:
         """Reconstrói a ficha a partir do objeto do arquivo.
 
         nome diz onde está o objeto, para a mensagem de erro. Um campo
@@ -124,17 +128,17 @@ class FichaTecnica:
         except ValueError as erro:
             raise ValueError(f"{nome}: {erro}") from erro
 
-    def copia(self):
+    def copia(self) -> FichaTecnica:
         """Devolve outra ficha com os mesmos dados."""
         return FichaTecnica(self.para_dict())
 
-    def __eq__(self, outra):
+    def __eq__(self, outra: object) -> bool:
         """Fichas com os mesmos dados são iguais."""
         if not isinstance(outra, FichaTecnica):
             return NotImplemented
         return self.para_dict() == outra.para_dict()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Texto para a tela, com os campos informados.
 
         Como "Dell PowerEdge R430 · Windows Server 2019 1809 · série
@@ -147,7 +151,7 @@ class FichaTecnica:
             f"patrimônio {self.patrimonio}" if self.patrimonio else ""]
         return " · ".join(p for p in partes if p) or "sem ficha técnica"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Texto para depuração: FichaTecnica(fabricante='Dell')."""
         campos = ", ".join(f"{c}={v!r}" for c, v in self.para_dict().items())
         return f"FichaTecnica({campos})"

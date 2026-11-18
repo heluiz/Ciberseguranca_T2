@@ -5,10 +5,10 @@ Há três formas de subir a interface web. Todas usam Docker e a mesma imagem (`
 | Onde | Arquivo | Endereço |
 |---|---|---|
 | Seu Windows | `ABRIR-SENTINEL.cmd` | http://127.0.0.1:8000 |
-| Servidor da disciplina (rede interna) | `compose.servidor.yaml` | http://IP-DO-SERVIDOR:8080 |
+| Servidor da disciplina (rede interna) | `compose.servidor.yaml` | http://IP-DO-SERVIDOR:2200 |
 | Internet, com domínio e HTTPS | `compose.web.yaml` | https://seu-dominio |
 
-O programa de terminal original continua disponível com `compose.yaml` e não é afetado.
+O programa de terminal original continua disponível com `compose.yaml` no seu computador; no servidor, o `compose.servidor.yaml` sobe o menu de terminal junto com a versão web.
 
 ## 1. No Windows
 
@@ -17,19 +17,19 @@ Instale e abra o Docker Desktop e dê dois cliques em `ABRIR-SENTINEL.cmd`. O pa
 ## 2. No servidor da disciplina
 
 ```sh
-git clone https://github.com/heluiz/Ciberseguranca_T2.git
-cd Ciberseguranca_T2
+git clone https://github.com/heluiz/trab02_2026_2_12621cbs200.git ~/trab02_2026_2_12621cbs200
+cd ~/trab02_2026_2_12621cbs200
 sh ops/servidor/subir.sh
 ```
 
-Para usar outra porta: `SENTINEL_PORT=8123 sh ops/servidor/subir.sh` (vale na primeira execução; depois, edite `SENTINEL_PORT` no `.env`).
+Todos os recursos seguem o padrão de nomes da disciplina (card S5_20), com o identificador `trab02_2026_2_12621cbs200`: projeto Compose, containers (`trab02_2026_2_12621cbs200` para a web e os sufixos `_db`, `_preparar`, `_monitor` e `_terminal`), imagens e volumes. A porta externa é 2200 (2000 + os três últimos dígitos da matrícula), mapeada para a 8000 do Gunicorn; os outros containers não publicam porta. A porta é atribuída pela regra da disciplina: se estiver ocupada, avise o docente.
 
 O script faz tudo em uma execução:
 
 1. cria o arquivo `.env` com segredos aleatórios e a senha do administrador inicial (só na primeira vez);
-2. constrói a imagem e sobe o PostgreSQL;
+2. constrói as imagens (web e terminal), põe a base de exemplo no volume do menu de terminal e sobe o PostgreSQL;
 3. aplica as migrações, cria os grupos, a conta `admin` e carrega o inventário de exemplo (container `preparar`, que termina sozinho);
-4. sobe a aplicação e o registro de disponibilidade;
+4. sobe a aplicação, o registro de disponibilidade e o menu de terminal;
 5. mostra os endereços de acesso.
 
 A senha inicial fica em `SENTINEL_ADMIN_PASSWORD`, no `.env` do servidor. Troque-a no primeiro acesso, em `/senha/`.
@@ -48,14 +48,14 @@ Mostra há quanto tempo cada container está no ar, quando a aplicação iniciou
 docker compose -f compose.servidor.yaml logs monitor
 ```
 
-A aplicação e o banco usam `restart: unless-stopped`: voltam sozinhos após uma falha ou o reinício do servidor. Os dados ficam no volume `heluiz-12621cbs200-web_postgres-data` e sobrevivem à recriação dos containers.
+Os containers usam `restart: unless-stopped`: voltam sozinhos após uma falha ou o reinício do servidor. Os dados ficam nos volumes `trab02_2026_2_12621cbs200_db_data` (banco) e `trab02_2026_2_12621cbs200_terminal_data` (menu de terminal) e sobrevivem à recriação dos containers.
 
 ### Comandos úteis
 
 ```sh
 docker compose -f compose.servidor.yaml ps                # situação
 docker compose -f compose.servidor.yaml logs --tail 50 app  # log da aplicação
-docker compose -f compose.servidor.yaml down              # parar (os dados ficam)
+docker compose -f compose.servidor.yaml stop              # parar (os dados ficam)
 sh ops/servidor/subir.sh                                   # subir de novo ou atualizar após git pull
 ```
 

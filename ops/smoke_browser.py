@@ -3,7 +3,7 @@
 import os
 import sys
 import secrets
-import subprocess
+import subprocess  # nosec B404
 import time
 from pathlib import Path
 import urllib.request
@@ -35,7 +35,7 @@ test_hostname = "PC-BROWSER-" + secrets.token_hex(3).upper()
 user = get_user_model().objects.create_superuser(
     "browser-" + secrets.token_hex(4), password=password, first_name="Heluiz"
 )
-server = subprocess.Popen(
+server = subprocess.Popen(  # nosec B603
     [
         str(root / ".venv/bin/python"),
         "manage.py",
@@ -49,7 +49,7 @@ server = subprocess.Popen(
 try:
     for _ in range(80):
         try:
-            urllib.request.urlopen("http://127.0.0.1:8765/health/", timeout=1)
+            urllib.request.urlopen("http://127.0.0.1:8765/health/", timeout=1)  # nosec B310
             break
         except Exception:
             time.sleep(0.1)
@@ -103,7 +103,7 @@ try:
                         path=str(Path(frame_dir) / f"frame-{frame:03d}.png")
                     )
                     page.wait_for_timeout(90)
-                subprocess.run(
+                subprocess.run(  # nosec B603 B607
                     [
                         "ffmpeg",
                         "-y",

@@ -30,4 +30,6 @@ test-results/
 playwright-report/
 # Documentação e testes da interface web não vão para a imagem.
 docs/
+# Exceção: o contrato da API v1 é servido pela aplicação (/api/v1/openapi.yaml).
+!docs/web/openapi.yaml
 tests_web/
