@@ -156,7 +156,7 @@
       {% endwith %}
     {% else %}
       <p class="footnote">
-        As matrizes completas aparecem para inventários de até {{ limit }} equipamentos (este tem {{ d.ordem }}). Use os
+        As matrizes completas aparecem para inventários de até {{ limit }} equipamentos e {{ limit }} vulnerabilidades, como no terminal (este tem {{ d.ordem }} equipamentos e {{ result.model.vulnerabilidades|length }} vulnerabilidades). Use os
         cenários de demonstração acima para vê-las montadas.
       </p>
     {% endif %}
@@ -243,7 +243,7 @@
                 <th>Vulnerabilidade</th>
                 <th>CVSS</th>
                 <th>Redução do risco total</th>
-                {% if not scenario %}<th>Ação</th>{% endif %}
+                <th>Ação</th>
               </tr>
             </thead>
             <tbody>
@@ -256,9 +256,10 @@
                   <td>{{ fix.vulnerabilidade.cve|default:fix.vulnerabilidade.descricao }}</td>
                   <td>{{ fix.vulnerabilidade.cvss|floatformat:1 }}</td>
                   <td class="cyan">↓ {{ fix.reducao|floatformat:2 }} pontos</td>
-                  {% if not scenario %}
-                    <td><a href="{% url 'collection' 'finding' %}?asset={{ fix.equipamento.id }}">Abrir tratamentos →</a></td>
-                  {% endif %}
+                  <td class="actions">
+                    <a href="{% url 'correction' %}?ativo={{ fix.equipamento.id }}&amp;vulnerabilidade={{ fix.vulnerabilidade.id }}{% if scenario %}&amp;cenario={{ scenario }}{% endif %}">Por que e como corrigir →</a>
+                    {% if not scenario %}<a href="{% url 'collection' 'finding' %}?asset={{ fix.equipamento.id }}">Abrir tratamentos</a>{% endif %}
+                  </td>
                 </tr>
               {% endfor %}
             </tbody>

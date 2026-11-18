@@ -1,0 +1,22 @@
+<div class="cvss-result" role="status">
+  <p>
+    <span class="badge cyan">Nota {{ r.nota|floatformat:1 }}{% if r.gravidade %} · {{ r.gravidade.rotulo }}{% endif %}</span>
+    <code>{{ r.vetor }}</code>
+  </p>
+  {% if not r.nota %}
+    <p class="muted">Nota 0,0: sem impacto nenhum, não há vulnerabilidade a cadastrar (o inventário aceita de 0,1 a 10,0).</p>
+  {% endif %}
+  {% if r.frases %}
+    <dl class="explain-list">
+      {% for label, sentence in r.frases %}
+        <div>
+          <dt>{{ label }}</dt>
+          <dd>{{ sentence }}</dd>
+        </div>
+      {% endfor %}
+    </dl>
+  {% endif %}
+  {% if r.register and can_add %}
+    <a class="button primary" href="{% url 'create' 'vulnerability' %}?{{ r.register }}">Cadastrar vulnerabilidade com esta nota</a>
+  {% endif %}
+</div>

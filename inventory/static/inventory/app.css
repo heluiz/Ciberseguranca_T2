@@ -159,3 +159,110 @@ th[aria-sort="descending"] .sort-button::after {
   text-decoration: underline;
   font-weight: 600;
 }
+/* ---- Consultas que vieram do terminal: base de CVEs, árvore, CVSS ---- */
+.inline-small {
+  display: inline;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+h3 {
+  font-size: 15px;
+  margin: 20px 0 8px;
+}
+.plain-list {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+.plain-list li {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.explain-list {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.explain-list > div {
+  padding: 10px 12px;
+  border-left: 3px solid var(--cyan);
+  background: var(--surface2);
+  border-radius: 0 8px 8px 0;
+}
+.explain-list dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.explain-list dd {
+  margin: 2px 0 0;
+}
+.dependency-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dependency-tree li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.dependency-tree li:last-child {
+  border-bottom: 0;
+}
+.dependency-tree small {
+  margin-top: 2px;
+}
+.tree-branch {
+  color: var(--muted);
+  margin-right: 4px;
+}
+.tree-depth-1 { padding-left: 0; }
+.tree-depth-2 { padding-left: 22px !important; }
+.tree-depth-3 { padding-left: 44px !important; }
+.tree-depth-4 { padding-left: 66px !important; }
+.tree-depth-5 { padding-left: 88px !important; }
+.tree-depth-6 { padding-left: 110px !important; }
+.tree-depth-7 { padding-left: 132px !important; }
+.cvss-question {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.cvss-question legend {
+  padding: 0 6px;
+}
+.cvss-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.cvss-option input {
+  flex: none;
+  width: auto;
+  margin-top: 4px;
+}
+.cvss-result {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--cyan);
+  border-radius: 8px;
+}
+.cvss-result code {
+  margin-left: 8px;
+  overflow-wrap: anywhere;
+}
+.tree-block {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.tree-block summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.diagnostic-list dd small {
+  font-weight: 400;
+}

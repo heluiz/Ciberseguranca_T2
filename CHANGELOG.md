@@ -7,6 +7,33 @@ release no GitHub (veja [docs/GIT-FLOW.md](docs/GIT-FLOW.md)).
 
 ## [Não publicado]
 
+## [1.1.0] - 2026-11-17
+
+Funções que existiam só no programa de terminal passam a existir na web.
+
+### Adicionado
+- Base de CVEs exploradas na web: navegação fabricante → produto → CVEs,
+  paginação da busca e página de cada CVE com a explicação em português
+  (vetor em frases, CWE com nome, SSVC, ação da CISA traduzida e boletins),
+  os ativos que a têm e os ativos cuja ficha técnica combina (opção 16).
+- Sugestões de CVEs pela ficha técnica na ficha do ativo (opção 16, item 3).
+- Risco passo a passo na ficha do ativo (opção 14).
+- Árvore de dependências nos dois sentidos, com remoção da ligação (opção 12).
+- Busca por CVE ou CWE em todo o inventário (opção 3, item 7) e CWE na busca
+  de tratamentos.
+- Detalhe de cada correção do plano: por que reduz o risco e o que fazer
+  (opção 17).
+- Calculadora CVSS 4.0 e 3.1 com as perguntas em português e conferência de
+  um vetor colado.
+- Importação do JSON do Trabalho 1, convertido como no terminal.
+
+### Alterado
+- Cadastro de vulnerabilidade na web: a nota sai do vetor quando fica em
+  branco, e uma CVE da base preenche descrição, CWE, vetor e nota. A API
+  continua exigindo a nota.
+- Matrizes da análise de risco até 12 equipamentos e 12 vulnerabilidades, o
+  mesmo limite do terminal.
+
 ## [1.0.0] - 2026-11-17
 
 Versão entregue do Trabalho 02 (Sprints 3, 4 e 5).
@@ -87,5 +114,6 @@ Versão entregue do Trabalho 02 (Sprints 3, 4 e 5).
 - Trabalho 2: inventário em orientação a objetos a partir do CRUD do
   Trabalho 1, com Docker e verificação automática no GitHub.
 
-[Não publicado]: https://github.com/heluiz/trab02_2026_2_12621cbs200/compare/v1.0.0...HEAD
+[Não publicado]: https://github.com/heluiz/trab02_2026_2_12621cbs200/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/heluiz/trab02_2026_2_12621cbs200/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/heluiz/trab02_2026_2_12621cbs200/releases/tag/v1.0.0

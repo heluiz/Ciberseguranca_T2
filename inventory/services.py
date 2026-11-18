@@ -9,6 +9,7 @@ from django.http import Http404
 from django.utils import timezone
 from classificacoes import TipoEquipamento
 from inventario import Inventario
+import migracao
 from vulnerabilidades import Vulnerabilidade
 from risco import ModeloRisco
 from formatacao import para_busca
@@ -278,8 +279,19 @@ def import_json(content, user=None, dry_run=False):
         )
     except RecursionError as error:
         raise ValueError("JSON excede a profundidade permitida.") from error
+    # Arquivo do Trabalho 1 ({"ativos": ..., "falhas": ...}): a mesma
+    # conversão que o terminal faz ao abrir um arquivo antigo (migracao.py).
+    converted = ""
+    if migracao.eh_formato_t1(raw):
+        raw, notes = migracao.converter(raw)
+        converted = " Arquivo do Trabalho 1 convertido para o formato novo" + (
+            ": " + " ".join(notes) if notes else "."
+        )
     if not isinstance(raw, list):
-        raise ValueError("A raiz do inventário deve ser uma lista JSON.")
+        raise ValueError(
+            "A raiz do inventário deve ser uma lista JSON "
+            "(ou o objeto do Trabalho 1, com ativos e falhas)."
+        )
     if len(raw) > 1000:
         raise ValueError("Importe até 1000 ativos por arquivo.")
     inv = Inventario.de_dict(raw)
@@ -306,6 +318,7 @@ def import_json(content, user=None, dry_run=False):
                 f"risco total {model.risco_total():.2f} pontos.{note}".replace(
                     ".", ",", 1
                 )
+                + converted
             )
         if occupied:
             raise ValueError(
@@ -345,4 +358,7 @@ def import_json(content, user=None, dry_run=False):
             raise ValueError("Risco divergente; importação revertida.")
         ImportReceipt.objects.create(digest=digest, assets=len(inv.todos()))
         audit(user, "import", digest)
-    return f"Importados {len(inv.todos())} ativos. Risco reconciliado com o JSON original."
+    return (
+        f"Importados {len(inv.todos())} ativos. Risco reconciliado com o JSON original."
+        + converted
+    )

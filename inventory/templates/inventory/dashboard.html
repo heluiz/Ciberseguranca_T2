@@ -122,7 +122,7 @@
             {% for c in plan %}
               <tr>
                 <td><a href="{% url 'asset_detail' c.equipamento.id %}">{{ c.equipamento.hostname }}</a></td>
-                <td>{{ c.vulnerabilidade.cve|default:c.vulnerabilidade.descricao }}</td>
+                <td><a href="{% url 'correction' %}?ativo={{ c.equipamento.id }}&amp;vulnerabilidade={{ c.vulnerabilidade.id }}" title="Por que e como corrigir">{{ c.vulnerabilidade.cve|default:c.vulnerabilidade.descricao }}</a></td>
                 <td>{{ c.vulnerabilidade.cvss|floatformat:1 }}</td>
                 <td class="cyan">↓ {{ c.reducao|floatformat:2 }} pontos</td>
               </tr>

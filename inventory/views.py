@@ -16,12 +16,13 @@ from urllib.parse import urlencode
 
 from classificacoes import (
     NivelGravidade,
-    OrigemVulnerabilidade,
     SituacaoTratamento,
     TipoEquipamento,
 )
 from risco import ModeloRisco, SistemaSingularError
-from . import analysis
+import arvore
+
+from . import analysis, reference_views, references
 from .models import (
     Asset,
     Vulnerability,
@@ -40,7 +41,7 @@ from .services import (
     MODELS,
 )
 from .strategies import EffectiveRiskRanking, OwnRiskRanking
-from .forms import FORMS
+from .forms import FORMS, WEB_FORMS
 
 TITLES = {
     "asset": "Ativos",
@@ -287,6 +288,7 @@ def collection(request, kind):
                 | Q(asset__lotacao__icontains=query)
                 | Q(vulnerability__descricao__icontains=query)
                 | Q(vulnerability__cve__icontains=query)
+                | Q(vulnerability__cwe__icontains=query)
             )
     elif kind == "dependency":
         objects = objects.select_related("source", "target")
@@ -349,13 +351,21 @@ def edit(request, kind, pk=None):
             for name in FORMS[kind]._meta.fields
             if name != "version" and request.GET.get(name)
         }
-    form = FORMS[kind](request.POST or None, instance=obj, initial=initial)
+    form = WEB_FORMS[kind](request.POST or None, instance=obj, initial=initial)
     back = safe_back(request)
     status = 200
     if request.method == "POST" and form.is_valid():
         try:
             save_entity(request.user, kind, form.cleaned_data, pk)
             messages.success(request, "Registro salvo com segurança.")
+            filled = getattr(form, "filled_from_base", None)
+            if filled:
+                messages.info(
+                    request,
+                    "Preenchido pela base de CVEs exploradas: "
+                    + ", ".join(filled)
+                    + ". Confira no registro.",
+                )
             return redirect(back or reverse("collection", args=[kind]))
         except Conflict as error:
             form.add_error(None, str(error))
@@ -614,56 +624,6 @@ def export(request):
 
 
 @login_required
-@permission_required("inventory.view_vulnerability", raise_exception=True)
-def cve_search(request):
-    from base_cve import BaseCVE
-
-    q = request.GET.get("q", "").strip()[:150]
-    base, warning = BaseCVE.carregar()
-    if warning:
-        messages.warning(request, warning)
-    items = base.buscar(q)[:30] if q else []
-    registered = dict(
-        Vulnerability.objects.filter(
-            cve__in=[item.cve for item in items]
-        ).values_list("cve", "pk")
-    )
-    rows = []
-    for item in items:
-        # Endereço do cadastro já preenchido com os dados do catálogo.
-        prefill = urlencode(
-            {
-                "cve": item.cve,
-                "descricao": f"{item.fabricante} {item.produto}: {item.nome}"[
-                    :2000
-                ],
-                "origem": OrigemVulnerabilidade.FALTA_ATUALIZACAO.value,
-                "cvss": item.cvss or "",
-                "cwe": item.cwes[0] if item.cwes else "",
-                "vetor": item.vetor or "",
-                "voltar": request.get_full_path(),
-            }
-        )
-        rows.append(
-            {
-                "item": item,
-                "registered": registered.get(item.cve),
-                "prefill": prefill,
-            }
-        )
-    return render(
-        request,
-        "inventory/cve.html",
-        {
-            "rows": rows,
-            "query": q,
-            "can_add": request.user.has_perm("inventory.add_vulnerability"),
-            "can_link": request.user.has_perm("inventory.add_finding"),
-        },
-    )
-
-
-@login_required
 def rest(request, kind, pk=None):
     """API de sessão: CSRF obrigatório nas mutações; versão obrigatória na edição."""
     if kind not in MODELS:
@@ -785,14 +745,44 @@ def asset_detail(request, pk):
         raise Http404
     model = ModeloRisco(inv)
     row = model.risco_de(pk)
+    pairs = inv.vulnerabilidades_do(pk)
+    contributions = model.contribuicoes(pk)
+    dependency_ids = {
+        (source, target): dep_pk
+        for dep_pk, source, target in Dependency.objects.values_list(
+            "pk", "source_id", "target_id"
+        )
+    }
+    base, warning = references.cve_base()
+    if warning:
+        messages.warning(request, warning)
+    suggestions, suggestion_count = references.suggestions(base, asset, inv)
+    back = request.get_full_path()
+    for item in suggestions:
+        item["prefill"] = reference_views.prefill(item["registro"], back)
     return render(
         request,
         "inventory/asset_detail.html",
         {
             "asset": asset,
             "row": row,
-            "findings": inv.vulnerabilidades_do(pk),
-            "contributions": model.contribuicoes(pk),
+            "findings": pairs,
+            "steps": references.risk_steps(row, pairs, contributions),
+            "contributions": contributions,
+            "tree_down": references.tree_rows(
+                inv, pk, arvore.DO_QUE_DEPENDE, dependency_ids
+            ),
+            "tree_up": references.tree_rows(
+                inv, pk, arvore.QUEM_DEPENDE, dependency_ids
+            ),
+            "suggestions": suggestions,
+            "suggestion_count": suggestion_count,
+            "can_add_vulnerability": request.user.has_perm(
+                "inventory.add_vulnerability"
+            ),
+            "can_delete_dependency": request.user.has_perm(
+                "inventory.delete_dependency"
+            ),
             "reached": analysis.reachability(inv, pk),
             "can_change": request.user.has_perm("inventory.change_asset"),
             "can_delete": request.user.has_perm("inventory.delete_asset"),

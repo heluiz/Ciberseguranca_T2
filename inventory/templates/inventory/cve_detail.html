@@ -1,0 +1,104 @@
+{% extends "inventory/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow cyan">CATÁLOGO CISA KEV / CVE</p>
+      <h1>{{ item.cve }}<span class="cyan">.</span></h1>
+      <p>
+        <a href="{% url 'cve' %}?fabricante={{ item.fabricante|urlencode }}">{{ item.fabricante }}</a> ·
+        <a href="{% url 'cve' %}?fabricante={{ item.fabricante|urlencode }}&amp;produto={{ item.produto|urlencode }}">{{ item.produto }}</a>
+      </p>
+    </div>
+    <div class="inline">
+      {% if registered %}
+        <a class="button" href="{% url 'collection' 'finding' %}?vulnerability={{ registered }}">Ver tratamentos</a>
+        {% if can_link %}<a class="button primary" href="{% url 'create' 'finding' %}?vulnerability={{ registered }}&amp;voltar={{ request.path|urlencode }}">Vincular a um ativo</a>{% endif %}
+      {% elif can_add %}
+        <a class="button primary" href="{% url 'create' 'vulnerability' %}?{{ prefill }}">Cadastrar no catálogo</a>
+      {% endif %}
+      <a class="button" href="{% url 'cve' %}">← Base de CVEs</a>
+    </div>
+  </div>
+  <section class="panel">
+    <h2>{{ item.nome }}</h2>
+    <p class="muted">{{ item.descricao }}</p>
+    <dl class="diagnostic-list">
+      <div>
+        <dt>Nota CVSS</dt>
+        <dd>{{ item.cvss|default:"Não informada" }}{% if item.fonte_nota %} ({{ item.fonte_nota }}){% endif %}</dd>
+      </div>
+      <div>
+        <dt>Vetor</dt>
+        <dd>{% if item.vetor %}<a href="{% url 'cvss' %}?vetor={{ item.vetor|urlencode }}">{{ item.vetor }}</a>{% else %}—{% endif %}</dd>
+      </div>
+      <div>
+        <dt>Incluída no KEV</dt>
+        <dd>{{ item.adicionada }}</dd>
+      </div>
+      <div>
+        <dt>Prazo de correção (CISA)</dt>
+        <dd>{{ item.prazo }}</dd>
+      </div>
+      <div>
+        <dt>Ransomware</dt>
+        <dd>{% if item.ransomware %}Usada em campanhas{% else %}Sem uso conhecido{% endif %}</dd>
+      </div>
+    </dl>
+    {% include "inventory/explanation.html" with e=explicacao %}
+  </section>
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">INVENTÁRIO · ONDE ESTA CVE ESTÁ REGISTRADA</p>
+        <h2>Ativos com a {{ item.cve }}</h2>
+      </div>
+    </div>
+    {% include "inventory/occurrence_table.html" with rows=occurrences empty="Nenhum ativo do inventário tem esta CVE registrada." %}
+  </section>
+  <section class="panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">SUGESTÃO PELA FICHA TÉCNICA</p>
+        <h2>Ativos cuja ficha combina com {{ item.fabricante }} · {{ item.produto }}</h2>
+      </div>
+    </div>
+    <p class="muted">
+      Compara o fabricante, o modelo e o sistema da ficha de cada ativo com o fabricante e o produto da CVE. É uma pista para
+      conferir a versão instalada, não a confirmação da falha.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Ativo</th>
+            <th>Lotação</th>
+            <th>Palavras que combinaram</th>
+            <th>Situação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in matching %}
+            <tr>
+              <td><a href="{% url 'asset_detail' row.equipamento.id %}">{{ row.equipamento.hostname }}</a></td>
+              <td>{{ row.equipamento.lotacao }}</td>
+              <td>{{ row.palavras|join:", " }}</td>
+              <td>
+                {% if row.vinculada %}
+                  Já registrada no ativo
+                {% elif registered and can_link %}
+                  <a href="{% url 'create' 'finding' %}?asset={{ row.equipamento.id }}&amp;vulnerability={{ registered }}&amp;voltar={{ request.path|urlencode }}">Vincular a este ativo</a>
+                {% else %}
+                  Conferir a versão instalada
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" class="empty">Nenhuma ficha técnica combina com esta CVE.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

@@ -6,48 +6,130 @@
       <h1>
         Catálogo CISA KEV<span class="cyan">.</span>
       </h1>
-      <p class="muted">Consulta local à base incluída no projeto. A presença no KEV não confirma que seu ativo esteja vulnerável.</p>
+      <p class="muted">
+        {{ summary.total }} CVEs exploradas em ataques reais ({{ summary.com_nota }} com nota CVSS) · catálogo {{ summary.catalogo|default:"sem versão" }}{% if summary.publicado %}, publicado em {{ summary.publicado }}{% endif %}.
+        A presença no KEV não confirma que seu ativo esteja vulnerável.
+      </p>
+    </div>
+    <div class="inline">
+      <a class="button" href="{% url 'occurrences' %}">Onde aparece no inventário</a>
+      <a class="button" href="{% url 'cvss' %}">Calculadora CVSS</a>
     </div>
   </div>
   <section class="panel">
-    <form class="search-form">
-      <label for="q">Buscar CVE, fabricante ou produto</label>
+    <form class="search-form" method="get">
+      <label for="q">Buscar CVE, fabricante, produto ou nome da falha</label>
       <div class="inline">
-        <input id="q" name="q" value="{{ query }}"><button class="button">Pesquisar</button>
+        <input id="q" name="q" value="{{ query }}" placeholder="Ex.: CVE-2019-0708, fortios, exchange">
+        <button class="button">Pesquisar</button>
+        {% if query or vendor %}<a class="button" href="{% url 'cve' %}">Navegar por fabricante</a>{% endif %}
       </div>
     </form>
-    {% for row in rows %}
-      {% with item=row.item %}
-        <article class="cve-item">
-          <h2>{{ item.cve }}</h2>
-          <p>
-            <strong>{{ item.fabricante }} · {{ item.produto }}</strong>
-          </p>
-          <p>{{ item.nome }}</p>
-          <p class="muted">{{ item.descricao }}</p>
-          <p class="muted">
-            Incluída no KEV em {{ item.adicionada }} · prazo de correção {{ item.prazo }}
-            {% if item.ransomware %}· usada em campanhas de ransomware{% endif %}
-            {% if item.cwes %}· {{ item.cwes|join:", " }}{% endif %}
-          </p>
-          <div class="inline">
-            <span class="badge">CVSS {{ item.cvss|default:"Não informado" }}</span>
-            {% if row.registered %}
-              <a class="button" href="{% url 'collection' 'finding' %}?vulnerability={{ row.registered }}">Já está no catálogo · ver ativos afetados</a>
-              {% if can_link %}<a class="button" href="{% url 'create' 'finding' %}?vulnerability={{ row.registered }}&amp;voltar={{ request.get_full_path|urlencode }}">Vincular a um ativo</a>{% endif %}
-            {% elif can_add %}
-              <a class="button primary" href="{% url 'create' 'vulnerability' %}?{{ row.prefill }}">Cadastrar no catálogo</a>
-            {% endif %}
-            {% for link in item.links|slice:":1" %}
-              <a href="{{ link }}" rel="noopener noreferrer" target="_blank">Detalhes no NVD ↗</a>
+    {% if mode == "vendors" %}
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">NAVEGAÇÃO · FABRICANTE → PRODUTO → CVEs</p>
+          <h2>Fabricantes</h2>
+        </div>
+        <form class="inline" method="get">
+          <label class="sr-only" for="filtro">Filtrar fabricantes</label>
+          <input id="filtro" name="filtro" value="{{ vendor_filter }}" placeholder="Filtrar (ex.: micro, dl)">
+          <button class="button">Filtrar</button>
+        </form>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Fabricante</th>
+              <th>CVEs na base</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for name, count in page %}
+              <tr>
+                <td><a href="?fabricante={{ name|urlencode }}">{{ name }}</a></td>
+                <td>{{ count }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="2" class="empty">Nenhum fabricante corresponde a "{{ vendor_filter }}".</td>
+              </tr>
             {% endfor %}
-          </div>
-        </article>
-      {% endwith %}
-    {% empty %}
-      <p class="muted">
-        {% if query %}Nenhuma CVE da base corresponde a "{{ query }}".{% else %}Digite uma referência ou produto para consultar a base.{% endif %}
-      </p>
-    {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif mode == "products" %}
+      <p class="muted"><a href="{% url 'cve' %}">Fabricantes</a> › {{ vendor }}</p>
+      <h2>Produtos de {{ vendor }}</h2>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>CVEs na base</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for name, count in products %}
+              <tr>
+                <td><a href="?fabricante={{ vendor|urlencode }}&amp;produto={{ name|urlencode }}">{{ name }}</a></td>
+                <td>{{ count }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="2" class="empty">Nenhum produto deste fabricante na base.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      {% if product %}
+        <p class="muted">
+          <a href="{% url 'cve' %}">Fabricantes</a> › <a href="?fabricante={{ vendor|urlencode }}">{{ vendor }}</a> › {{ product }}
+        </p>
+      {% endif %}
+      <p class="muted">{{ page.paginator.count }} CVE(s), da maior nota para a menor.</p>
+      {% for row in rows %}
+        {% with item=row.item %}
+          <article class="cve-item">
+            <h2><a href="{% url 'cve_detail' item.cve %}">{{ item.cve }}</a></h2>
+            <p>
+              <strong>{{ item.fabricante }} · {{ item.produto }}</strong>
+            </p>
+            <p>{{ item.nome }}</p>
+            <p class="muted">{{ item.descricao }}</p>
+            <p class="muted">
+              Incluída no KEV em {{ item.adicionada }} · prazo de correção {{ item.prazo }}
+              {% if item.ransomware %}· usada em campanhas de ransomware{% endif %}
+              {% if item.cwes %}· {{ item.cwes|join:", " }}{% endif %}
+            </p>
+            <div class="inline">
+              <span class="badge">CVSS {{ item.cvss|default:"Não informado" }}</span>
+              <a class="button" href="{% url 'cve_detail' item.cve %}">Explicação em português</a>
+              {% if row.registered %}
+                <a class="button" href="{% url 'collection' 'finding' %}?vulnerability={{ row.registered }}">Já está no catálogo · ver ativos afetados</a>
+                {% if can_link %}<a class="button" href="{% url 'create' 'finding' %}?vulnerability={{ row.registered }}&amp;voltar={{ request.get_full_path|urlencode }}">Vincular a um ativo</a>{% endif %}
+              {% elif can_add %}
+                <a class="button primary" href="{% url 'create' 'vulnerability' %}?{{ row.prefill }}">Cadastrar no catálogo</a>
+              {% endif %}
+              <a href="https://nvd.nist.gov/vuln/detail/{{ item.cve }}" rel="noopener noreferrer" target="_blank">Detalhes no NVD ↗</a>
+            </div>
+          </article>
+        {% endwith %}
+      {% empty %}
+        <p class="muted">
+          {% if query %}Nenhuma CVE da base corresponde a "{{ query }}".{% else %}Nenhuma CVE deste produto na base.{% endif %}
+        </p>
+      {% endfor %}
+    {% endif %}
+    {% if page and page.paginator.num_pages > 1 %}
+      <div class="pagination">
+        {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}{{ filters }}">← Anterior</a>{% endif %}
+        <span>Página {{ page.number }} de {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?page={{ page.next_page_number }}{{ filters }}">Próxima →</a>{% endif %}
+      </div>
+    {% endif %}
   </section>
 {% endblock %}

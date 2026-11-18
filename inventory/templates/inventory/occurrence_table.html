@@ -1,0 +1,32 @@
+{# Linhas (equipamento, vulnerabilidade, situação) de Inventario.ocorrencias_da_referencia. #}
+<div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Ativo</th>
+        <th>Lotação</th>
+        <th>Vulnerabilidade</th>
+        <th>CVSS</th>
+        <th>Situação</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for equipment, vuln, status in rows %}
+        <tr>
+          <td><a href="{% url 'asset_detail' equipment.id %}">{{ equipment.hostname }}</a></td>
+          <td>{{ equipment.lotacao }}</td>
+          <td>
+            {{ vuln.descricao }}
+            <small>{% if vuln.cve %}<a href="{% url 'occurrences' %}?ref={{ vuln.cve }}">{{ vuln.cve }}</a>{% endif %}{% if vuln.cve and vuln.cwe %} · {% endif %}{% if vuln.cwe %}<a href="{% url 'occurrences' %}?ref={{ vuln.cwe }}">{{ vuln.cwe }}</a>{% endif %}</small>
+          </td>
+          <td>{{ vuln.cvss|floatformat:1 }} <small>{{ vuln.gravidade.rotulo }}</small></td>
+          <td>{{ status.rotulo }}{% if not status.conta_no_risco %} <small>não conta no risco</small>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5" class="empty">{{ empty }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

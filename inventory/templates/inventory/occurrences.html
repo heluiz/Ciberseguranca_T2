@@ -1,0 +1,33 @@
+{% extends "inventory/base.html" %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow cyan">INVENTÁRIO / BUSCA POR REFERÊNCIA</p>
+      <h1>Onde aparece uma CVE ou um CWE<span class="cyan">.</span></h1>
+      <p class="muted">
+        Todos os ativos com a referência, da vulnerabilidade mais grave para a menos grave. Um CWE junta falhas diferentes do mesmo
+        tipo, como todas as de injeção de SQL.
+      </p>
+    </div>
+  </div>
+  <section class="panel">
+    <form class="search-form" method="get">
+      <label for="ref">CVE (CVE-2019-0708 ou 2019-0708) ou CWE (CWE-416 ou 416)</label>
+      <div class="inline">
+        <input id="ref" name="ref" value="{{ ref }}" required maxlength="40">
+        <button class="button">Buscar</button>
+      </div>
+    </form>
+    {% if error %}<p class="notice error" role="alert">{{ error }}.</p>{% endif %}
+    {% if target %}
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">{{ rows|length }} OCORRÊNCIA(S) · {{ pending }} AINDA CONTAM NO RISCO</p>
+          <h2>{{ label }}</h2>
+        </div>
+        {% if record %}<a class="button" href="{% url 'cve_detail' record.cve %}">Ver na base de CVEs exploradas</a>{% endif %}
+      </div>
+      {% include "inventory/occurrence_table.html" with empty="Nenhum ativo do inventário tem esta referência." %}
+    {% endif %}
+  </section>
+{% endblock %}
