@@ -203,7 +203,7 @@ class BancoInventario:
         if engine.dialect.name == "sqlite":
             event.listen(engine, "connect", _ligar_chaves_estrangeiras)
         self.engine = engine
-        self.caminho = make_url(str(engine.url)).render_as_string(
+        self.caminho = make_url(url or str(engine.url)).render_as_string(
             hide_password=True)
         # Mesmo atributo do ArquivoInventario: o banco não converte
         # arquivos do Trabalho 1, então nunca há migração a contar.

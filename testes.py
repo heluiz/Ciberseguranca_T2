@@ -2397,9 +2397,14 @@ class TesteDoRepositorioSQL(unittest.TestCase):
 
     def test_senha_da_url_nao_aparece(self):
         """A senha da URL não aparece nas mensagens de erro."""
-        banco = self.sql.BancoInventario(
-            "postgresql+psycopg://usuario:segredo@servidor/banco")
+        # Sem conectar: o motor é trocado pelo SQLite em memória, para o
+        # teste não depender do driver do PostgreSQL.
+        with mock.patch.object(self.sql, "create_engine",
+                               return_value=self.engine):
+            banco = self.sql.BancoInventario(
+                "postgresql+psycopg://usuario:segredo@servidor/banco")
         self.assertNotIn("segredo", banco.caminho)
+        self.assertIn("usuario", banco.caminho)
 
 
 class TesteDosAutotestes(unittest.TestCase):
